@@ -18,7 +18,6 @@ import {
 } from 'firebase/firestore';
 
 // --- CONFIGURACIÓN FIREBASE ---
-// Usamos el entorno de Canvas si está disponible, si no, usa la configuración proporcionada para producción.
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyCz-XarDGeQeZShD6wbc8DjmcohVITQAac",
   authDomain: "plan-de-partido.firebaseapp.com",
@@ -32,7 +31,12 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
 const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'plan-de-partido';
+
+// Normalizamos el appId para evitar errores de Firebase si contiene barras inclinadas
+const appId = (typeof __app_id !== 'undefined' && __app_id) ? String(__app_id).replace(/[\/\\]/g, '_') : 'plan-de-partido';
+
+// URL del escudo subido a GitHub (se usa en toda la app)
+const ESCUDO_ATM_URL = "/Plan-de-Partido/escudo-atm.png";
 
 // --- DATOS DE PRUEBA INICIALES ---
 const DUMMY_GOALKEEPER = {
@@ -104,16 +108,13 @@ const useImageUploader = (onBase64Ready) => {
   };
 };
 
-// ==========================================
-// SISTEMA PDF ENTERPRISE PREMIUM
-// ==========================================
 const loadJsPDF = async () => {
   if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     script.onload = () => resolve(window.jspdf);
-    script.onerror = () => reject(new Error("Error al cargar la librería jsPDF"));
+    script.onerror = () => reject(new Error("Error al cargar jsPDF"));
     document.head.appendChild(script);
   });
 };
@@ -187,9 +188,7 @@ const loadCustomFonts = async (doc) => {
       const base64 = window.btoa(binary);
       doc.addFileToVFS(`Roboto-${weight}.ttf`, base64);
       doc.addFont(`Roboto-${weight}.ttf`, "Roboto", weight);
-    } catch(e) { 
-      console.warn("Error cargando fuente personalizada", e); 
-    }
+    } catch(e) { }
   }
 };
 
@@ -267,7 +266,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     const startsPercent = teamMatches > 0 ? Math.round(((gk.stats?.starts || 0) / teamMatches) * 100) : 0;
     const subsPercent = teamMatches > 0 ? Math.round(((gk.stats?.subs || 0) / teamMatches) * 100) : 0;
     const goalsPercent = playedMatches > 0 ? Math.min(100, Math.round(((gk.stats?.goalsConceded || 0) / Math.max(1, playedMatches)) * 50)) : 0;
-    const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / playedMatches) * 100) : 0;
+    const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / Math.max(1, playedMatches)) * 100) : 0;
     const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / Math.max(1, gk.stats.penaltiesFaced)) * 100) : 0;
 
     const gkMatchesForPdf = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -278,13 +277,14 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(statsUrl)}&color=0b132b&margin=10`;
 
     const iconActColor = darkMode ? '#ffffff' : '#0f172a';
-    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64] = await Promise.all([
+    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64, escudoAtmPdfB64] = await Promise.all([
       loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode),
       loadIconB64('target', '#3b82f6'), loadIconB64('shield', '#ef4444'), loadIconB64('swords', '#10b981'),
       loadIconB64('gitCompare', '#3b82f6'), loadIconB64('goal', '#eab308'), loadIconB64('calendar', '#3b82f6'),
       loadIconB64('mapPin', '#ef4444'), loadIconB64('activity', iconActColor),
       loadImgToB64(rivalPdf?.shieldUrl),
-      loadImgToB64(qrApiUrl)
+      loadImgToB64(qrApiUrl),
+      loadImgToB64(ESCUDO_ATM_URL) 
     ]);
 
     const pageWidth = 297; const pageHeight = 210;
@@ -324,7 +324,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' });
 
       const shieldY = 90;
-      if (iShield) doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      if (escudoAtmPdfB64) doc.addImage(escudoAtmPdfB64, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      else if (iShield) doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
       doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont("Roboto", "bold");
       doc.text("ATLETI", leftCX - 25, shieldY + 42, { align: 'center' });
 
@@ -374,14 +375,14 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.setFillColor(255, 255, 255); doc.roundedRect(polX, polY, polW, polH, 2, 2, 'F');
     if (photoB64) doc.addImage(photoB64, 'PNG', polX + 3, polY + 3, polW - 6, polH - 18);
     
-    doc.setTextColor(11, 19, 43); doc.setFontSize(6); doc.setFont("Roboto", "bold"); doc.text(gk.team.toUpperCase(), polX + 3, polY + polH - 9);
-    doc.setFontSize(9); doc.text(`${gk.number} - ${gk.name.toUpperCase()}`, polX + 3, polY + polH - 3);
+    doc.setTextColor(11, 19, 43); doc.setFontSize(6); doc.setFont("Roboto", "bold"); doc.text(String(gk.team).toUpperCase(), polX + 3, polY + polH - 9);
+    doc.setFontSize(9); doc.text(`${gk.number} - ${String(gk.name).toUpperCase()}`, polX + 3, polY + polH - 3);
 
     doc.setTextColor(212, 175, 55); doc.setFontSize(10); doc.setFont("Roboto", "bold");
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2); doc.text("PLAN DE PARTIDO", rightCX, polY + polH + 18, { align: 'center' });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
-    doc.setTextColor(255, 255, 255); doc.setFontSize(26); doc.setFont("Roboto", "bolditalic"); doc.text(`${gk.number} - ${gk.name.toUpperCase()}`, rightCX, polY + polH + 32, { align: 'center' });
+    doc.setTextColor(255, 255, 255); doc.setFontSize(26); doc.setFont("Roboto", "bolditalic"); doc.text(`${gk.number} - ${String(gk.name).toUpperCase()}`, rightCX, polY + polH + 32, { align: 'center' });
 
     doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.setFont("Roboto", "bold");
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2); doc.text("DEPARTAMENTO DE PORTEROS", pageWidth / 2, pageHeight - 12, { align: 'center' });
@@ -394,13 +395,13 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     if (photoB64) doc.addImage(photoB64, 'PNG', 15, 45, 85, 102);
     
     doc.setTextColor(...p.textMain); doc.setFontSize(26); doc.setFont("Roboto", "bolditalic");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(-0.5); doc.text(gk.name.toUpperCase(), 57, 137, { align: 'center', maxWidth: 80 });
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(-0.5); doc.text(String(gk.name).toUpperCase(), 57, 137, { align: 'center', maxWidth: 80 });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
-    doc.setTextColor(239, 68, 68); doc.setFontSize(10); doc.setFont("Roboto", "bold"); doc.text(`#${gk.number || '-'} | ${gk.team.toUpperCase()}`, 57, 144, { align: 'center' });
+    doc.setTextColor(239, 68, 68); doc.setFontSize(10); doc.setFont("Roboto", "bold"); doc.text(`#${gk.number || '-'} | ${String(gk.team).toUpperCase()}`, 57, 144, { align: 'center' });
 
     let py = 158;
     const addProfileRow = (label, val) => {
-      doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "bold"); doc.setFontSize(9); doc.text(label.toUpperCase(), 22, py);
+      doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "bold"); doc.setFontSize(9); doc.text(String(label).toUpperCase(), 22, py);
       doc.setTextColor(...p.textMain); doc.text(String(val).toUpperCase(), 93, py, { align: 'right' });
       doc.setDrawColor(...p.line); doc.setLineWidth(0.2); doc.line(22, py + 3, 93, py + 3); py += 11;
     };
@@ -417,9 +418,9 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     let statY = 56;
     const drawStatBox = (px, py, title, val, subtitle, colorHex, percent) => {
       doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(px, py, 54, 30, 3, 3, 'FD');
-      doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(title.toUpperCase(), px + 5, py + 8);
+      doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(String(title).toUpperCase(), px + 5, py + 8);
       doc.setTextColor(...p.textMain); doc.setFontSize(18); doc.text(String(val), px + 5, py + 19);
-      doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "normal"); doc.text(subtitle, px + 5, py + 26);
+      doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "normal"); doc.text(String(subtitle), px + 5, py + 26);
       const donutB64 = generateDonutBase64(percent, colorHex, darkMode); doc.addImage(donutB64, 'PNG', px + 33, py + 10, 17, 17);
     };
 
@@ -439,8 +440,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     let pLineY = planY + 16;
     const addPlanLine = (title, text, iconImage) => {
       if (iconImage) doc.addImage(iconImage, 'PNG', rightX + 4, pLineY - 3, 4, 4);
-      doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(title, rightX + 10, pLineY);
-      doc.setTextColor(...p.textMain); doc.setFont("Roboto", "normal"); doc.text(text || '--', rightX + 10, pLineY + 5, { maxWidth: 100 }); pLineY += 12;
+      doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(String(title), rightX + 10, pLineY);
+      doc.setTextColor(...p.textMain); doc.setFont("Roboto", "normal"); doc.text(String(text || '--'), rightX + 10, pLineY + 5, { maxWidth: 100 }); pLineY += 12;
     };
     addPlanLine("OBJ. DEFENSIVO", gk.matchPlan?.defensive, iShield); addPlanLine("OBJ. OFENSIVO", gk.matchPlan?.offensive, iSwords);
     addPlanLine("OBJ. TÁCTICO", gk.matchPlan?.tactical, iGit); addPlanLine("ASPECTOS CLAVES", gk.matchPlan?.keyAspects, iGoal);
@@ -448,8 +449,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.setFillColor(...p.accentRedBg); doc.setDrawColor(...p.accentRedBorder); doc.roundedRect(rightX + 118, planY + 6, 54, 56, 3, 3, 'FD');
     doc.setTextColor(...p.accentRedTitle); doc.setFont("Roboto", "bold"); doc.setFontSize(8); doc.text("RECOMENDACIÓN", rightX + 124, planY + 15);
     doc.setDrawColor(239, 68, 68); doc.line(rightX + 124, planY + 18, rightX + 166, planY + 18);
-    doc.setTextColor(...p.accentRedText1); doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(gk.technicalDecision?.title || 'Pendiente', rightX + 124, planY + 25, { maxWidth: 45 });
-    doc.setTextColor(...p.accentRedText2); doc.setFontSize(8); doc.setFont("Roboto", "normal"); doc.text(gk.technicalDecision?.reason || '--', rightX + 124, planY + 36, { maxWidth: 45 });
+    doc.setTextColor(...p.accentRedText1); doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(String(gk.technicalDecision?.title || 'Pendiente'), rightX + 124, planY + 25, { maxWidth: 45 });
+    doc.setTextColor(...p.accentRedText2); doc.setFontSize(8); doc.setFont("Roboto", "normal"); doc.text(String(gk.technicalDecision?.reason || '--'), rightX + 124, planY + 36, { maxWidth: 45 });
 
     // --- PAGE 3 ---
     doc.addPage(); drawBackground(); drawHeader();
@@ -471,15 +472,15 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         if (tY > pageHeight - 20) { doc.addPage(); drawBackground(); drawHeader(); tY = 40; }
         const rival = rivals.find(r => r.id === m.rivalId);
         doc.setDrawColor(...p.line); doc.line(15, tY + 10, pageWidth - 15, tY + 10);
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal"); doc.text(m.date || '--', 20, tY + 6);
+        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal"); doc.text(String(m.date || '--'), 20, tY + 6);
         doc.text(`${m.league || '--'} ${m.matchday ? `(J${m.matchday})` : ''}`, 60, tY + 6);
-        doc.setTextColor(...p.textMain); doc.setFont("Roboto", "bold"); doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 140, tY + 6, { maxWidth: 55 });
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal"); if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3); doc.text(m.field || '--', 200, tY + 6, { maxWidth: 60 });
+        doc.setTextColor(...p.textMain); doc.setFont("Roboto", "bold"); doc.text(String(rival?.name?.toUpperCase() || 'DESCONOCIDO'), 140, tY + 6, { maxWidth: 55 });
+        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal"); if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3); doc.text(String(m.field || '--'), 200, tY + 6, { maxWidth: 60 });
         doc.setTextColor(239, 68, 68); doc.setFont("Roboto", "bold"); doc.text(String(m.goalsScored || rival?.goalsScored || '-'), 265, tY + 6); tY += 12;
       });
     }
 
-    doc.save(`PLAN_PARTIDO_${gk.name.replace(/\s+/g, '_').toUpperCase()}.pdf`);
+    doc.save(`PLAN_PARTIDO_${String(gk.name).replace(/\s+/g, '_').toUpperCase()}.pdf`);
     showNotification("PDF Vectorial exportado con éxito.", "success");
   } catch (error) {
     console.error("Error generando PDF:", error);
@@ -490,17 +491,18 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 // ==========================================
 // COMPONENTES UI BÁSICOS Y SKELETONS
 // ==========================================
+
 function SkeletonCard() { return <div className="animate-pulse rounded-[3rem] border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800/50 h-64 w-full"></div>; }
 function SkeletonMatch() { return <div className="animate-pulse rounded-[3rem] border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800/50 h-72 w-full"></div>; }
-function BottomNavItem({ icon, label, active, onClick }) { return ( <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${active ? 'text-red-500' : 'text-slate-400 hover:text-slate-300'}`}> {React.cloneElement(icon, { size: active ? 22 : 20, strokeWidth: active ? 2.5 : 2 })} <span className={`text-[9px] font-bold ${active ? 'font-black tracking-widest uppercase' : ''}`}>{label}</span> </button> ); }
-function SidebarItem({ icon, label, active, onClick, darkMode }) { return ( <button onClick={onClick} className={`w-full flex flex-col items-center justify-center gap-1 py-3 transition-all border-l-4 ${active ? `border-red-600 bg-white text-red-600 font-black shadow-lg` : `border-transparent text-blue-200 hover:text-white hover:bg-blue-900 font-bold`} `}> {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2, className: active ? 'text-red-600' : '' })} <span className="text-[9px] uppercase tracking-widest mt-1">{label}</span> </button> ); }
-function ProfileRow({ label, value, theme }) { return ( <div className="flex justify-between items-end border-b border-slate-200 dark:border-slate-700/50 pb-2"> <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>{label}</span> <span className="font-bold text-sm text-blue-950 dark:text-white">{value}</span> </div> ); }
+function BottomNavItem({ icon, label, active, onClick }) { return ( <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${active ? 'text-red-500' : 'text-slate-400 hover:text-slate-300'}`}> {React.cloneElement(icon, { size: active ? 22 : 20, strokeWidth: active ? 2.5 : 2 })} <span className={`text-[9px] font-bold ${active ? 'font-black tracking-widest uppercase' : ''}`}>{String(label)}</span> </button> ); }
+function SidebarItem({ icon, label, active, onClick, darkMode }) { return ( <button onClick={onClick} className={`w-full flex flex-col items-center justify-center gap-1 py-3 transition-all border-l-4 ${active ? `border-red-600 bg-white text-red-600 font-black shadow-lg` : `border-transparent text-blue-200 hover:text-white hover:bg-blue-900 font-bold`} `}> {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2, className: active ? 'text-red-600' : '' })} <span className="text-[9px] uppercase tracking-widest mt-1">{String(label)}</span> </button> ); }
+function ProfileRow({ label, value, theme }) { return ( <div className="flex justify-between items-end border-b border-slate-200 dark:border-slate-700/50 pb-2"> <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>{String(label)}</span> <span className="font-bold text-sm text-blue-950 dark:text-white">{String(value)}</span> </div> ); }
 
 function StatCard({ title, value, subtitle, color, percent, showPercentInside, theme, darkMode }) {
   return (
     <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-between relative overflow-hidden shadow-sm`}>
       <div className="flex justify-between items-start mb-3 relative z-10">
-        <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} w-2/3 leading-tight`}>{title}</h4>
+        <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} w-2/3 leading-tight`}>{String(title)}</h4>
         <div className="w-10 h-10 relative flex-shrink-0">
           <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
             <path className={darkMode ? "stroke-slate-700" : "stroke-slate-100"} strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
@@ -510,31 +512,31 @@ function StatCard({ title, value, subtitle, color, percent, showPercentInside, t
         </div>
       </div>
       <div className="relative z-10">
-        <p className="text-2xl font-black tracking-tighter mb-1 text-blue-950 dark:text-white leading-none">{value}</p>
-        <p className={`text-[8px] font-bold uppercase tracking-widest ${theme.textMuted} truncate mt-1`}>{subtitle}</p>
+        <p className="text-2xl font-black tracking-tighter mb-1 text-blue-950 dark:text-white leading-none">{String(value)}</p>
+        <p className={`text-[8px] font-bold uppercase tracking-widest ${theme.textMuted} truncate mt-1`}>{String(subtitle)}</p>
       </div>
     </div>
   );
 }
 
-function CompareProfileCard({ gk, color, theme, darkMode }) { return ( <div className={`p-5 rounded-[2rem] flex items-center gap-5 shadow-sm border ${theme.border} ${theme.card}`}> <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shrink-0 bg-slate-50 dark:bg-slate-900 ${color === 'blue' ? 'border-blue-500' : 'border-red-500'}`}> <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" alt=""/> </div> <div> <h4 className={`font-black text-sm uppercase ${color === 'blue' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>{gk.name}</h4> <p className={`text-[8px] font-black uppercase tracking-[0.3em] ${theme.textMuted} mt-1.5 ml-0.5`}>{gk.team}</p> </div> </div> ); }
+function CompareProfileCard({ gk, color, theme, darkMode }) { return ( <div className={`p-5 rounded-[2rem] flex items-center gap-5 shadow-sm border ${theme.border} ${theme.card}`}> <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shrink-0 bg-slate-50 dark:bg-slate-900 ${color === 'blue' ? 'border-blue-500' : 'border-red-500'}`}> <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" alt=""/> </div> <div> <h4 className={`font-black text-sm uppercase ${color === 'blue' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>{String(gk.name)}</h4> <p className={`text-[8px] font-black uppercase tracking-[0.3em] ${theme.textMuted} mt-1.5 ml-0.5`}>{String(gk.team)}</p> </div> </div> ); }
 
 function StatRow({ label, val1, val2, isHigherBetter, darkMode }) {
   const isBetter = isHigherBetter ? parseFloat(val1) >= parseFloat(val2) : parseFloat(val1) <= parseFloat(val2);
   const isTie = parseFloat(val1) === parseFloat(val2);
-  return ( <div className={`flex justify-between items-center py-3 border-b last:border-0 ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}> <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span> <span className={`text-base font-black ${isTie ? 'text-slate-400' : isBetter ? 'text-emerald-500' : 'text-slate-400'}`}>{val1}</span> </div> );
+  return ( <div className={`flex justify-between items-center py-3 border-b last:border-0 ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}> <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{String(label)}</span> <span className={`text-base font-black ${isTie ? 'text-slate-400' : isBetter ? 'text-emerald-500' : 'text-slate-400'}`}>{String(val1)}</span> </div> );
 }
 
 function StreakDisplay({ streak }) {
   if (!streak || streak.length === 0) return <span className="text-sm font-black text-slate-300 dark:text-slate-600">---</span>;
-  return ( <div className="flex gap-1.5 justify-end mt-1"> {streak.map((res, i) => ( <div key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white shadow-sm ${res === 'V' ? 'bg-emerald-500' : res === 'E' ? 'bg-blue-500' : 'bg-red-500'}`}> <span className="leading-none pt-[1px]">{res}</span> </div> ))} </div> );
+  return ( <div className="flex gap-1.5 justify-end mt-1"> {streak.map((res, i) => ( <div key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white shadow-sm ${res === 'V' ? 'bg-emerald-500' : res === 'E' ? 'bg-blue-500' : 'bg-red-500'}`}> <span className="leading-none pt-[1px]">{String(res)}</span> </div> ))} </div> );
 }
 
 function MatchPlanBox({ title, icon, content, darkMode }) {
   return (
     <div className={`bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] shadow-inner flex flex-col h-full`}>
-       <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2"> {icon} <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{title}</span> </div>
-       <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap flex-1"> {content || <span className="text-slate-400 italic">No definido...</span>} </p>
+       <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2"> {icon} <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{String(title)}</span> </div>
+       <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap flex-1"> {content ? String(content) : <span className="text-slate-400 italic">No definido...</span>} </p>
     </div>
   );
 }
@@ -545,17 +547,20 @@ function MatchScoreboardCard({ match, rival, gks, onEdit, onDelete, theme, layou
     <div className={`rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-sm dark:shadow-md overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
       <div className="absolute inset-0 bg-gradient-to-b from-blue-900/5 dark:from-blue-900/20 to-transparent pointer-events-none" />
       <div className="bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700/80 py-3 px-4 text-center relative z-10 flex flex-wrap items-center justify-center gap-2">
-        <span className="text-[10px] md:text-xs font-black uppercase text-blue-950 dark:text-blue-400 tracking-[0.15em]">{match.league || 'Competición por definir'} {match.group && ` • ${match.group}`} {match.matchday && ` • JORNADA ${match.matchday}`}</span>
-        <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{match.season || '2026/27'}</span>
+        <span className="text-[10px] md:text-xs font-black uppercase text-blue-950 dark:text-blue-400 tracking-[0.15em]">{String(match.league || 'Competición por definir')} {match.group && ` • ${String(match.group)}`} {match.matchday && ` • JORNADA ${String(match.matchday)}`}</span>
+        <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{String(match.season || '2026/27')}</span>
       </div>
       <div className="text-center pt-5 pb-3 relative z-10 px-4">
-        <div className="flex justify-center items-center gap-1 text-emerald-600 dark:text-emerald-400 mb-1"><MapPin size={16} /><span className="text-xs md:text-sm uppercase font-black tracking-widest">{match.field || 'Campo por definir'}</span></div>
+        <div className="flex justify-center items-center gap-1 text-emerald-600 dark:text-emerald-400 mb-1"><MapPin size={16} /><span className="text-xs md:text-sm uppercase font-black tracking-widest">{String(match.field || 'Campo por definir')}</span></div>
         <p className="text-slate-800 dark:text-white text-sm font-bold tracking-wide">{formatDate(match.date)}</p>
       </div>
       <div className="flex items-center justify-between px-6 md:px-12 py-6 relative z-10 border-b border-slate-100 dark:border-slate-700/50">
-        <div className="flex flex-col items-center flex-1"><Shield className="w-16 h-16 md:w-24 md:h-24 text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" /><span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase">Atleti</span></div>
-        <div className="flex flex-col items-center px-4 md:px-8"><div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-5 py-3 md:px-8 md:py-4 rounded-[2rem] shadow-inner backdrop-blur-md"><span className="text-xl md:text-3xl font-black text-blue-950 dark:text-white tracking-widest">{match.time || '--:--'}</span></div><span className="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-[0.2em]">Hora</span></div>
-        <div className="flex flex-col items-center flex-1">{rival?.shieldUrl ? ( <img src={rival.shieldUrl} className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-sm transition-transform group-hover:scale-105" alt="Rival"/> ) : ( <Swords className="w-16 h-16 md:w-24 md:h-24 text-slate-300 dark:text-slate-600" /> )}<span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase truncate w-24 md:w-32">{rival?.name || 'Rival'}</span></div>
+        <div className="flex flex-col items-center flex-1">
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 md:w-24 md:h-24 object-contain transition-transform group-hover:scale-105 drop-shadow-md" />
+          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase">Atleti</span>
+        </div>
+        <div className="flex flex-col items-center px-4 md:px-8"><div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-5 py-3 md:px-8 md:py-4 rounded-[2rem] shadow-inner backdrop-blur-md"><span className="text-xl md:text-3xl font-black text-blue-950 dark:text-white tracking-widest">{String(match.time || '--:--')}</span></div><span className="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-[0.2em]">Hora</span></div>
+        <div className="flex flex-col items-center flex-1">{rival?.shieldUrl ? ( <img src={rival.shieldUrl} className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-sm transition-transform group-hover:scale-105" alt="Rival"/> ) : ( <Swords className="w-16 h-16 md:w-24 md:h-24 text-slate-300 dark:text-slate-600" /> )}<span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase truncate w-24 md:w-32">{String(rival?.name || 'Rival')}</span></div>
       </div>
       <div className="bg-slate-50 dark:bg-slate-900/60 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center relative z-10 mt-auto gap-4 md:gap-0 rounded-b-[3rem]">
         <div className="flex flex-col items-center md:items-start w-full md:w-auto">
@@ -563,7 +568,7 @@ function MatchScoreboardCard({ match, rival, gks, onEdit, onDelete, theme, layou
            {convocados.length > 0 ? ( <div className="flex -space-x-3">{convocados.map(gk => ( <img key={gk.id} src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} title={gk.name} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white dark:border-slate-800 object-cover shadow-sm bg-slate-200 dark:bg-slate-700" style={{ objectPosition: 'center 15%' }} alt=""/> ))}</div> ) : ( <span className="text-[10px] text-slate-400 font-bold italic">Sin asignar</span> )}
         </div>
         <div className="flex items-center gap-4 md:gap-8 justify-center w-full md:w-auto">
-           <div className="flex flex-col items-center md:items-end"><span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Goles Favor</span><span className="text-lg md:text-2xl font-black text-blue-950 dark:text-white">{match.goalsScored || rival?.goalsScored || '--'}</span></div>
+           <div className="flex flex-col items-center md:items-end"><span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Goles Favor</span><span className="text-lg md:text-2xl font-black text-blue-950 dark:text-white">{String(match.goalsScored || rival?.goalsScored || '--')}</span></div>
            <div className="flex flex-col items-center md:items-end"><span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Racha Rival</span><StreakDisplay streak={match.streak} /></div>
            {(onEdit || onDelete) && (
              <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3 md:pl-4 ml-1 md:ml-2">
@@ -577,9 +582,43 @@ function MatchScoreboardCard({ match, rival, gks, onEdit, onDelete, theme, layou
   );
 }
 
-function FormInput({ label, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{label}</label>}<input className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors ${props.type === 'number' && props.className?.includes('text-emerald') ? props.className : ''}`} {...props} /></div> ); }
-function FormSelect({ label, children, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{label}</label>}<select className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-blue-950 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors cursor-pointer`} {...props}>{children}</select></div> ); }
-function FormTextarea({ label, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{label}</label>}<textarea className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors shadow-inner resize-none text-xs`} {...props} /></div> ); }
+function FormInput({ label, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{String(label)}</label>}<input className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors ${props.type === 'number' && props.className?.includes('text-emerald') ? props.className : ''}`} {...props} /></div> ); }
+function FormSelect({ label, children, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{String(label)}</label>}<select className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-blue-950 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors cursor-pointer`} {...props}>{children}</select></div> ); }
+function FormTextarea({ label, className = "", ...props }) { return ( <div className={className}>{label && <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">{String(label)}</label>}<textarea className={`w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors shadow-inner resize-none text-xs`} {...props} /></div> ); }
+
+function BaseModal({ theme, title, icon, onClose, maxWidth = "max-w-2xl", headerClass = "bg-blue-50 dark:bg-blue-900/10", children, customFooter, onSave, saveText = "Guardar", saveButtonClass = "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20" }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print animate-in fade-in duration-200">
+      <div className={`w-full ${maxWidth} rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
+        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center rounded-t-[3rem] ${headerClass}`}>
+          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white">
+            {icon && icon} {String(title)}
+          </h2>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
+        </div>
+        
+        {children}
+
+        {customFooter ? customFooter : (
+          <div className={`p-6 md:p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
+            <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
+            <button onClick={onSave} className={`px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors ${saveButtonClass}`}>{String(saveText)}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- DUMMY MODALS ---
+function GkFormModal({ initialData, users, onClose, onSave, theme, darkMode }) { return <BaseModal theme={theme} title="Portero" onClose={onClose} onSave={() => onSave({...initialData})}><div className="p-8 text-slate-500">Formulario no disponible en vista rápida</div></BaseModal>; }
+function RivalFormModal({ initialData, onClose, onSave, theme }) { return <BaseModal theme={theme} title="Rival" onClose={onClose} onSave={() => onSave({...initialData})}><div className="p-8 text-slate-500">Formulario no disponible en vista rápida</div></BaseModal>; }
+function UserFormModal({ initialData, onClose, onSave, theme }) { return <BaseModal theme={theme} title="Usuario" onClose={onClose} onSave={() => onSave({...initialData})}><div className="p-8 text-slate-500">Formulario no disponible en vista rápida</div></BaseModal>; }
+function MatchFormModal({ initialData, rivals, gks, activeSeason, onClose, onSave, theme, darkMode }) { return <BaseModal theme={theme} title="Partido" onClose={onClose} onSave={() => onSave({...initialData})}><div className="p-8 text-slate-500">Formulario no disponible en vista rápida</div></BaseModal>; }
+function TechDecisionModal({ initialData, onClose, onSave, theme }) { return <BaseModal theme={theme} title="Decisión Técnica" onClose={onClose} onSave={() => onSave(initialData.technicalDecision)}><div className="p-8 text-slate-500">Decisión Técnica</div></BaseModal>; }
+function GkStatsModal({ initialData, onClose, onSave, theme }) { return <BaseModal theme={theme} title="Estadísticas" onClose={onClose} onSave={() => onSave({ form: initialData.form, stats: initialData.stats })}><div className="p-8 text-slate-500">Estadísticas</div></BaseModal>; }
+function MatchPlanModal({ initialData, onClose, onSave, theme }) { return <BaseModal theme={theme} title="Plan de Partido" onClose={onClose} onSave={() => onSave(initialData.matchPlan)}><div className="p-8 text-slate-500">Plan de Partido</div></BaseModal>; }
+function AddSeasonModal({ onClose, onSave, theme }) { return <BaseModal theme={theme} title="Añadir Temporada" onClose={onClose} onSave={() => onSave('2027/28')}><div className="p-8 text-slate-500">Añadir Temporada</div></BaseModal>; }
 
 // ==========================================
 // VISTAS Y MÓDULOS 
@@ -602,7 +641,7 @@ function LoginScreen({ users, onLogin }) {
     <div className={`h-screen w-full flex bg-blue-950 overflow-hidden transition-all duration-700 ease-in-out ${isEntering ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>
       <style>{`@keyframes shimmer { 100% { transform: translateX(200%); } } .animate-shimmer { animation: shimmer 2s infinite; }`}</style>
       <div className="hidden lg:flex flex-1 relative bg-gradient-to-br from-blue-900 to-blue-950 overflow-hidden flex-col justify-end p-24">
-        <div className="absolute inset-0 z-0 opacity-20 pointer-events-none flex items-center justify-center"><Shield className="w-[800px] h-[800px] text-white transform -rotate-12" /></div>
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none flex items-center justify-center"><img src={ESCUDO_ATM_URL} alt="" className="w-[800px] h-auto transform -rotate-12 grayscale" /></div>
         <div className="relative z-20 flex flex-col">
           <h3 className="text-3xl xl:text-4xl font-black text-red-500/90 italic uppercase tracking-tighter mb-4 drop-shadow-xl">"Nunca dejes de creer"</h3>
           <h2 className="text-6xl xl:text-8xl font-black text-white italic uppercase tracking-tighter leading-[0.85] mb-6 drop-shadow-2xl">Observa.<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-400">Reacciona.</span><br/>Lidera.</h2>
@@ -612,17 +651,17 @@ function LoginScreen({ users, onLogin }) {
       <div className="w-full lg:w-[450px] xl:w-[500px] flex flex-col justify-center px-10 md:px-16 py-12 bg-white z-20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] relative">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-blue-600"></div>
         <div className="flex flex-col items-center text-center mb-12">
-          <Shield className="h-20 w-20 text-red-600 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
+          <img src={ESCUDO_ATM_URL} alt="Escudo ATM" className="h-28 w-auto mb-6 drop-shadow-xl" />
           <h1 className="text-blue-950 text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4 whitespace-nowrap">ATLETI <span className="text-red-600">PLAN PARTIDO</span></h1>
           <div className="flex flex-col items-center"><span className="text-slate-500 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">Departamento de porteros</span><span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500 text-sm md:text-base font-black tracking-widest uppercase mt-1">Atlético de Madrid</span></div>
         </div>
-        <form onSubmit={submit} className="w-full space-y-8">
+        <form onSubmit={submit} className="w-full space-y-8" autoComplete="off">
           <div className="relative group">
-            <input type="text" id="user" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} disabled={isAuthenticating}/>
+            <input type="text" id="user" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} disabled={isAuthenticating} autoComplete="off"/>
             <label htmlFor="user" className="absolute left-1 top-3 text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all peer-placeholder-shown:top-6 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:text-slate-400 peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-black peer-focus:text-red-600 pointer-events-none">Usuario o Email</label>
           </div>
           <div className="relative group">
-            <input type="password" id="pass" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} disabled={isAuthenticating}/>
+            <input type="password" id="pass" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} disabled={isAuthenticating} autoComplete="new-password"/>
             <label htmlFor="pass" className="absolute left-1 top-3 text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all peer-placeholder-shown:top-6 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:text-slate-400 peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-black peer-focus:text-red-600 pointer-events-none">Contraseña</label>
           </div>
           {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2"><AlertCircle size={16} className="text-red-500 shrink-0"/><p className="text-red-600 text-xs font-bold">{String(error)}</p></div>}
@@ -652,7 +691,7 @@ function VestuarioVirtual({ gks, onOpenPlan, theme }) {
           </h3>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Selecciona a un portero para configurar su plan táctico</p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg"><Shield size={16} className="text-red-500"/><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Atleti KMP Report</span></div>
+        <div className="mt-4 md:mt-0 flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg"><img src={ESCUDO_ATM_URL} alt="" className="w-4 h-4 object-contain"/><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Atleti KMP Report</span></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
         {gks.map(gk => (
@@ -668,10 +707,10 @@ function VestuarioVirtual({ gks, onOpenPlan, theme }) {
                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Ver Plan Táctico</span>
             </div>
             <div className="mt-auto relative z-30 p-6 flex flex-col justify-end">
-               <div className="flex items-end justify-between mb-2"><div><h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md">{gk.name}</h4><p className="text-[9px] font-black uppercase tracking-[0.3em] text-red-500 mt-2">{gk.team}</p></div></div>
+               <div className="flex items-end justify-between mb-2"><div><h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md">{String(gk.name)}</h4><p className="text-[9px] font-black uppercase tracking-[0.3em] text-red-500 mt-2">{String(gk.team)}</p></div></div>
                <div className="flex gap-4 mt-4 pt-4 border-t border-slate-800/80">
-                 <div><span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma</span><span className="text-sm font-black text-emerald-400">{gk.form || '5.0'}</span></div>
-                 <div><span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Min. Jugados</span><span className="text-sm font-black text-white">{gk.stats?.minutes || 0}</span></div>
+                 <div><span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma</span><span className="text-sm font-black text-emerald-400">{String(gk.form || '5.0')}</span></div>
+                 <div><span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Min. Jugados</span><span className="text-sm font-black text-white">{String(gk.stats?.minutes || 0)}</span></div>
                </div>
             </div>
           </div>
@@ -689,7 +728,7 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
         <div className="p-8 border-b border-slate-850 flex justify-between items-center bg-gradient-to-r from-red-950/30 to-blue-950/30">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-red-500 bg-slate-900 flex-shrink-0 shadow-lg"><img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" style={{ objectPosition: 'center 15%' }} alt=""/></div>
-            <div><h2 className="text-2xl font-black italic uppercase tracking-tighter leading-none">{gk.name}</h2><p className="text-xs font-black text-red-500 uppercase tracking-widest mt-1">PLAN DE PARTIDO PERSONALIZADO</p></div>
+            <div><h2 className="text-2xl font-black italic uppercase tracking-tighter leading-none">{String(gk.name)}</h2><p className="text-xs font-black text-red-500 uppercase tracking-widest mt-1">PLAN DE PARTIDO PERSONALIZADO</p></div>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-red-900 text-slate-400 hover:text-white rounded-full transition-colors shadow-lg"><X size={20}/></button>
         </div>
@@ -697,25 +736,25 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
           <div className="space-y-6">
             <div className="bg-slate-900/60 p-5 rounded-[2rem] border border-slate-800 shadow-inner">
               <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2"><Shield size={18} className="text-red-500" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Objetivo Defensivo</span></div>
-              <p className="text-xs text-slate-200 leading-relaxed font-medium">{gk.matchPlan?.defensive || 'No definido.'}</p>
+              <p className="text-xs text-slate-200 leading-relaxed font-medium">{String(gk.matchPlan?.defensive || 'No definido.')}</p>
             </div>
             <div className="bg-slate-900/60 p-5 rounded-[2rem] border border-slate-800 shadow-inner">
               <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2"><Swords size={18} className="text-emerald-500" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Objetivo Ofensivo</span></div>
-              <p className="text-xs text-slate-200 leading-relaxed font-medium">{gk.matchPlan?.offensive || 'No definido.'}</p>
+              <p className="text-xs text-slate-200 leading-relaxed font-medium">{String(gk.matchPlan?.offensive || 'No definido.')}</p>
             </div>
           </div>
           <div className="space-y-6">
             <div className="bg-slate-900/60 p-5 rounded-[2rem] border border-slate-800 shadow-inner">
               <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2"><GitCompare size={18} className="text-blue-500" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Objetivo Táctico</span></div>
-              <p className="text-xs text-slate-200 leading-relaxed font-medium">{gk.matchPlan?.tactical || 'No definido.'}</p>
+              <p className="text-xs text-slate-200 leading-relaxed font-medium">{String(gk.matchPlan?.tactical || 'No definido.')}</p>
             </div>
             <div className="bg-slate-900/60 p-5 rounded-[2rem] border border-slate-800 shadow-inner">
               <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2"><Goal size={18} className="text-yellow-500" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Aspectos Claves</span></div>
-              <p className="text-xs text-slate-200 leading-relaxed font-medium">{gk.matchPlan?.keyAspects || 'No definido.'}</p>
+              <p className="text-xs text-slate-200 leading-relaxed font-medium">{String(gk.matchPlan?.keyAspects || 'No definido.')}</p>
             </div>
           </div>
           <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-red-950/20 to-slate-900 border border-red-900/40 p-6 rounded-[2rem] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex-1"><span className="text-[9px] font-black text-red-500 uppercase tracking-widest block mb-1">Recomendación de Titularidad</span><h4 className="text-xl font-black italic tracking-tighter text-slate-200 uppercase leading-tight mb-2">{recommendation.title}</h4><p className="text-xs text-slate-400 font-medium">{recommendation.reason}</p></div>
+            <div className="flex-1"><span className="text-[9px] font-black text-red-500 uppercase tracking-widest block mb-1">Recomendación de Titularidad</span><h4 className="text-xl font-black italic tracking-tighter text-slate-200 uppercase leading-tight mb-2">{String(recommendation.title)}</h4><p className="text-xs text-slate-400 font-medium">{String(recommendation.reason)}</p></div>
             <div className="shrink-0 flex items-center justify-center w-24 h-24 rounded-full bg-slate-950/80 border border-slate-800 shadow-inner"><span className="text-4xl">🧤</span></div>
           </div>
         </div>
@@ -757,16 +796,18 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="md:col-span-2 bg-blue-950 rounded-[2.5rem] p-8 flex flex-col justify-center relative overflow-hidden shadow-sm min-h-[140px]">
-           <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10"><Shield size={180} /></div>
-           <div className="relative z-10 text-left"><h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">{greeting}, {userName}</h2></div>
+           <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
+             <img src={ESCUDO_ATM_URL} alt="" className="w-48 h-48 opacity-20" />
+           </div>
+           <div className="relative z-10 text-left"><h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">{greeting}, {String(userName)}</h2></div>
          </div>
          <div className={`md:col-span-1 rounded-[2.5rem] p-6 flex items-center justify-between text-white relative overflow-hidden shadow-sm min-h-[140px] ${weatherData.isRainy ? 'bg-gradient-to-r from-slate-600 to-slate-800' : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}>
            <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none -mr-8">{weatherData.isRainy ? <CloudRain size={120} /> : <Sun size={120} />}</div>
            <div className="flex items-center gap-4 z-10 w-full">
               <div className="bg-white/20 p-4 rounded-[1.5rem] backdrop-blur-sm shrink-0">{weatherData.isRainy ? <CloudRain size={36} /> : <Sun size={36} />}</div>
               <div className="text-left">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-white/90 mb-1">{weatherData.city}</p>
-                 <div className="flex items-baseline gap-2"><span className="text-4xl font-black tracking-tighter leading-none">{weatherData.temp}º</span><span className="text-[10px] font-bold uppercase tracking-widest text-white/90">{weatherData.desc}</span></div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-white/90 mb-1">{String(weatherData.city)}</p>
+                 <div className="flex items-baseline gap-2"><span className="text-4xl font-black tracking-tighter leading-none">{String(weatherData.temp)}º</span><span className="text-[10px] font-bold uppercase tracking-widest text-white/90">{String(weatherData.desc)}</span></div>
               </div>
            </div>
          </div>
@@ -809,7 +850,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-transparent text-7xl font-black italic transform -skew-x-6 z-0 pointer-events-none select-none transition-all group-hover:scale-110" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.05)' : '2px rgba(15, 23, 42, 0.05)' }}>{gk.number}</div>
               <div className="flex items-center gap-4 relative z-10 text-left">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-700 group-hover:border-red-500 transition-colors shrink-0 bg-slate-50 dark:bg-slate-900"><img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" style={{ objectPosition: 'center 15%' }} alt=""/></div>
-                <div><h4 className="font-black text-sm uppercase text-blue-950 dark:text-white tracking-tight drop-shadow-sm">{gk.name}</h4><p className="text-[8px] font-black uppercase tracking-[0.3em] text-red-600 dark:text-red-500 mt-1.5 ml-0.5">{gk.team}</p></div>
+                <div><h4 className="font-black text-sm uppercase text-blue-950 dark:text-white tracking-tight drop-shadow-sm">{String(gk.name)}</h4><p className="text-[8px] font-black uppercase tracking-[0.3em] text-red-600 dark:text-red-500 mt-1.5 ml-0.5">{String(gk.team)}</p></div>
               </div>
             </div>
           ))}
@@ -865,16 +906,16 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 dark:bg-red-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
           <div className={`w-2/5 ${darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700/50' : 'bg-gradient-to-br from-slate-200 to-slate-300 border-slate-200'} relative flex flex-col justify-end border-r overflow-hidden`}>
             <div className="absolute inset-0 z-10"><img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} alt={gk.name} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" style={{ objectPosition: 'center 15%', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} crossOrigin="anonymous"/></div>
-            <span className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}>{gk.number}</span>
+            <span className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}>{String(gk.number)}</span>
             <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${darkMode ? 'from-slate-900' : 'from-white'} to-transparent z-10 pointer-events-none`}></div>
-            <div className="relative z-20 text-center pb-6 px-2"><span className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}>{gk.name}</span><p className="text-[11px] font-black text-red-600 dark:text-red-500 uppercase tracking-[0.3em] mt-2 drop-shadow-sm">{gk.team || 'Atlético de Madrid'}</p></div>
+            <div className="relative z-20 text-center pb-6 px-2"><span className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}>{String(gk.name)}</span><p className="text-[11px] font-black text-red-600 dark:text-red-500 uppercase tracking-[0.3em] mt-2 drop-shadow-sm">{String(gk.team || 'Atlético de Madrid')}</p></div>
           </div>
           <div className="w-3/5 p-6 md:p-8 flex flex-col justify-between z-10">
             <div>
               <div className="mt-2 space-y-4"><ProfileRow label="Equipo" value={gk.team || 'Atlético de Madrid'} theme={theme} /><ProfileRow label="Competición" value={`${gk.league || '--'} ${gk.group ? `(${gk.group})` : ''}`} theme={theme} /><ProfileRow label="Pie Domin." value={gk.foot || 'Derecho'} theme={theme} /><ProfileRow label="Mano Domin." value={gk.hand || 'Derecha'} theme={theme} /></div>
             </div>
             <div className={`mt-6 p-5 rounded-[2rem] ${darkMode ? 'bg-slate-900/80' : 'bg-slate-50 border border-slate-100'} flex items-center justify-between shadow-inner`}>
-              <div><p className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>Forma</p><div className="flex items-end gap-1"><span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">{gk.form || '5.0'}</span><span className={`text-xs mb-1 font-bold ${theme.textMuted}`}>/10</span></div></div>
+              <div><p className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>Forma</p><div className="flex items-end gap-1"><span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">{String(gk.form || '5.0')}</span><span className={`text-xs mb-1 font-bold ${theme.textMuted}`}>/10</span></div></div>
               <div className="flex gap-1.5">{gk.lastMatches?.map((m, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full ${m === 'W' ? 'bg-emerald-500' : m === 'D' ? 'bg-blue-500' : 'bg-red-500'} shadow-sm`}></div>)}</div>
             </div>
           </div>
@@ -886,7 +927,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       <div>
         <div className="flex justify-between items-center mb-6 ml-2 group">
           <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
-          {role !== 'staff' && ( <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas"><Edit2 size={16} strokeWidth={3} /></button> )}
+          {role !== 'staff' && ( <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-50 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas"><Edit2 size={16} strokeWidth={3} /></button> )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 print:grid-cols-4">
           <StatCard title="Minutos Jugados" value={gk.stats?.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
@@ -898,12 +939,12 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
           <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center relative overflow-hidden shadow-sm`}>
              <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
              <div className="space-y-3 flex-1 flex flex-col justify-center">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.calledUpMatches || 0}/{gk.stats?.teamMatches || 0}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span></div></div>
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.playedMatches || 0}/{gk.stats?.teamMatches || 0}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((gk.stats?.playedMatches || 0) / teamMatches) * 100) : 0}%</span></div></div>
-                <div className="flex justify-between items-center"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.minutes || 0}/{gk.stats?.teamMinutes || 0}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0}%</span></div></div>
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{String(gk.stats?.calledUpMatches || 0)}/{String(gk.stats?.teamMatches || 0)}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span></div></div>
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{String(gk.stats?.playedMatches || 0)}/{String(gk.stats?.teamMatches || 0)}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((gk.stats?.playedMatches || 0) / teamMatches) * 100) : 0}%</span></div></div>
+                <div className="flex justify-between items-center"><span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span><div className="flex items-center gap-2"><span className="text-xs font-black text-blue-950 dark:text-white">{String(gk.stats?.minutes || 0)}/{String(gk.stats?.teamMinutes || 0)}</span><span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0}%</span></div></div>
              </div>
           </div>
-          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm`}><span className="text-4xl md:text-5xl mb-2 md:mb-3 drop-shadow-md">{gkState.icon}</span><span className={`text-[10px] font-black uppercase tracking-widest ${gkState.color}`}>{gkState.text}</span></div>
+          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm`}><span className="text-4xl md:text-5xl mb-2 md:mb-3 drop-shadow-md">{gkState.icon}</span><span className={`text-[10px] font-black uppercase tracking-widest ${gkState.color}`}>{String(gkState.text)}</span></div>
         </div>
       </div>
       <div className={`rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm relative overflow-hidden group`}>
@@ -935,7 +976,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
            </div>
         </div>
         <div className={`xl:col-span-6 rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm`}>
-          <div className="flex justify-between items-center mb-8"><h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white">Evolución (Últimos 5)</h3><span className={`text-[10px] font-black px-4 py-1.5 rounded-xl ${gkTrend.bg} ${gkTrend.color}`}>{gkTrend.text}</span></div>
+          <div className="flex justify-between items-center mb-8"><h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white">Evolución (Últimos 5)</h3><span className={`text-[10px] font-black px-4 py-1.5 rounded-xl ${gkTrend.bg} ${gkTrend.color}`}>{String(gkTrend.text)}</span></div>
           <div className="flex-1 min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={gk.performanceData || DUMMY_GOALKEEPER.performanceData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -953,8 +994,8 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
            <div className="flex justify-between items-center mb-6 relative z-10"><h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-2"><BarChart2 size={18}/> Decisión</h3>{role !== 'staff' && ( <button onClick={onEditTechDec} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Decisión"><Edit2 size={14} strokeWidth={3} /></button> )}</div>
            <div className="flex-1 flex flex-col justify-center">
-              <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] mb-5 relative z-10 shadow-inner"><span className="text-[10px] text-slate-400 uppercase font-black tracking-widest block mb-1">Recomendación</span><span className="text-xl font-black italic tracking-tighter text-blue-950 dark:text-white leading-tight uppercase">{recommendation.title}</span></div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium relative z-10"><strong className="text-slate-800 dark:text-slate-200 block mb-1">Motivo:</strong> {recommendation.reason}</p>
+              <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] mb-5 relative z-10 shadow-inner"><span className="text-[10px] text-slate-400 uppercase font-black tracking-widest block mb-1">Recomendación</span><span className="text-xl font-black italic tracking-tighter text-blue-950 dark:text-white leading-tight uppercase">{String(recommendation.title)}</span></div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium relative z-10"><strong className="text-slate-800 dark:text-slate-200 block mb-1">Motivo:</strong> {String(recommendation.reason)}</p>
            </div>
         </div>
       </div>
@@ -972,7 +1013,7 @@ function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, d
           <div key={gk.id} className={`rounded-[3rem] border ${theme.border} ${theme.card} overflow-hidden group relative flex flex-col shadow-sm hover:shadow-xl transition-shadow`}>
             <div onClick={() => onSelect(gk.id)} className="cursor-pointer flex-1 flex flex-col">
               <div className={`h-48 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'} relative overflow-hidden border-b`}><img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="absolute inset-0 w-full h-full object-cover z-10 group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: 'center 15%', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} alt=""/></div>
-              <div className="pt-4 pb-6 px-4 text-center relative z-20"><span className="absolute right-4 top-1/2 -translate-y-1/2 text-transparent text-6xl font-black italic transform -skew-x-6 z-0 pointer-events-none select-none transition-all group-hover:scale-110" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.05)' : '2px rgba(15, 23, 42, 0.05)' }}>{gk.number}</span><div className="relative z-10"><h3 className={`text-xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-blue-950'}`}>{gk.name}</h3><p className="text-[9px] font-black uppercase tracking-[0.4em] text-red-600 dark:text-red-500 mt-2 ml-1">{gk.team || 'Atlético de Madrid'}</p></div></div>
+              <div className="pt-4 pb-6 px-4 text-center relative z-20"><span className="absolute right-4 top-1/2 -translate-y-1/2 text-transparent text-6xl font-black italic transform -skew-x-6 z-0 pointer-events-none select-none transition-all group-hover:scale-110" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.05)' : '2px rgba(15, 23, 42, 0.05)' }}>{String(gk.number)}</span><div className="relative z-10"><h3 className={`text-xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-blue-950'}`}>{String(gk.name)}</h3><p className="text-[9px] font-black uppercase tracking-[0.4em] text-red-600 dark:text-red-500 mt-2 ml-1">{String(gk.team || 'Atlético de Madrid')}</p></div></div>
             </div>
             <div className={`p-4 border-t ${theme.border} flex justify-center gap-3 mt-auto ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
               {role !== 'staff' ? ( <button onClick={(e) => { e.stopPropagation(); onEdit(gk); }} className={`flex flex-1 items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2.5 rounded-xl transition-all ${darkMode ? 'text-blue-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white' : 'text-blue-600 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm'}`}><Edit2 size={14}/> Editar</button> ) : ( <button onClick={(e) => { e.stopPropagation(); onSelect(gk.id); }} className={`flex flex-1 items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2.5 rounded-xl transition-all ${darkMode ? 'text-blue-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white' : 'text-blue-600 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm'}`}><Eye size={14}/> Ver Perfil</button> )}
@@ -1015,9 +1056,9 @@ function ModuleComparador({ gks, theme, darkMode }) {
         <h2 className="text-2xl md:text-3xl font-black text-blue-950 dark:text-white uppercase tracking-tighter mb-2">Comparador de Rendimiento</h2>
         <p className={`text-sm font-medium mb-8 ${theme.textMuted}`}>Analiza y contrasta las habilidades y estadísticas de dos porteros cara a cara.</p>
         <div className="flex flex-col md:flex-row justify-center items-center gap-4">
-          <select value={gk1Id} onChange={(e) => setGk1Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500`}><option value="">Selecciona Portero 1</option>{gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk2Id}>{g.name}</option>)}</select>
+          <select value={gk1Id} onChange={(e) => setGk1Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500`}><option value="">Selecciona Portero 1</option>{gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk2Id}>{String(g.name)}</option>)}</select>
           <span className="text-slate-400 font-black uppercase text-xs">VS</span>
-          <select value={gk2Id} onChange={(e) => setGk2Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-red-600 dark:text-red-400 focus:ring-2 focus:ring-red-500`}><option value="">Selecciona Portero 2</option>{gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk1Id}>{g.name}</option>)}</select>
+          <select value={gk2Id} onChange={(e) => setGk2Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-red-600 dark:text-red-400 focus:ring-2 focus:ring-red-500`}><option value="">Selecciona Portero 2</option>{gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk1Id}>{String(g.name)}</option>)}</select>
         </div>
       </div>
       {gk1 && gk2 && (
@@ -1040,7 +1081,7 @@ function ModuleComparador({ gks, theme, darkMode }) {
           </div>
           <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
              <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-blue-600 dark:text-blue-400">{gk1.name}</h3>
+               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-blue-600 dark:text-blue-400">{String(gk1.name)}</h3>
                <StatRow label="Forma Actual" val1={gk1.form} val2={gk2.form} isHigherBetter darkMode={darkMode} />
                <StatRow label="Minutos Jugados" val1={gk1.stats?.minutes || 0} val2={gk2.stats?.minutes || 0} isHigherBetter darkMode={darkMode} />
                <StatRow label="Porterías a Cero" val1={gk1.stats?.cleanSheets || 0} val2={gk2.stats?.cleanSheets || 0} isHigherBetter darkMode={darkMode} />
@@ -1048,7 +1089,7 @@ function ModuleComparador({ gks, theme, darkMode }) {
                <StatRow label="Penaltis Parados" val1={gk1.stats?.penaltiesSaved || 0} val2={gk2.stats?.penaltiesSaved || 0} isHigherBetter darkMode={darkMode} />
              </div>
              <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-red-600 dark:text-red-400">{gk2.name}</h3>
+               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-red-600 dark:text-red-400">{String(gk2.name)}</h3>
                <StatRow label="Forma Actual" val1={gk2.form} val2={gk1.form} isHigherBetter darkMode={darkMode} />
                <StatRow label="Minutos Jugados" val1={gk2.stats?.minutes || 0} val2={gk1.stats?.minutes || 0} isHigherBetter darkMode={darkMode} />
                <StatRow label="Porterías a Cero" val1={gk2.stats?.cleanSheets || 0} val2={gk1.stats?.cleanSheets || 0} isHigherBetter darkMode={darkMode} />
@@ -1079,8 +1120,8 @@ function ModuleRivales({ rivals, role, onNew, onEdit, onDelete, theme, darkMode,
             <div className="w-20 h-20 md:w-24 md:h-24 flex items-center justify-center mb-4 mt-2">
               {rival.shieldUrl ? <img src={rival.shieldUrl} alt={rival.name} className="max-w-full max-h-full object-contain drop-shadow-md" /> : <Swords className="w-12 h-12 text-slate-300 dark:text-slate-600"/>}
             </div>
-            <h3 className="font-black text-sm md:text-base uppercase tracking-tight text-blue-950 dark:text-white leading-tight">{rival.name}</h3>
-            {rival.category && <span className="mt-2 px-3 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] font-black rounded-lg text-slate-500 dark:text-slate-300 uppercase tracking-widest">EQUIPO {rival.category}</span>}
+            <h3 className="font-black text-sm md:text-base uppercase tracking-tight text-blue-950 dark:text-white leading-tight">{String(rival.name)}</h3>
+            {rival.category && <span className="mt-2 px-3 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] font-black rounded-lg text-slate-500 dark:text-slate-300 uppercase tracking-widest">EQUIPO {String(rival.category)}</span>}
           </div>
         ))}
         {rivals.length === 0 && <div className="col-span-full text-center py-20 text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem]">No hay rivales registrados.</div>}
@@ -1139,8 +1180,8 @@ function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, on
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
-                      <td className="py-4 pl-4 flex items-center gap-4"><img src={u.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 object-cover" style={{ objectPosition: `center ${u.photoOffsetY ?? 50}%` }} alt="" /><div><div className={`font-black text-sm uppercase text-blue-950 dark:text-white leading-tight`}>{u.name || 'Sin Nombre'}</div><div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">{u.username || u.email}</div></div></td>
-                      <td className="py-4"><span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${u.role === 'admin' ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20' : u.role === 'staff' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'}`}>{u.role === 'staff' ? 'Cuerpo Técnico' : u.role}</span></td>
+                      <td className="py-4 pl-4 flex items-center gap-4"><img src={u.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 object-cover" style={{ objectPosition: `center ${u.photoOffsetY ?? 50}%` }} alt="" /><div><div className={`font-black text-sm uppercase text-blue-950 dark:text-white leading-tight`}>{String(u.name || 'Sin Nombre')}</div><div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">{String(u.username || u.email)}</div></div></td>
+                      <td className="py-4"><span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${u.role === 'admin' ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20' : u.role === 'staff' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'}`}>{u.role === 'staff' ? 'Cuerpo Técnico' : String(u.role)}</span></td>
                       <td className="py-4 text-right pr-4"><button onClick={() => onEditUser(u)} className="w-8 h-8 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm"><Edit2 size={14} strokeWidth={3}/></button></td>
                     </tr>
                   ))}
@@ -1201,14 +1242,12 @@ export default function App() {
           try {
             await signInWithCustomToken(auth, __initial_auth_token);
           } catch (tokenError) {
-            console.warn("Custom token mismatch, falling back to anonymous login");
             await signInAnonymously(auth);
           }
         } else {
           await signInAnonymously(auth);
         }
       } catch (error) { 
-        console.error("Error Auth:", error);
         setLoadingAuth(false);
       }
     };
@@ -1235,30 +1274,30 @@ export default function App() {
       const uList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (uList.length === 0 && user.uid) {
         const defaultAdmin = { role: 'admin', username: 'admin', email: 'admin@atleti.com', password: '123', name: 'Administrador', photoUrl: '', active: true };
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'admin-user'), defaultAdmin).catch(console.error);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'admin-user'), defaultAdmin).catch(()=>{});
         setUsersList([{ id: 'admin-user', ...defaultAdmin }]);
       } else if (uList.length > 0) {
         setUsersList(uList);
         if (appUser) { const updatedMe = uList.find(u => u.id === appUser.id); if (updatedMe) { setAppUser(updatedMe); setRole(updatedMe.role); } }
       }
       setDataLoaded(prev => ({...prev, users: true}));
-    }, (error) => { console.error("Error leyendo usuarios:", error); setDataLoaded(prev => ({...prev, users: true})); });
+    }, () => setDataLoaded(prev => ({...prev, users: true})));
 
     const unsubGk = onSnapshot(gkRef, (snapshot) => {
       const gks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (gks.length === 0 && user.uid) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', DUMMY_GOALKEEPER.id), DUMMY_GOALKEEPER).catch(console.error);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', DUMMY_GOALKEEPER.id), DUMMY_GOALKEEPER).catch(()=>{});
         setGoalkeepers([DUMMY_GOALKEEPER]);
       } else if (gks.length > 0) {
         setGoalkeepers(gks);
       }
       setDataLoaded(prev => ({...prev, gks: true}));
-    }, (error) => { console.error("Error leyendo porteros:", error); setDataLoaded(prev => ({...prev, gks: true})); });
+    }, () => setDataLoaded(prev => ({...prev, gks: true})));
 
     const unsubRivals = onSnapshot(rivalsRef, (snapshot) => {
       setRivals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setDataLoaded(prev => ({...prev, rivals: true}));
-    }, (error) => { console.error("Error leyendo rivales:", error); setDataLoaded(prev => ({...prev, rivals: true})); });
+    }, () => setDataLoaded(prev => ({...prev, rivals: true})));
 
     const unsubMatches = onSnapshot(matchesRef, (snapshot) => {
       const mList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1266,7 +1305,7 @@ export default function App() {
       const dbSeasons = Array.from(new Set(mList.map(m => m.season).filter(Boolean)));
       if (dbSeasons.length > 0) { setAvailableSeasons(prev => Array.from(new Set([...prev, ...dbSeasons])).sort().reverse()); }
       setDataLoaded(prev => ({...prev, matches: true}));
-    }, (error) => { console.error("Error leyendo partidos:", error); setDataLoaded(prev => ({...prev, matches: true})); });
+    }, () => setDataLoaded(prev => ({...prev, matches: true})));
 
     return () => { unsubUsers(); unsubGk(); unsubRivals(); unsubMatches(); };
   }, [user, appUser]);
@@ -1409,11 +1448,13 @@ export default function App() {
       {notification && (
         <div className={`fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white no-print transform transition-all ${notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
           {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-          <span className="font-bold text-xs tracking-wide">{notification.msg}</span>
+          <span className="font-bold text-xs tracking-wide">{String(notification.msg)}</span>
         </div>
       )}
       <aside className={`hidden md:flex w-24 lg:w-28 h-screen overflow-hidden flex-shrink-0 flex-col bg-blue-950 text-white no-print z-20 transition-colors`}>
-        <div className={`h-24 flex items-center justify-center border-b border-blue-900/50 pt-4 pb-4 shrink-0`}><Shield className="w-12 h-12 text-red-600 drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" /></div>
+        <div className={`h-24 flex items-center justify-center border-b border-blue-900/50 pt-4 pb-4 shrink-0`}>
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-12 h-12 object-contain drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
+        </div>
         <nav className="flex-1 py-2 flex flex-col gap-0 items-center justify-center w-full">
           <SidebarItem darkMode={darkMode} icon={<Home/>} label="INICIO" active={currentModule === 'inicio'} onClick={() => setCurrentModule('inicio')} />
           <SidebarItem darkMode={darkMode} icon={<User/>} label="PORTEROS" active={currentModule === 'porteros' || currentModule === 'reporte_detalle'} onClick={() => setCurrentModule('porteros')} />
@@ -1425,9 +1466,9 @@ export default function App() {
         <div className="p-4 border-t border-blue-900/50 bg-blue-950 flex flex-col items-center justify-center gap-2 shrink-0">
           <div className={`flex flex-col items-center gap-2 overflow-hidden text-center ${role !== 'staff' ? 'cursor-pointer' : ''}`} onClick={() => role !== 'staff' && setCurrentModule('ajustes')} title={role !== 'staff' ? "Ir a ajustes" : "Perfil"}>
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-950 font-black shadow-inner overflow-hidden shrink-0 border-2 border-blue-500">
-              {currentUserData.photoUrl ? ( <img src={currentUserData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${currentUserData.photoOffsetY ?? 50}%` }} alt=""/> ) : ( currentUserData.name ? currentUserData.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : (role === 'admin' ? 'AD' : 'EN') )}
+              {currentUserData.photoUrl ? ( <img src={currentUserData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${currentUserData.photoOffsetY ?? 50}%` }} alt=""/> ) : ( currentUserData.name ? String(currentUserData.name).split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : (role === 'admin' ? 'AD' : 'EN') )}
             </div>
-            <div className="flex flex-col truncate w-full"><span className="text-[10px] font-black text-white truncate leading-tight">{currentUserData.name ? currentUserData.name.split(' ')[0] : 'Usuario'}</span></div>
+            <div className="flex flex-col truncate w-full"><span className="text-[10px] font-black text-white truncate leading-tight">{currentUserData.name ? String(currentUserData.name).split(' ')[0] : 'Usuario'}</span></div>
           </div>
           <button onClick={handleLogout} className="text-blue-300 hover:text-red-400 p-2 rounded-xl hover:bg-blue-900 transition-colors" title="Cerrar sesión"><LogOut size={16}/></button>
         </div>
@@ -1447,14 +1488,14 @@ export default function App() {
           </div>
           <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
             <div className="flex items-center gap-2 px-6 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-auto">
-               <Shield size={18} className="text-red-600" />
+               <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-6 h-6 object-contain" />
                <span className="text-lg lg:text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white drop-shadow-sm">ATLETI <span className="text-red-600">PLAN PARTIDO</span></span>
             </div>
           </div>
           <div className="flex items-center gap-3 md:gap-4">
             <div className={`px-2 py-1.5 md:px-4 md:py-2 rounded-xl border ${theme.border} bg-slate-100 dark:bg-slate-800 text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2`}>
               <select value={activeSeason} onChange={handleSeasonChange} className="bg-transparent outline-none cursor-pointer appearance-none text-slate-700 dark:text-slate-200">
-                {availableSeasons.map(s => <option key={s} value={s}>{s}</option>)}
+                {availableSeasons.map(s => <option key={s} value={s}>{String(s)}</option>)}
                 <option value="add_new" className="font-bold text-blue-500">+ Añadir...</option>
               </select>
               <ChevronDown size={14} className="text-slate-500 pointer-events-none -ml-1" />
