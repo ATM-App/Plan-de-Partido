@@ -1,5 +1,5 @@
 {
-  "name": "plan-partido-atm",
+  "name": "plan-de-partido",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "predeploy": "npm run build",
-    "deploy": "npx gh-pages -d dist"
+    "preview": "vite preview"
   },
   "dependencies": {
     "firebase": "^10.0.0",
@@ -20,7 +19,6 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.0",
-    "gh-pages": "^6.1.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "vite": "^5.1.0"
