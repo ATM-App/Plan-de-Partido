@@ -320,13 +320,14 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 
     // Carga de Recursos Asíncronos
     const iconActColor = darkMode ? '#ffffff' : '#0f172a';
-    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64] = await Promise.all([
+    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64, atletiShieldB64] = await Promise.all([
       loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode),
       loadIconB64('target', '#3b82f6'), loadIconB64('shield', '#ef4444'), loadIconB64('swords', '#10b981'),
       loadIconB64('gitCompare', '#3b82f6'), loadIconB64('goal', '#eab308'), loadIconB64('calendar', '#3b82f6'),
       loadIconB64('mapPin', '#ef4444'), loadIconB64('activity', iconActColor),
       loadImgToB64(rivalPdf?.shieldUrl),
-      loadImgToB64(qrApiUrl)
+      loadImgToB64(qrApiUrl),
+      loadImgToB64(ESCUDO_ATM_URL)
     ]);
 
     const pageWidth = 297; const pageHeight = 210;
@@ -410,7 +411,12 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       const shieldY = 90;
 
       // Atleti
-      if (iShield) doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      if (atletiShieldB64) {
+          doc.addImage(atletiShieldB64, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      } else if (iShield) {
+          doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      }
+
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
@@ -907,6 +913,15 @@ export default function App() {
     const rivalsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rivals');
     const matchesRef = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
 
+    // 1. CREAMOS UN MANEJADOR DE ERRORES PARA EVITAR LA CARGA INFINITA
+    const handleError = (error) => {
+      console.error("Firestore Error detectado:", error);
+      // Forzamos que se quite la pantalla de carga aunque haya fallado
+      setDataLoaded({ users: true, gks: true, rivals: true, matches: true });
+      // Mostramos la notificación al usuario
+      showNotification("Error de permisos o conexión con la base de datos.", "error");
+    };
+
     const unsubUsers = onSnapshot(usersRef, (snapshot) => {
       const uList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
@@ -932,23 +947,23 @@ export default function App() {
         }
       }
       setDataLoaded(prev => ({...prev, users: true}));
-    });
+    }, handleError); // <-- Añadimos el manejador aquí
 
     const unsubGk = onSnapshot(gkRef, (snapshot) => {
       const gks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (gks.length === 0 && user.uid) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', DUMMY_GOALKEEPER.id), DUMMY_GOALKEEPER);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', DUMMY_GOALKEEPER.id), DUMMY_GOALKEEPER).catch(console.error);
         setGoalkeepers([DUMMY_GOALKEEPER]);
       } else {
         setGoalkeepers(gks);
       }
       setDataLoaded(prev => ({...prev, gks: true}));
-    });
+    }, handleError); // <-- Añadimos el manejador aquí
 
     const unsubRivals = onSnapshot(rivalsRef, (snapshot) => {
       setRivals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setDataLoaded(prev => ({...prev, rivals: true}));
-    });
+    }, handleError); // <-- Añadimos el manejador aquí
 
     const unsubMatches = onSnapshot(matchesRef, (snapshot) => {
       const mList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -958,7 +973,7 @@ export default function App() {
         setAvailableSeasons(prev => Array.from(new Set([...prev, ...dbSeasons])).sort().reverse());
       }
       setDataLoaded(prev => ({...prev, matches: true}));
-    });
+    }, handleError); // <-- Añadimos el manejador aquí
 
     return () => { unsubUsers(); unsubGk(); unsubRivals(); unsubMatches(); };
   }, [user, appUser]);
@@ -1187,7 +1202,7 @@ export default function App() {
       {/* SIDEBAR (Desktop Only) */}
       <aside className={`hidden md:flex w-24 lg:w-28 h-screen overflow-hidden flex-shrink-0 flex-col bg-blue-950 text-white no-print z-20 transition-colors`}>
         <div className={`h-24 flex items-center justify-center border-b border-blue-900/50 pt-4 pb-4 shrink-0`}>
-          <Shield className="w-12 h-12 text-red-600 drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-12 h-12 object-contain drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
         </div>
 
         <nav className="flex-1 py-2 flex flex-col gap-0 items-center justify-center w-full">
@@ -1238,7 +1253,7 @@ export default function App() {
 
           <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
             <div className="flex items-center gap-2 px-6 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-auto">
-               <Shield size={18} className="text-red-600" />
+               <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-5 h-5 object-contain" />
                <span className="text-lg lg:text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white drop-shadow-sm">
                  ATLETI <span className="text-red-600">PLAN PARTIDO</span>
                </span>
@@ -1277,7 +1292,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* MODALES GLOBALES (Ahora refactorizados usando BaseModal y componentes de formulario) */}
+        {/* MODALES GLOBALES */}
         {isGkFormOpen && <GkFormModal initialData={editingGk} users={usersList} onClose={() => setIsGkFormOpen(false)} onSave={(data) => handleSaveDoc('goalkeepers', data, !editingGk, "Portero guardado").then(id => {if(id){setIsGkFormOpen(false); if(!editingGk){setSelectedGkId(id); setCurrentModule('reporte_detalle');}}})} theme={theme} darkMode={darkMode} />}
         {isRivalFormOpen && <RivalFormModal initialData={editingRival} onClose={() => setIsRivalFormOpen(false)} onSave={(data) => handleSaveDoc('rivals', data, !editingRival, "Rival guardado").then(()=>setIsRivalFormOpen(false))} theme={theme} />}
         {isUserFormOpen && <UserFormModal initialData={editingUser} onClose={() => setIsUserFormOpen(false)} onSave={(data) => handleSaveDoc('users', data, !editingUser, "Usuario guardado").then(()=>setIsUserFormOpen(false))} theme={theme} />}
@@ -1349,8 +1364,8 @@ const LoginScreen = ({ users, onLogin }) => {
 
       {/* Lado Izquierdo */}
       <div className="hidden lg:flex flex-1 relative bg-gradient-to-br from-blue-900 to-blue-950 overflow-hidden flex-col justify-end p-24">
-        <div className="absolute inset-0 z-0 opacity-20 pointer-events-none flex items-center justify-center">
-            <Shield className="w-[800px] h-[800px] text-white transform -rotate-12" />
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none flex items-center justify-center">
+            <img src={ESCUDO_ATM_URL} alt="" className="w-[800px] h-[800px] object-contain transform -rotate-12" />
         </div>
         <div className="relative z-20 flex flex-col">
           <h3 className="text-3xl xl:text-4xl font-black text-red-500/90 italic uppercase tracking-tighter mb-4 drop-shadow-xl">
@@ -1372,7 +1387,7 @@ const LoginScreen = ({ users, onLogin }) => {
         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-blue-600"></div>
         
         <div className="flex flex-col items-center text-center mb-12">
-          <Shield className="h-20 w-20 text-red-600 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="h-24 w-auto mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
           <h1 className="text-blue-950 text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4 whitespace-nowrap">ATLETI <span className="text-red-600">PLAN PARTIDO</span></h1>
           <div className="flex flex-col items-center">
             <span className="text-slate-500 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">
@@ -1477,7 +1492,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
       {/* Escudos y Hora */}
       <div className="flex items-center justify-between px-6 md:px-12 py-6 relative z-10 border-b border-slate-100 dark:border-slate-700/50">
         <div className="flex flex-col items-center flex-1">
-          <Shield className="w-16 h-16 md:w-24 md:h-24 text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
           <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase">Atleti</span>
         </div>
 
@@ -1782,7 +1797,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="md:col-span-2 bg-blue-950 rounded-[2.5rem] p-8 flex flex-col justify-center relative overflow-hidden shadow-sm min-h-[140px]">
            <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
-              <Shield size={180} />
+              <img src={ESCUDO_ATM_URL} alt="" className="w-48 h-48 object-contain" />
            </div>
            <div className="relative z-10 text-left">
              <h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">
@@ -2260,860 +2275,3 @@ function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, on
     </div>
   );
 }
-
-
-// --- VISTA DETALLADA DEL PORTERO (DASHBOARD) ---
-function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTechDec, onEditStats, onEditMatchPlan, activeSeason, isDataLoading, exportTrigger, resetExportTrigger, showNotification, role }) {
-  
-  useEffect(() => {
-    if (exportTrigger > 0) {
-      exportarPDFVectorial(gk, matches, rivals, activeSeason, showNotification, darkMode).finally(() => {
-        if (resetExportTrigger) resetExportTrigger();
-      });
-    }
-  }, [exportTrigger]);
-
-  if (isDataLoading) return <div className="space-y-6"><SkeletonCard/><SkeletonCard/></div>;
-  if (!gk) return null;
-
-  const gkMatches = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const nextMatch = gkMatches[0];
-  const nextMatchRival = nextMatch ? rivals.find(r => r.id === nextMatch.rivalId) : null;
-
-  const getGkState = (formScore) => {
-    if (formScore >= 8.0) return { text: 'EN FORMA', icon: '🟢', color: 'text-emerald-500 dark:text-emerald-400' };
-    if (formScore >= 5.0) return { text: 'REGULAR', icon: '🟠', color: 'text-orange-500 dark:text-orange-400' };
-    return { text: 'BAJO', icon: '🔴', color: 'text-red-500 dark:text-red-400' };
-  };
-  const gkState = getGkState(gk.form || 5);
-
-  const getTrend = (perfData) => {
-    if (!perfData || perfData.length < 2) return { text: 'ESTABLE →', color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' };
-    const last = perfData[perfData.length - 1].goals;
-    const prev = perfData[perfData.length - 2].goals;
-    if (last < prev) return { text: 'EN MEJORA ↗', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-100 dark:border-emerald-500/20' };
-    if (last > prev) return { text: 'EN DECLIVE ↘', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-400/10 border border-red-100 dark:border-red-500/20' };
-    return { text: 'ESTABLE →', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-400/10 border border-blue-100 dark:border-blue-500/20' };
-  };
-  const gkTrend = getTrend(gk.performanceData);
-
-  const recommendation = gk.technicalDecision || { title: 'PENDIENTE', reason: 'Aún no se ha introducido una valoración técnica para este portero.' };
-
-  const teamMatches = gk.stats?.teamMatches || Math.max(matches.length, (gk.stats?.starts || 0) + (gk.stats?.subs || 0));
-  const teamMinutes = gk.stats?.teamMinutes || teamMatches * 90;
-  const playedMatches = gk.stats?.playedMatches || ((gk.stats?.starts || 0) + (gk.stats?.subs || 0));
-  
-  const minsPercent = teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0;
-  const startsPercent = teamMatches > 0 ? Math.round(((gk.stats?.starts || 0) / teamMatches) * 100) : 0;
-  const subsPercent = teamMatches > 0 ? Math.round(((gk.stats?.subs || 0) / teamMatches) * 100) : 0;
-  const goalsPercent = (gk.stats?.goalsConceded || 0) > 0 ? Math.min(100, Math.round(((gk.stats?.goalsConceded || 0) / Math.max(1, playedMatches)) * 50)) : 0;
-  const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / playedMatches) * 100) : 0;
-  const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
-
-  return (
-    <div className="flex flex-col gap-8 relative">
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12">
-        {/* TARJETA PERFIL */}
-        <div className={`xl:col-span-4 rounded-[3rem] border ${theme.border} ${theme.card} overflow-hidden flex relative min-h-[380px] shadow-sm`}>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 dark:bg-red-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          
-          <div className={`w-2/5 ${darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700/50' : 'bg-gradient-to-br from-slate-200 to-slate-300 border-slate-200'} relative flex flex-col justify-end border-r overflow-hidden`}>
-            <div className="absolute inset-0 z-10">
-              <img 
-                src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} 
-                alt={gk.name} 
-                className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" 
-                style={{ 
-                  objectPosition: 'center 15%', 
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-                  maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)'
-                }} 
-                crossOrigin="anonymous"
-              />
-            </div>
-            <span 
-              className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" 
-              style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}
-            >
-              {gk.number}
-            </span>
-            <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${darkMode ? 'from-slate-900' : 'from-white'} to-transparent z-10 pointer-events-none`}></div>
-            <div className="relative z-20 text-center pb-6 px-2">
-              <span 
-                className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" 
-                style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}
-              >
-                {gk.name}
-              </span>
-              <p className="text-[11px] font-black text-red-600 dark:text-red-500 uppercase tracking-[0.3em] mt-2 drop-shadow-sm">{gk.team || 'Atlético de Madrid'}</p>
-            </div>
-          </div>
-          
-          <div className="w-3/5 p-6 md:p-8 flex flex-col justify-between z-10">
-            <div>
-              <div className="mt-2 space-y-4">
-                <ProfileRow label="Equipo" value={gk.team || 'Atlético de Madrid'} theme={theme} />
-                <ProfileRow label="Competición" value={`${gk.league || '--'} ${gk.group ? `(${gk.group})` : ''}`} theme={theme} />
-                <ProfileRow label="Pie Domin." value={gk.foot || 'Derecho'} theme={theme} />
-                <ProfileRow label="Mano Domin." value={gk.hand || 'Derecha'} theme={theme} />
-              </div>
-            </div>
-            <div className={`mt-6 p-5 rounded-[2rem] ${darkMode ? 'bg-slate-900/80' : 'bg-slate-50 border border-slate-100'} flex items-center justify-between shadow-inner`}>
-              <div>
-                <p className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>Forma</p>
-                <div className="flex items-end gap-1"><span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">{gk.form || '5.0'}</span><span className={`text-xs mb-1 font-bold ${theme.textMuted}`}>/10</span></div>
-              </div>
-              <div className="flex gap-1.5">{gk.lastMatches?.map((m, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full ${m === 'W' ? 'bg-emerald-500' : m === 'D' ? 'bg-blue-500' : 'bg-red-500'} shadow-sm`}></div>)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* WIDGET DINÁMICO DE PRÓXIMO PARTIDO */}
-        <div className={`xl:col-span-8 h-full`}>
-          {nextMatch ? (
-             <MatchScoreboardCard match={nextMatch} rival={nextMatchRival} gks={[gk]} theme={theme} darkMode={darkMode} />
-          ) : (
-            <div className={`h-full p-8 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col items-center justify-center text-slate-400 dark:text-slate-500`}>
-              <CalendarDays size={56} className="mb-4 opacity-50" />
-              <p className="text-base font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Sin partidos inminentes</p>
-              <p className="text-xs mt-2 font-medium">Este portero no está en ninguna convocatoria próxima.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ESTADÍSTICAS GRID */}
-      <div>
-        <div className="flex justify-between items-center mb-6 ml-2 group">
-          <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
-          {role !== 'staff' && (
-            <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas">
-              <Edit2 size={16} strokeWidth={3} />
-            </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 print:grid-cols-4">
-          <StatCard title="Minutos Jugados" value={gk.stats?.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Titular" value={gk.stats?.starts || 0} subtitle={`${gk.stats?.starts || 0} / ${teamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Suplente" value={gk.stats?.subs || 0} subtitle={`${gk.stats?.subs || 0} / ${teamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Goles Encajados" value={gk.stats?.goalsConceded || 0} subtitle={`Promedio: ${playedMatches ? ((gk.stats?.goalsConceded || 0) / playedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Porterías a Cero" value={gk.stats?.cleanSheets || 0} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Penaltis Parados" value={gk.stats?.penaltiesSaved || 0} subtitle={`de ${gk.stats?.penaltiesFaced || 0} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
-          
-          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center relative overflow-hidden shadow-sm`}>
-             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
-             <div className="space-y-3 flex-1 flex flex-col justify-center">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.calledUpMatches || 0}/{gk.stats?.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.playedMatches || 0}/{gk.stats?.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((gk.stats?.playedMatches || 0) / teamMatches) * 100) : 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.minutes || 0}/{gk.stats?.teamMinutes || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0}%</span>
-                  </div>
-                </div>
-             </div>
-          </div>
-
-          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm`}>
-             <span className="text-4xl md:text-5xl mb-2 md:mb-3 drop-shadow-md">{gkState.icon}</span>
-             <span className={`text-[10px] font-black uppercase tracking-widest ${gkState.color}`}>{gkState.text}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* PLAN DE PARTIDO */}
-      <div className={`rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm relative overflow-hidden group`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 dark:bg-blue-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-        
-        <div className="flex justify-between items-center mb-8 relative z-10">
-          <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">
-            <Target size={18} className="text-blue-500"/> Plan de Partido
-          </h3>
-          {role !== 'staff' && (
-            <button onClick={onEditMatchPlan} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Plan de Partido">
-              <Edit2 size={16} strokeWidth={3} />
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 relative z-10">
-          <MatchPlanBox title="Objetivo Defensivo" icon={<Shield size={18} className="text-red-500"/>} content={gk.matchPlan?.defensive} darkMode={darkMode} />
-          <MatchPlanBox title="Objetivo Ofensivo" icon={<Swords size={18} className="text-emerald-500"/>} content={gk.matchPlan?.offensive} darkMode={darkMode} />
-          <MatchPlanBox title="Objetivo Táctico" icon={<GitCompare size={18} className="text-blue-500"/>} content={gk.matchPlan?.tactical} darkMode={darkMode} />
-          <MatchPlanBox title="Aspectos Claves" icon={<Goal size={18} className="text-yellow-500"/>} content={gk.matchPlan?.keyAspects} darkMode={darkMode} />
-        </div>
-      </div>
-
-      {/* GRÁFICOS (RADAR Y LÍNEA) Y DECISIÓN DE TITULARIDAD */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12 print:break-inside-avoid">
-        
-        {/* RADAR: HABILIDADES */}
-        <div className={`xl:col-span-3 rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col items-center justify-center shadow-sm`}>
-           <h3 className="text-xs font-black uppercase tracking-widest mb-4 w-full text-center text-blue-950 dark:text-white">Perfil Técnico</h3>
-           <div className="w-full h-[240px] -mt-4">
-             <ResponsiveContainer width="100%" height="100%">
-               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={gk.skills || DUMMY_GOALKEEPER.skills}>
-                 <PolarGrid stroke={darkMode ? '#334155' : '#cbd5e1'} />
-                 <PolarAngleAxis dataKey="subject" tick={{ fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '900' }} />
-                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                 <Radar name={gk.name} dataKey="A" stroke="#ef4444" fill="#ef4444" fillOpacity={0.5} strokeWidth={2} />
-                 <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '16px' }} />
-               </RadarChart>
-             </ResponsiveContainer>
-           </div>
-        </div>
-
-        {/* LÍNEA: EVOLUCIÓN Y TENDENCIA */}
-        <div className={`xl:col-span-6 rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm`}>
-          <div className="flex justify-between items-center mb-8">
-             <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white">Evolución (Últimos 5)</h3>
-             <span className={`text-[10px] font-black px-4 py-1.5 rounded-xl ${gkTrend.bg} ${gkTrend.color}`}>{gkTrend.text}</span>
-          </div>
-          <div className="flex-1 min-h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={gk.performanceData || DUMMY_GOALKEEPER.performanceData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#334155' : '#f1f5f9'} vertical={false} />
-                <XAxis dataKey="match" stroke={darkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} fontWeight="bold" />
-                <YAxis stroke={darkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} domain={[0, 'auto']} fontWeight="bold" />
-                <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '16px', color: darkMode ? '#fff' : '#000' }} itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}/>
-                <Line type="monotone" dataKey="goals" name="Goles Encajados" stroke="#ef4444" strokeWidth={4} dot={{ r: 5, strokeWidth: 2 }} activeDot={{ r: 7 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-8 mt-6">
-            <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-sm"></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Goles Encajados</span></div>
-          </div>
-        </div>
-
-        {/* RECOMENDACIÓN TÉCNICA (MANUAL) */}
-        <div className={`xl:col-span-3 rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 p-8 flex flex-col relative overflow-hidden shadow-sm dark:shadow-md group`}>
-           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
-           <div className="flex justify-between items-center mb-6 relative z-10">
-             <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-2">
-               <BarChart2 size={18}/> Decisión
-             </h3>
-             {role !== 'staff' && (
-               <button onClick={onEditTechDec} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Decisión">
-                 <Edit2 size={14} strokeWidth={3} />
-               </button>
-             )}
-           </div>
-           
-           <div className="flex-1 flex flex-col justify-center">
-              <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] mb-5 relative z-10 shadow-inner">
-                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest block mb-1">Recomendación</span>
-                 <span className="text-xl font-black italic tracking-tighter text-blue-950 dark:text-white leading-tight uppercase">{recommendation.title}</span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium relative z-10"><strong className="text-slate-800 dark:text-slate-200 block mb-1">Motivo:</strong> {recommendation.reason}</p>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const MatchPlanBox = ({ title, icon, content, darkMode }) => (
-  <div className={`bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] shadow-inner flex flex-col h-full`}>
-     <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
-        {icon}
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{title}</span>
-     </div>
-     <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">
-       {content || <span className="text-slate-400 italic">No definido...</span>}
-     </p>
-  </div>
-);
-
-function MatchPlanModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState({ 
-    defensive: initialData?.matchPlan?.defensive || '', 
-    offensive: initialData?.matchPlan?.offensive || '',
-    tactical: initialData?.matchPlan?.tactical || '',
-    keyAspects: initialData?.matchPlan?.keyAspects || ''
-  });
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-900 transition-colors shadow-inner text-xs resize-none font-medium";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-4xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-blue-50 dark:bg-blue-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-blue-950 dark:text-white"><Target className="text-blue-600 w-8 h-8" /> Plan de Partido</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
-        </div>
-        <div className="p-8 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 custom-scrollbar">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Defensivo</label>
-            <textarea name="defensive" value={formData.defensive} onChange={handleChange} rows={4} className={inputClass} placeholder="Ej: Cerrar espacios en bloque bajo..." />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Ofensivo</label>
-            <textarea name="offensive" value={formData.offensive} onChange={handleChange} rows={4} className={inputClass} placeholder="Ej: Salida rápida por bandas..." />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Táctico</label>
-            <textarea name="tactical" value={formData.tactical} onChange={handleChange} rows={4} className={inputClass} placeholder="Ej: Mantener línea adelantada..." />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Aspectos Claves</label>
-            <textarea name="keyAspects" value={formData.keyAspects} onChange={handleChange} rows={4} className={inputClass} placeholder="Ej: Sonreír, disfrutar, transmitir seguridad..." />
-          </div>
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={() => onSave(formData)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg shadow-blue-900/20">Guardar Plan</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AddSeasonModal({ onClose, onSave, theme }) {
-  const [seasonText, setSeasonText] = useState('');
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-900 transition-colors shadow-inner font-black text-sm";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-sm rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-blue-50 dark:bg-blue-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-blue-950 dark:text-white"><CalendarDays className="text-blue-600 w-6 h-6" /> Nueva Temporada</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={18}/></button>
-        </div>
-        <div className="p-8 space-y-4">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Introduce el nombre de la nueva temporada:</p>
-          <input 
-            type="text" 
-            value={seasonText} 
-            onChange={(e) => setSeasonText(e.target.value)} 
-            placeholder="Ej: 2027/28" 
-            className={inputClass} 
-            autoFocus
-            onKeyDown={(e) => e.key === 'Enter' && seasonText.trim() && onSave(seasonText.trim())}
-          />
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={() => seasonText.trim() && onSave(seasonText.trim())} className="px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg shadow-blue-900/20">Añadir</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GkStatsModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState({
-    form: initialData?.form || 5.0, minutes: initialData?.stats?.minutes || 0, starts: initialData?.stats?.starts || 0, subs: initialData?.stats?.subs || 0,
-    goalsConceded: initialData?.stats?.goalsConceded || 0, cleanSheets: initialData?.stats?.cleanSheets || 0, penaltiesSaved: initialData?.stats?.penaltiesSaved || 0, penaltiesFaced: initialData?.stats?.penaltiesFaced || 0,
-    teamMatches: initialData?.stats?.teamMatches || 0, calledUpMatches: initialData?.stats?.calledUpMatches || 0, playedMatches: initialData?.stats?.playedMatches || 0, teamMinutes: initialData?.stats?.teamMinutes || 0
-  });
-
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSubmit = () => { onSave({ form: parseFloat(formData.form) || 5.0, stats: { minutes: parseInt(formData.minutes) || 0, starts: parseInt(formData.starts) || 0, subs: parseInt(formData.subs) || 0, goalsConceded: parseInt(formData.goalsConceded) || 0, cleanSheets: parseInt(formData.cleanSheets) || 0, penaltiesSaved: parseInt(formData.penaltiesSaved) || 0, penaltiesFaced: parseInt(formData.penaltiesFaced) || 0, teamMatches: parseInt(formData.teamMatches) || 0, calledUpMatches: parseInt(formData.calledUpMatches) || 0, playedMatches: parseInt(formData.playedMatches) || 0, teamMinutes: parseInt(formData.teamMinutes) || 0 } }); };
-
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-3xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-emerald-950 dark:text-white"><Activity className="text-emerald-500 w-8 h-8" /> Editar Estadísticas</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
-        </div>
-        <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-4">Actualiza las estadísticas acumuladas y el estado de forma general de <strong className="text-slate-800 dark:text-white font-black uppercase">{initialData?.name}</strong>.</p>
-          
-          <div className="mb-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos Globales (Para Porcentajes)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={formData.teamMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={formData.calledUpMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={formData.playedMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={formData.teamMinutes} onChange={handleChange} className={inputClass} /></div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={formData.form} onChange={handleChange} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={formData.minutes} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={formData.starts} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={formData.subs} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={formData.goalsConceded} onChange={handleChange} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={formData.cleanSheets} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={formData.penaltiesSaved} onChange={handleChange} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={formData.penaltiesFaced} onChange={handleChange} className={inputClass} /></div>
-          </div>
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm">Cancelar</button>
-          <button onClick={handleSubmit} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/30">Guardar Estadísticas</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TechDecisionModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState({ title: initialData?.technicalDecision?.title || '', reason: initialData?.technicalDecision?.reason || '' });
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-900 transition-colors shadow-inner";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-lg rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-blue-50 dark:bg-blue-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-blue-950 dark:text-white"><BarChart2 className="text-blue-600 w-8 h-8" /> Decisión Técnica</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
-        </div>
-        <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Introduce la recomendación técnica para <strong className="text-slate-800 dark:text-white uppercase font-black">{initialData?.name}</strong>. Visible internamente.</p>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Recomendación (Título)</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="Ej: Titular Indiscutible..." className={`${inputClass} font-black text-blue-950 dark:text-blue-400`} />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Motivo / Justificación</label>
-            <textarea name="reason" value={formData.reason} onChange={handleChange} placeholder="Ej: Mejor estado de forma..." rows={4} className={`${inputClass} font-medium resize-none`} />
-          </div>
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={() => onSave(formData)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg shadow-blue-900/20">Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '' });
-  
-  const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
-  
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  
-  const toggleGk = (id) => {
-    setFormData(prev => {
-      const isSelected = prev.goalkeeperIds.includes(id);
-      const newIds = isSelected ? prev.goalkeeperIds.filter(gkId => gkId !== id) : [...prev.goalkeeperIds, id];
-      let newLeague = prev.league; let newGroup = prev.group;
-      if (!isSelected) { const gk = gks.find(g => g.id === id); if (gk) { newLeague = gk.league || newLeague; newGroup = gk.group || newGroup; } }
-      return { ...prev, goalkeeperIds: newIds, league: newLeague, group: newGroup };
-    });
-  };
-
-  const addStreak = (res) => { if (formData.streak.length >= 5) return; setFormData(prev => ({ ...prev, streak: [...(prev.streak || []), res] })); };
-  const clearStreak = () => setFormData(prev => ({ ...prev, streak: [] }));
-
-  const handleSubmit = () => {
-    if(!formData.date || !formData.rivalId) return alert("Fecha y Rival son obligatorios"); 
-    onSave({ ...formData, id: initialData?.id });
-  };
-
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-2xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><CalendarDays className="text-red-500" /> {initialData ? 'Editar Partido' : 'Nuevo Partido'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors"><X size={20}/></button>
-        </div>
-        
-        <div className="flex px-8 pt-8 pb-4">
-          {['Contexto', 'Fecha & Lugar', 'Rival & Convocatoria'].map((title, idx) => (
-             <div key={idx} className={`flex-1 text-center text-[10px] font-black uppercase tracking-widest pb-3 border-b-4 rounded-b-sm ${step === idx + 1 ? 'border-red-600 text-red-600' : 'border-slate-100 dark:border-slate-700 text-slate-400'}`}>
-                <span className="hidden sm:inline">{title}</span><span className="sm:hidden">Paso {idx+1}</span>
-             </div>
-          ))}
-        </div>
-
-        <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-          {step === 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-right-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Temporada</label><input type="text" name="season" value={formData.season} onChange={handleChange} className={inputClass} placeholder="Ej: 2026/27" /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Jornada</label><input type="text" name="matchday" value={formData.matchday} onChange={handleChange} className={inputClass} placeholder="Ej: 14" /></div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="grid grid-cols-1 gap-5 animate-in fade-in slide-in-from-right-4">
-              <div className="grid grid-cols-2 gap-5">
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha *</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Hora</label><input type="time" name="time" value={formData.time} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} /></div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Campo</label>
-                {!isCustomField ? (
-                  <select name="field" value={formData.field} onChange={(e) => { if (e.target.value === 'Otro') { setIsCustomField(true); setFormData({...formData, field: ''}); } else { handleChange(e); } }} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                    <option value="">-- Selecciona campo --</option>
-                    <option value="CD ATM Alcalá de Henares">CD ATM Alcalá de Henares</option>
-                    <option value="CD Cerro Del Espino Majadahonda">CD Cerro Del Espino Majadahonda</option>
-                    <option value="Otro">Otro (Especificar manual)</option>
-                  </select>
-                ) : (
-                  <div className="flex gap-2">
-                    <input type="text" name="field" value={formData.field} onChange={handleChange} className={inputClass} placeholder="Escribe el nombre del campo" />
-                    <button type="button" onClick={() => { setIsCustomField(false); setFormData({...formData, field: ''}); }} className="px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-2xl transition-colors"><RotateCcw size={16}/></button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Seleccionar Rival *</label>
-                  <select name="rivalId" value={formData.rivalId} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`} required>
-                    <option value="">-- Elige un rival --</option>
-                    {rivals.map(r => <option key={r.id} value={r.id}>{r.name} {r.category && `(${r.category})`}</option>)}
-                  </select>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mt-6 mb-2 pl-2">Goles a Favor rival (Opcional)</label>
-                  <input type="number" name="goalsScored" value={formData.goalsScored} onChange={handleChange} className={inputClass} placeholder="Ej: 45" />
-                </div>
-                
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Racha del Rival</label>
-                  <div className="flex flex-col gap-3">
-                     <div className="flex gap-3">
-                        <button type="button" onClick={() => addStreak('V')} className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-md transition-colors">V</button>
-                        <button type="button" onClick={() => addStreak('E')} className="flex-1 py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-black shadow-md transition-colors">E</button>
-                        <button type="button" onClick={() => addStreak('D')} className="flex-1 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-black shadow-md transition-colors">D</button>
-                     </div>
-                     <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3 h-14">
-                        {formData.streak && formData.streak.map((res, i) => (
-                          <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm ${res === 'V' ? 'bg-emerald-500' : res === 'E' ? 'bg-blue-500' : 'bg-red-500'}`}>
-                             <span className="leading-none pt-[1px]">{res}</span>
-                          </div>
-                        ))}
-                        {(!formData.streak || formData.streak.length === 0) && <span className="text-xs text-slate-400 italic font-medium">Pulsa los botones para añadir...</span>}
-                        <div className="flex-1"></div>
-                        <button type="button" onClick={clearStreak} className="text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={18}/></button>
-                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">Porteros Convocados</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {gks.map(gk => {
-                    const isSelected = formData.goalkeeperIds.includes(gk.id);
-                    return (
-                      <div key={gk.id} onClick={() => toggleGk(gk.id)} className={`cursor-pointer p-4 rounded-[2rem] border-2 flex flex-col items-center gap-3 transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-200 hover:shadow-sm'}`}>
-                         <div className="relative">
-                           <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm" style={{ objectPosition: 'center 15%' }} alt=""/>
-                           {isSelected && <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1 border-2 border-white dark:border-slate-800 shadow-sm"><CheckCircle2 size={12} className="text-white" strokeWidth={3}/></div>}
-                         </div>
-                         <span className={`text-xs text-center font-black uppercase truncate w-full ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>{gk.name}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className={`p-6 md:p-8 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          {step > 1 ? (
-             <button onClick={() => setStep(step - 1)} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-500 hover:text-blue-950 dark:text-slate-400 dark:hover:text-white flex items-center gap-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700"><ArrowLeft size={16} strokeWidth={3}/> Atrás</button>
-          ) : (
-             <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-400 hover:text-red-500">Cancelar</button>
-          )}
-
-          {step < 3 ? (
-             <button onClick={() => setStep(step + 1)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-blue-950 hover:bg-blue-900 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 flex items-center gap-2 shadow-lg">Siguiente <ArrowRight size={16} strokeWidth={3}/></button>
-          ) : (
-             <button onClick={handleSubmit} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 shadow-lg shadow-red-900/20"><CheckCircle2 size={18} strokeWidth={3}/> Guardar</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GkFormModal({ initialData, users, onClose, onSave, theme, darkMode }) {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    name: initialData?.name || '', number: initialData?.number || '', team: initialData?.team || '', photoUrl: initialData?.photoUrl || '', 
-    birthYear: initialData?.birthYear || '', nationality: initialData?.nationality || '', foot: initialData?.foot || 'Derecho', hand: initialData?.hand || 'Derecha',
-    assignedTo: initialData?.assignedTo || ['all'], league: initialData?.league || '', group: initialData?.group || '',
-    skills: initialData?.skills || [ { subject: 'Reflejos', A: 50, fullMark: 100 }, { subject: 'Juego Aéreo', A: 50, fullMark: 100 }, { subject: '1 vs 1', A: 50, fullMark: 100 }, { subject: 'Distribución', A: 50, fullMark: 100 }, { subject: 'Anticipación', A: 50, fullMark: 100 } ]
-  });
-  
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSkillChange = (index, value) => {
-    const newSkills = [...formData.skills];
-    newSkills[index].A = parseInt(value) || 0;
-    setFormData({ ...formData, skills: newSkills });
-  };
-  const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, photoUrl: base64 })));
-
-  const toggleAssign = (userId) => {
-    let newAssigned = [...(Array.isArray(formData.assignedTo) ? formData.assignedTo : [formData.assignedTo])];
-    if (userId === 'all') {
-      newAssigned = ['all'];
-    } else {
-      newAssigned = newAssigned.filter(id => id !== 'all');
-      if (newAssigned.includes(userId)) newAssigned = newAssigned.filter(id => id !== userId);
-      else newAssigned.push(userId);
-      
-      if (newAssigned.length === 0) newAssigned = ['all'];
-    }
-    setFormData({ ...formData, assignedTo: newAssigned });
-  };
-
-  const handleSubmit = () => { if(!formData.name) return; onSave({ ...formData, id: initialData?.id }); };
-
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 outline-none transition-all";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-2xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><User className="text-red-500" /> {initialData ? 'Editar Portero' : 'Crear Portero'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors"><X size={20}/></button>
-        </div>
-
-        <div className="flex px-8 pt-8 pb-4">
-          {['Identidad', 'Físico & Liga', 'Atributos'].map((title, idx) => (
-             <div key={idx} className={`flex-1 text-center text-[10px] font-black uppercase tracking-widest pb-3 border-b-4 rounded-b-sm ${step === idx + 1 ? 'border-red-600 text-red-600' : 'border-slate-100 dark:border-slate-700 text-slate-400'}`}>
-                <span className="hidden sm:inline">{title}</span><span className="sm:hidden">Paso {idx+1}</span>
-             </div>
-          ))}
-        </div>
-
-        <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-          {step === 1 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
-              <div className="col-span-1 md:col-span-2 flex justify-center mb-6">
-                <label className="flex flex-col items-center justify-center w-36 h-36 border-4 border-slate-100 dark:border-slate-700 border-dashed rounded-full cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all overflow-hidden bg-white dark:bg-slate-800 shadow-sm">
-                  {formData.photoUrl ? (
-                    <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-cover" style={{objectPosition:'center 15%'}} />
-                  ) : (
-                    <div className="flex flex-col items-center text-slate-400"><Upload className="mb-2 w-8 h-8"/> <span className="text-[10px] font-black uppercase tracking-widest text-center leading-tight">Subir<br/>Foto</span></div>
-                  )}
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre Completo *</label><input type="text" name="name" value={formData.name} onChange={handleChange} className={inputClass} placeholder="Ej: Jan Oblak" required/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Dorsal</label><input type="number" name="number" value={formData.number} onChange={handleChange} className={inputClass} placeholder="Ej: 13"/></div>
-                <div className="md:col-span-2">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Asignar Visibilidad (Entrenadores y Staff)</label>
-                  <div className="flex flex-wrap gap-2 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <button type="button" onClick={() => toggleAssign('all')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors shadow-sm ${(Array.isArray(formData.assignedTo) ? formData.assignedTo : [formData.assignedTo]).includes('all') ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>Público (Todos)</button>
-                    {users.filter(u => u.role === 'trainer' || u.role === 'staff').map(u => {
-                      const isSelected = (Array.isArray(formData.assignedTo) ? formData.assignedTo : [formData.assignedTo]).includes(u.id);
-                      return (
-                        <button key={u.id} type="button" onClick={() => toggleAssign(u.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors shadow-sm flex items-center gap-1 ${isSelected ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>
-                          {isSelected && <CheckCircle2 size={12}/>} {u.name} ({u.role === 'staff' ? 'Staff' : 'Entrenador'})
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-right-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Equipo (Categoría)</label><input type="text" name="team" value={formData.team} onChange={handleChange} placeholder="Ej: Alevín A" className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Liga / Competición</label><input type="text" name="league" value={formData.league} onChange={handleChange} placeholder="Ej: 1ª Autonómica" className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Grupo</label><input type="text" name="group" value={formData.group} onChange={handleChange} placeholder="Ej: Grupo 2" className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Año Nacimiento</label><input type="number" name="birthYear" value={formData.birthYear} onChange={handleChange} placeholder="Ej: 2012" className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nacionalidad</label><input type="text" name="nationality" value={formData.nationality} onChange={handleChange} placeholder="Ej: España" className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Pie Dominante</label>
-                <select name="foot" value={formData.foot} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                  <option value="Derecho">Derecho</option><option value="Izquierdo">Izquierdo</option><option value="Ambidiestro">Ambidiestro</option>
-                </select>
-              </div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Mano Dominante</label>
-                <select name="hand" value={formData.hand} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                  <option value="Derecha">Derecha</option><option value="Izquierda">Izquierda</option><option value="Ambidiestro">Ambidiestro</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 font-medium">Ajusta los atributos técnicos base del portero para alimentar su gráfico de perfil analítico.</p>
-              {formData.skills.map((skill, index) => (
-                <div key={index} className="flex items-center gap-5 bg-slate-50 dark:bg-slate-900 p-4 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm">
-                  <span className="w-28 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{skill.subject}</span>
-                  <input type="range" min="0" max="100" value={skill.A} onChange={(e) => handleSkillChange(index, e.target.value)} className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-600" />
-                  <span className="w-10 text-right text-base font-black text-red-600 dark:text-red-400">{skill.A}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className={`p-6 md:p-8 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          {step > 1 ? (
-             <button onClick={() => setStep(step - 1)} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-500 hover:text-blue-950 dark:text-slate-400 dark:hover:text-white flex items-center gap-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700"><ArrowLeft size={16} strokeWidth={3}/> Atrás</button>
-          ) : (
-             <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-400 hover:text-red-500">Cancelar</button>
-          )}
-
-          {step < 3 ? (
-             <button onClick={() => setStep(step + 1)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-blue-950 hover:bg-blue-900 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 flex items-center gap-2 shadow-lg">Siguiente <ArrowRight size={16} strokeWidth={3}/></button>
-          ) : (
-             <button onClick={handleSubmit} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 shadow-lg shadow-red-900/20"><CheckCircle2 size={18} strokeWidth={3}/> Guardar</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RivalFormModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState(initialData || { name: '', category: '', shieldUrl: '' });
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, shieldUrl: base64 })));
-  const handleSubmit = () => { if(!formData.name) return alert("Nombre obligatorio"); onSave({ ...formData, id: initialData?.id }); }
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 transition-colors";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><Swords className="text-red-500 w-8 h-8" /> {initialData ? 'Editar Rival' : 'Añadir Rival'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
-        </div>
-        <div className="p-8 space-y-5 overflow-y-auto custom-scrollbar">
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre del Club</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: RSD ALCALÁ" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Letra Equipo (Opcional)</label><input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Ej: A" className={inputClass} /></div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Escudo del Club</label>
-            <label className="flex flex-col items-center justify-center w-full h-36 border-4 border-slate-100 dark:border-slate-700 border-dashed rounded-[2rem] cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors bg-white dark:bg-slate-800 shadow-sm">
-              {formData.shieldUrl ? <img src={formData.shieldUrl} className="h-full p-4 object-contain" alt="shield" /> : <div className="text-slate-400 dark:text-slate-500 flex flex-col items-center"><Upload className="mb-2 w-8 h-8"/><span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Subir Escudo</span></div>}
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            </label>
-          </div>
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={handleSubmit} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg shadow-blue-900/20">Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UserFormModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState(initialData || { name: '', email: '', username: '', password: '123', role: 'trainer', photoUrl: '', photoOffsetY: 50 });
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, photoUrl: base64 })));
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 transition-colors";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><Key className="text-emerald-500 w-8 h-8" /> {initialData ? 'Editar Usuario' : 'Crear Usuario'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
-        </div>
-        <div className="p-8 space-y-5 overflow-y-auto custom-scrollbar">
-          <div className="flex flex-col items-center justify-center mb-4">
-            <label className="w-28 h-28 rounded-full border-4 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-md">
-              {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${formData.photoOffsetY ?? 50}%` }} alt="Perfil" /> : <User size={40} className="text-slate-300 dark:text-slate-600" />}
-              <div className="absolute inset-0 bg-blue-950/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Upload size={20} className="text-white mb-2"/>
-              </div>
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            </label>
-            {formData.photoUrl && (
-               <div className="w-32 mt-5">
-                 <div className="flex justify-center text-[9px] font-black tracking-widest uppercase text-slate-400 mb-2">Ajustar encuadre</div>
-                 <input type="range" min="0" max="100" value={formData.photoOffsetY ?? 50} onChange={(e) => setFormData({...formData, photoOffsetY: e.target.value})} className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-               </div>
-            )}
-          </div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre Completo</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: Pablo Fernández" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Usuario</label><input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Ej: pablo.f" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="usuario@atleti.com" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Contraseña</label><input type="text" name="password" value={formData.password} onChange={handleChange} placeholder="Contraseña de acceso" className={inputClass} /></div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Rol del Sistema</label>
-            <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
-              <option value="trainer">Entrenador (Edita sus porteros)</option>
-              <option value="staff">Cuerpo Técnico (Solo lectura)</option>
-              <option value="admin">Administrador (Control total)</option>
-            </select>
-          </div>
-        </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={() => onSave(formData)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/20">Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- COMPONENTES UI PEQUEÑOS ---
-const SidebarItem = ({ icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex flex-col items-center justify-center gap-1 py-3 transition-all border-l-4
-      ${active 
-        ? `border-red-600 bg-white text-red-600 font-black shadow-lg` 
-        : `border-transparent text-blue-200 hover:text-white hover:bg-blue-900 font-bold`}
-    `}
-  >
-    {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2, className: active ? 'text-red-600' : '' })}
-    <span className="text-[9px] uppercase tracking-widest mt-1">{label}</span>
-  </button>
-);
-
-const ProfileRow = ({ label, value, theme }) => (
-  <div className="flex justify-between items-end border-b border-slate-200 dark:border-slate-700/50 pb-2">
-    <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>{label}</span>
-    <span className="font-bold text-sm text-blue-950 dark:text-white">{value}</span>
-  </div>
-);
-
-const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, theme, darkMode }) => (
-  <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-between relative overflow-hidden shadow-sm`}>
-    <div className="flex justify-between items-start mb-3 relative z-10">
-      <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} w-2/3 leading-tight`}>{title}</h4>
-      <div className="w-10 h-10 relative flex-shrink-0">
-        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-          <path className={darkMode ? "stroke-slate-700" : "stroke-slate-100"} strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-          {percent > 0 && (
-            <path className={`${color}`} strokeWidth="4" fill="none" strokeDasharray={`${percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-          )}
-        </svg>
-        {showPercentInside && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-[9px] font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{percent}%</span>
-          </div>
-        )}
-      </div>
-    </div>
-    <div className="relative z-10">
-      <p className="text-2xl font-black tracking-tighter mb-1 text-blue-950 dark:text-white leading-none">{value}</p>
-      <p className={`text-[8px] font-bold uppercase tracking-widest ${theme.textMuted} truncate mt-1`}>{subtitle}</p>
-    </div>
-  </div>
-);
