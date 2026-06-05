@@ -2275,3 +2275,100 @@ function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, on
     </div>
   );
 }
+function UserFormModal({ initialData, onClose, onSave, theme }) {
+  const [formData, setFormData] = useState(initialData || { name: '', email: '', username: '', password: '123', role: 'trainer', photoUrl: '', photoOffsetY: 50 });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, photoUrl: base64 })));
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 transition-colors";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
+      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
+        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
+          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><Key className="text-emerald-500 w-8 h-8" /> {initialData ? 'Editar Usuario' : 'Crear Usuario'}</h2>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
+        </div>
+        <div className="p-8 space-y-5 overflow-y-auto custom-scrollbar">
+          <div className="flex flex-col items-center justify-center mb-4">
+            <label className="w-28 h-28 rounded-full border-4 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-md">
+              {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${formData.photoOffsetY ?? 50}%` }} alt="Perfil" /> : <User size={40} className="text-slate-300 dark:text-slate-600" />}
+              <div className="absolute inset-0 bg-blue-950/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Upload size={20} className="text-white mb-2"/>
+              </div>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+            {formData.photoUrl && (
+               <div className="w-32 mt-5">
+                 <div className="flex justify-center text-[9px] font-black tracking-widest uppercase text-slate-400 mb-2">Ajustar encuadre</div>
+                 <input type="range" min="0" max="100" value={formData.photoOffsetY ?? 50} onChange={(e) => setFormData({...formData, photoOffsetY: e.target.value})} className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+               </div>
+            )}
+          </div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre Completo</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: Pablo Fernández" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Usuario</label><input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Ej: pablo.f" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="usuario@atleti.com" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Contraseña</label><input type="text" name="password" value={formData.password} onChange={handleChange} placeholder="Contraseña de acceso" className={inputClass} /></div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Rol del Sistema</label>
+            <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+              <option value="trainer">Entrenador (Edita sus porteros)</option>
+              <option value="staff">Cuerpo Técnico (Solo lectura)</option>
+              <option value="admin">Administrador (Control total)</option>
+            </select>
+          </div>
+        </div>
+        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
+          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
+          <button onClick={() => onSave(formData)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/20">Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- COMPONENTES UI PEQUEÑOS ---
+const SidebarItem = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`w-full flex flex-col items-center justify-center gap-1 py-3 transition-all border-l-4
+      ${active 
+        ? `border-red-600 bg-white text-red-600 font-black shadow-lg` 
+        : `border-transparent text-blue-200 hover:text-white hover:bg-blue-900 font-bold`}
+    `}
+  >
+    {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2, className: active ? 'text-red-600' : '' })}
+    <span className="text-[9px] uppercase tracking-widest mt-1">{label}</span>
+  </button>
+);
+
+const ProfileRow = ({ label, value, theme }) => (
+  <div className="flex justify-between items-end border-b border-slate-200 dark:border-slate-700/50 pb-2">
+    <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>{label}</span>
+    <span className="font-bold text-sm text-blue-950 dark:text-white">{value}</span>
+  </div>
+);
+
+const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, theme, darkMode }) => (
+  <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-between relative overflow-hidden shadow-sm`}>
+    <div className="flex justify-between items-start mb-3 relative z-10">
+      <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} w-2/3 leading-tight`}>{title}</h4>
+      <div className="w-10 h-10 relative flex-shrink-0">
+        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+          <path className={darkMode ? "stroke-slate-700" : "stroke-slate-100"} strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          {percent > 0 && (
+            <path className={`${color}`} strokeWidth="4" fill="none" strokeDasharray={`${percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          )}
+        </svg>
+        {showPercentInside && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className={`text-[9px] font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{percent}%</span>
+          </div>
+        )}
+      </div>
+    </div>
+    <div className="relative z-10">
+      <p className="text-2xl font-black tracking-tighter mb-1 text-blue-950 dark:text-white leading-none">{value}</p>
+      <p className={`text-[8px] font-bold uppercase tracking-widest ${theme.textMuted} truncate mt-1`}>{subtitle}</p>
+    </div>
+  </div>
+);
