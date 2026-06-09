@@ -320,7 +320,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 
     // Carga de Recursos Asíncronos
     const iconActColor = darkMode ? '#ffffff' : '#0f172a';
-    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64] = await Promise.all([
+    const [photoB64, iTarget, iShield, iSwords, iGit, iGoal, iCalendar, iPin, iActivity, rivalShieldB64, qrB64, atletiShieldB64] = await Promise.all([
       loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode),
       loadIconB64('target', '#3b82f6'), loadIconB64('shield', '#ef4444'), loadIconB64('swords', '#10b981'),
       loadIconB64('gitCompare', '#3b82f6'), loadIconB64('goal', '#eab308'), loadIconB64('calendar', '#3b82f6'),
