@@ -314,8 +314,9 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     const nextMatchPdf = gkMatchesForPdf.length > 0 ? gkMatchesForPdf[0] : null;
     const rivalPdf = nextMatchPdf ? rivals.find(r => r.id === nextMatchPdf.rivalId) : null;
 
-    // Generar URL para QR Código Dinámico de Estadísticas del Portero
-    const statsUrl = `https://www.atleticodemadrid.com/jugadores/${gk.name.toLowerCase().replace(/\s+/g, '-')}`;
+    // Generar URL para QR apuntando a la VISTA PÚBLICA de tu app
+    const baseUrl = window.location.origin + window.location.pathname;
+    const statsUrl = `${baseUrl}?public_gk=${gk.id}`;
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(statsUrl)}&color=0b132b&margin=10`;
 
     // Carga de Recursos Asíncronos
@@ -885,6 +886,16 @@ export default function App() {
   const [viewLockerRoom, setViewLockerRoom] = useState(true);
   const [lockerSelectedGk, setLockerSelectedGk] = useState(null);
 
+  // NUEVO: Leer el QR para abrir directamente el perfil del portero
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gkParam = params.get('gk');
+    if (gkParam) {
+      setSelectedGkId(gkParam);
+      setCurrentModule('reporte_detalle');
+    }
+  }, []);
+
   useEffect(() => {
     if (!auth) { setLoadingAuth(false); return; }
     const initAuth = async () => {
@@ -1103,10 +1114,6 @@ export default function App() {
     );
   }
 
-  if (!appUser) {
-    return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
-  }
-
   const theme = {
     bg: darkMode ? 'dark bg-slate-900' : 'bg-slate-50',
     card: darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-sm',
@@ -1114,6 +1121,53 @@ export default function App() {
     textMuted: darkMode ? 'text-slate-400' : 'text-slate-500',
     border: darkMode ? 'border-slate-700' : 'border-slate-200'
   };
+
+  // --- NUEVA VISTA PÚBLICA PARA COMPARTIR POR QR ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const publicGkId = urlParams.get('public_gk');
+
+  if (publicGkId) {
+    const publicGk = goalkeepers.find(g => g.id === publicGkId) || DUMMY_GOALKEEPER;
+    const publicMatches = matches.filter(m => m.season === activeSeason || (!m.season && activeSeason === '2026/27'));
+    
+    return (
+      <div className={`flex h-screen w-full overflow-y-auto font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''} bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 custom-scrollbar p-4 md:p-8`}>
+        <div className="max-w-[1600px] mx-auto w-full space-y-4">
+           {/* Cabecera Pública Personalizada */}
+           <div className="flex justify-between items-center mb-6 no-print bg-white dark:bg-slate-800 p-4 md:p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm">
+             <div className="flex items-center gap-4">
+               <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-10 h-10 md:w-12 md:h-12 object-contain drop-shadow-sm" />
+               <div>
+                 <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">ATLETI <span className="text-red-600">PLAN PARTIDO</span></h1>
+                 <p className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Informe Público del Jugador</p>
+               </div>
+             </div>
+             <button onClick={() => setDarkMode(!darkMode)} className={`p-3 rounded-xl border ${theme.border} bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-inner`}>
+               {darkMode ? <Sun size={20} className="text-slate-400" /> : <Moon size={20} className="text-slate-500" />}
+             </button>
+           </div>
+           
+           {/* Vista de reporte engañando a la app con role="staff" para que sea Solo Lectura */}
+           <DashboardView 
+              gk={publicGk} 
+              allGks={[publicGk]} 
+              matches={publicMatches} 
+              rivals={rivals} 
+              theme={theme} 
+              darkMode={darkMode} 
+              activeSeason={activeSeason} 
+              role="staff" 
+              isDataLoading={false}
+           />
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay QR público, pedimos login normal
+  if (!appUser) {
+    return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
+  }
 
   const renderModule = () => {
     if (selectedGkId && currentModule === 'reporte_detalle') {
