@@ -1522,6 +1522,17 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
           {match.league || 'Competición por definir'} {match.group && ` • ${match.group}`} {match.matchday && ` • JORNADA ${match.matchday}`}
         </span>
         <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{match.season || '2026/27'}</span>
+        
+        {/* Píldora de color dinámica según el tipo de partido */}
+        <span className={`text-[9px] px-2.5 py-1 rounded-lg font-black uppercase border ${
+          match.matchType === 'Pretemporada' 
+            ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/60' 
+            : match.matchType === 'Torneo'
+              ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/60'
+              : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60'
+        }`}>
+          {match.matchType || 'Liga'}
+        </span>
       </div>
 
       {/* Cabecera */}
@@ -2759,7 +2770,7 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '' });
+  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '', matchType: 'Liga' });
   
   const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
   
@@ -2806,6 +2817,14 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-right-4">
               <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Temporada</label><input type="text" name="season" value={formData.season} onChange={handleChange} className={inputClass} placeholder="Ej: 2026/27" /></div>
               <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Jornada</label><input type="text" name="matchday" value={formData.matchday} onChange={handleChange} className={inputClass} placeholder="Ej: 14" /></div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Tipo de Partido</label>
+                <select name="matchType" value={formData.matchType || 'Liga'} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
+                  <option value="Liga">Liga</option>
+                  <option value="Pretemporada">Pretemporada / Amistoso</option>
+                  <option value="Torneo">Torneo / Copa</option>
+                </select>
+              </div>
             </div>
           )}
 
