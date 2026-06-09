@@ -2424,7 +2424,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const penaltiesPercent = (currentStats.penaltiesFaced || 0) > 0 ? Math.round(((currentStats.penaltiesSaved || 0) / currentStats.penaltiesFaced) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-8 relative"></div>
     <div className="flex flex-col gap-8 relative">
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12">
         {/* TARJETA PERFIL */}
