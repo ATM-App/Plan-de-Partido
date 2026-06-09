@@ -2047,16 +2047,41 @@ function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, d
 }
 
 function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
-  const sortedMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+  // NUEVO: Estado para controlar el filtro seleccionado
+  const [filterType, setFilterType] = useState('Todos');
+
+  // NUEVO: Lógica de filtrado antes de ordenar
+  const filteredMatches = matches.filter(m => filterType === 'Todos' || (m.matchType || 'Liga') === filterType);
+  const sortedMatches = [...filteredMatches].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
+        <div className="flex flex-col gap-3">
+          <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
+          
+          {/* BOTONES DE FILTRADO DINÁMICO */}
+          <div className="flex flex-wrap gap-2">
+            {['Todos', 'Liga', 'Pretemporada', 'Torneo'].map(type => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${
+                  filterType === type 
+                    ? 'bg-red-600 text-white border-red-600' 
+                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {role !== 'staff' && (
-          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20">
+          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-950 hover:bg-blue-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shrink-0">
             <Plus size={16} /> Añadir Partido
           </button>
         )}
@@ -2071,8 +2096,9 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
         {sortedMatches.length === 0 && (
           <div className="col-span-full py-20 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-200 dark:border-slate-700 shadow-sm">
             <CalendarDays className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" />
-            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No hay partidos programados</p>
-            <p className="text-xs text-slate-400 mt-2 font-medium">Haz clic en "Añadir Partido" para crear la próxima jornada.</p>
+            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">
+              {filterType === 'Todos' ? 'No hay partidos programados' : `No hay partidos de ${filterType}`}
+            </p>
           </div>
         )}
       </div>
