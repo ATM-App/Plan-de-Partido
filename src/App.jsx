@@ -1077,7 +1077,7 @@ export default function App() {
     if (!db || !selectedGkId) return;
     try {
       const gkRef = doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', selectedGkId);
-      await setDoc(gkRef, { form: statsData.form, stats: statsData.stats }, { merge: true });
+      await setDoc(gkRef, statsData, { merge: true });
       showNotification("Estadísticas actualizadas con éxito");
       setIsStatsModalOpen(false);
     } catch(e) { showNotification("Error al guardar estadísticas", "error"); }
@@ -2395,18 +2395,36 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
   const recommendation = gk.technicalDecision || { title: 'PENDIENTE', reason: 'Aún no se ha introducido una valoración técnica para este portero.' };
 
-  const teamMatches = gk.stats?.teamMatches || Math.max(matches.length, (gk.stats?.starts || 0) + (gk.stats?.subs || 0));
-  const teamMinutes = gk.stats?.teamMinutes || teamMatches * 90;
-  const playedMatches = gk.stats?.playedMatches || ((gk.stats?.starts || 0) + (gk.stats?.subs || 0));
+  // NUEVO: Estado para alternar la visualización en el Dashboard
+  const [statsTab, setStatsTab] = useState('Global');
+
+  const currentStats = useMemo(() => {
+    if (statsTab === 'Liga') return gk.statsLiga || {};
+    if (statsTab === 'Pretemporada') return gk.statsPretemporada || {};
+    if (statsTab === 'Torneo') return gk.statsTorneo || {};
+    return gk.stats || {};
+  }, [gk, statsTab]);
+
+  const currentForm = useMemo(() => {
+    if (statsTab === 'Liga') return gk.formLiga || gk.form || 5.0;
+    if (statsTab === 'Pretemporada') return gk.formPretemporada || gk.form || 5.0;
+    if (statsTab === 'Torneo') return gk.formTorneo || gk.form || 5.0;
+    return gk.form || 5.0;
+  }, [gk, statsTab]);
+
+  const teamMatches = currentStats.teamMatches || Math.max(matches.length, (currentStats.starts || 0) + (currentStats.subs || 0));
+  const teamMinutes = currentStats.teamMinutes || teamMatches * 90;
+  const playedMatches = currentStats.playedMatches || ((currentStats.starts || 0) + (currentStats.subs || 0));
   
-  const minsPercent = teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0;
-  const startsPercent = teamMatches > 0 ? Math.round(((gk.stats?.starts || 0) / teamMatches) * 100) : 0;
-  const subsPercent = teamMatches > 0 ? Math.round(((gk.stats?.subs || 0) / teamMatches) * 100) : 0;
-  const goalsPercent = (gk.stats?.goalsConceded || 0) > 0 ? Math.min(100, Math.round(((gk.stats?.goalsConceded || 0) / Math.max(1, playedMatches)) * 50)) : 0;
-  const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / playedMatches) * 100) : 0;
-  const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
+  const minsPercent = teamMinutes > 0 ? Math.round(((currentStats.minutes || 0) / teamMinutes) * 100) : 0;
+  const startsPercent = teamMatches > 0 ? Math.round(((currentStats.starts || 0) / teamMatches) * 100) : 0;
+  const subsPercent = teamMatches > 0 ? Math.round(((currentStats.subs || 0) / teamMatches) * 100) : 0;
+  const goalsPercent = playedMatches > 0 ? Math.min(100, Math.round(((currentStats.goalsConceded || 0) / playedMatches) * 50)) : 0;
+  const cleanSheetsPercent = playedMatches > 0 ? Math.round(((currentStats.cleanSheets || 0) / playedMatches) * 100) : 0;
+  const penaltiesPercent = (currentStats.penaltiesFaced || 0) > 0 ? Math.round(((currentStats.penaltiesSaved || 0) / currentStats.penaltiesFaced) * 100) : 0;
 
   return (
+    <div className="flex flex-col gap-8 relative"></div>
     <div className="flex flex-col gap-8 relative">
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12">
         {/* TARJETA PERFIL */}
@@ -2480,45 +2498,65 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
       {/* ESTADÍSTICAS GRID */}
       <div>
-        <div className="flex justify-between items-center mb-6 ml-2 group">
-          <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 ml-2">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
+          </div>
+          
+          {/* Pestañas de Filtrado en el Dashboard */}
+          <div className="flex items-center gap-1.5 bg-slate-200 dark:bg-slate-800 p-1 rounded-xl border border-slate-300 dark:border-slate-700 shadow-inner no-print">
+            {['Global', 'Liga', 'Pretemporada', 'Torneo'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setStatsTab(tab)}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  statsTab === tab 
+                    ? 'bg-blue-950 dark:bg-red-600 text-white shadow' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           {role !== 'staff' && (
-            <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas">
+            <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print" title="Editar Estadísticas">
               <Edit2 size={16} strokeWidth={3} />
             </button>
           )}
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 print:grid-cols-4">
-          <StatCard title="Minutos Jugados" value={gk.stats?.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Titular" value={gk.stats?.starts || 0} subtitle={`${gk.stats?.starts || 0} / ${teamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Suplente" value={gk.stats?.subs || 0} subtitle={`${gk.stats?.subs || 0} / ${teamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Goles Encajados" value={gk.stats?.goalsConceded || 0} subtitle={`Promedio: ${playedMatches ? ((gk.stats?.goalsConceded || 0) / playedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Porterías a Cero" value={gk.stats?.cleanSheets || 0} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Penaltis Parados" value={gk.stats?.penaltiesSaved || 0} subtitle={`de ${gk.stats?.penaltiesFaced || 0} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Minutos Jugados" value={currentStats.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Titular" value={currentStats.starts || 0} subtitle={`${currentStats.starts || 0} / ${teamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Suplente" value={currentStats.subs || 0} subtitle={`${currentStats.subs || 0} / ${teamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Goles Encajados" value={currentStats.goalsConceded || 0} subtitle={`Promedio: ${playedMatches ? ((currentStats.goalsConceded || 0) / playedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Porterías a Cero" value={currentStats.cleanSheets || 0} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Penaltis Parados" value={currentStats.penaltiesSaved || 0} subtitle={`de ${currentStats.penaltiesFaced || 0} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
           
           <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center relative overflow-hidden shadow-sm`}>
-             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
+             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos {statsTab}</h4>
              <div className="space-y-3 flex-1 flex flex-col justify-center">
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.calledUpMatches || 0}/{gk.stats?.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.calledUpMatches || 0}/{currentStats.teamMatches || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((currentStats.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.playedMatches || 0}/{gk.stats?.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((gk.stats?.playedMatches || 0) / teamMatches) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.playedMatches || 0}/{currentStats.teamMatches || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((currentStats.playedMatches || 0) / teamMatches) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.minutes || 0}/{gk.stats?.teamMinutes || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.minutes || 0}/{currentStats.teamMinutes || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((currentStats.minutes || 0) / teamMinutes) * 100) : 0}%</span>
                   </div>
                 </div>
              </div>
@@ -2711,14 +2749,53 @@ function AddSeasonModal({ onClose, onSave, theme }) {
 }
 
 function GkStatsModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState({
+  const [currentTab, setCurrentTab] = useState('Global');
+  
+  const [globalData, setGlobalData] = useState({
     form: initialData?.form || 5.0, minutes: initialData?.stats?.minutes || 0, starts: initialData?.stats?.starts || 0, subs: initialData?.stats?.subs || 0,
     goalsConceded: initialData?.stats?.goalsConceded || 0, cleanSheets: initialData?.stats?.cleanSheets || 0, penaltiesSaved: initialData?.stats?.penaltiesSaved || 0, penaltiesFaced: initialData?.stats?.penaltiesFaced || 0,
     teamMatches: initialData?.stats?.teamMatches || 0, calledUpMatches: initialData?.stats?.calledUpMatches || 0, playedMatches: initialData?.stats?.playedMatches || 0, teamMinutes: initialData?.stats?.teamMinutes || 0
   });
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSubmit = () => { onSave({ form: parseFloat(formData.form) || 5.0, stats: { minutes: parseInt(formData.minutes) || 0, starts: parseInt(formData.starts) || 0, subs: parseInt(formData.subs) || 0, goalsConceded: parseInt(formData.goalsConceded) || 0, cleanSheets: parseInt(formData.cleanSheets) || 0, penaltiesSaved: parseInt(formData.penaltiesSaved) || 0, penaltiesFaced: parseInt(formData.penaltiesFaced) || 0, teamMatches: parseInt(formData.teamMatches) || 0, calledUpMatches: parseInt(formData.calledUpMatches) || 0, playedMatches: parseInt(formData.playedMatches) || 0, teamMinutes: parseInt(formData.teamMinutes) || 0 } }); };
+  const [ligaData, setLigaData] = useState({
+    form: initialData?.formLiga || 5.0, minutes: initialData?.statsLiga?.minutes || 0, starts: initialData?.statsLiga?.starts || 0, subs: initialData?.statsLiga?.subs || 0,
+    goalsConceded: initialData?.statsLiga?.goalsConceded || 0, cleanSheets: initialData?.statsLiga?.cleanSheets || 0, penaltiesSaved: initialData?.statsLiga?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsLiga?.penaltiesFaced || 0,
+    teamMatches: initialData?.statsLiga?.teamMatches || 0, calledUpMatches: initialData?.statsLiga?.calledUpMatches || 0, playedMatches: initialData?.statsLiga?.playedMatches || 0, teamMinutes: initialData?.statsLiga?.teamMinutes || 0
+  });
+
+  const [preData, setPreData] = useState({
+    form: initialData?.formPretemporada || 5.0, minutes: initialData?.statsPretemporada?.minutes || 0, starts: initialData?.statsPretemporada?.starts || 0, subs: initialData?.statsPretemporada?.subs || 0,
+    goalsConceded: initialData?.statsPretemporada?.goalsConceded || 0, cleanSheets: initialData?.statsPretemporada?.cleanSheets || 0, penaltiesSaved: initialData?.statsPretemporada?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsPretemporada?.penaltiesFaced || 0,
+    teamMatches: initialData?.statsPretemporada?.teamMatches || 0, calledUpMatches: initialData?.statsPretemporada?.calledUpMatches || 0, playedMatches: initialData?.statsPretemporada?.playedMatches || 0, teamMinutes: initialData?.statsPretemporada?.teamMinutes || 0
+  });
+
+  const [torneoData, setTorneoData] = useState({
+    form: initialData?.formTorneo || 5.0, minutes: initialData?.statsTorneo?.minutes || 0, starts: initialData?.statsTorneo?.starts || 0, subs: initialData?.statsTorneo?.subs || 0,
+    goalsConceded: initialData?.statsTorneo?.goalsConceded || 0, cleanSheets: initialData?.statsTorneo?.cleanSheets || 0, penaltiesSaved: initialData?.statsTorneo?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsTorneo?.penaltiesFaced || 0,
+    teamMatches: initialData?.statsTorneo?.teamMatches || 0, calledUpMatches: initialData?.statsTorneo?.calledUpMatches || 0, playedMatches: initialData?.statsTorneo?.playedMatches || 0, teamMinutes: initialData?.statsTorneo?.teamMinutes || 0
+  });
+
+  const activeData = currentTab === 'Liga' ? ligaData : currentTab === 'Pretemporada' ? preData : currentTab === 'Torneo' ? torneoData : globalData;
+  const setActiveData = currentTab === 'Liga' ? setLigaData : currentTab === 'Pretemporada' ? setPreData : currentTab === 'Torneo' ? setTorneoData : setGlobalData;
+
+  const handleChange = (e) => { setActiveData({ ...activeData, [e.target.name]: e.target.value }); };
+
+  const cleanObj = (obj) => ({
+    minutes: parseInt(obj.minutes) || 0, starts: parseInt(obj.starts) || 0, subs: parseInt(obj.subs) || 0,
+    goalsConceded: parseInt(obj.goalsConceded) || 0, cleanSheets: parseInt(obj.cleanSheets) || 0,
+    penaltiesSaved: parseInt(obj.penaltiesSaved) || 0, penaltiesFaced: parseInt(obj.penaltiesFaced) || 0,
+    teamMatches: parseInt(obj.teamMatches) || 0, calledUpMatches: parseInt(obj.calledUpMatches) || 0,
+    playedMatches: parseInt(obj.playedMatches) || 0, teamMinutes: parseInt(obj.teamMinutes) || 0
+  });
+
+  const handleSubmit = () => {
+    onSave({
+      form: parseFloat(globalData.form) || 5.0, stats: cleanObj(globalData),
+      formLiga: parseFloat(ligaData.form) || 5.0, statsLiga: cleanObj(ligaData),
+      formPretemporada: parseFloat(preData.form) || 5.0, statsPretemporada: cleanObj(preData),
+      formTorneo: parseFloat(torneoData.form) || 5.0, statsTorneo: cleanObj(torneoData)
+    });
+  };
 
   const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner";
 
@@ -2726,36 +2803,44 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
       <div className={`w-full max-w-3xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
         <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-emerald-950 dark:text-white"><Activity className="text-emerald-500 w-8 h-8" /> Editar Estadísticas</h2>
+          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-emerald-950 dark:text-white"><Activity className="text-emerald-500 w-8 h-8" /> Configurar Métricas</h2>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
         </div>
+        
+        {/* Selector de Pestañas dentro del Modal */}
+        <div className="flex justify-center gap-2 mt-4 px-8 no-print">
+          {['Global', 'Liga', 'Pretemporada', 'Torneo'].map(tab => (
+            <button key={tab} type="button" onClick={() => setCurrentTab(tab)} className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${currentTab === tab ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>{tab}</button>
+          ))}
+        </div>
+
         <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-4">Actualiza las estadísticas acumuladas y el estado de forma general de <strong className="text-slate-800 dark:text-white font-black uppercase">{initialData?.name}</strong>.</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Editando métricas de la categoría: <strong className="text-emerald-500 uppercase font-black">{currentTab}</strong></p>
           
           <div className="mb-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos Globales (Para Porcentajes)</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos del Bloque ({currentTab})</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={formData.teamMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={formData.calledUpMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={formData.playedMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={formData.teamMinutes} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={activeData.teamMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={activeData.calledUpMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={activeData.playedMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={activeData.teamMinutes} onChange={handleChange} className={inputClass} /></div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={formData.form} onChange={handleChange} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={formData.minutes} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={formData.starts} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={formData.subs} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={formData.goalsConceded} onChange={handleChange} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={formData.cleanSheets} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={formData.penaltiesSaved} onChange={handleChange} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={formData.penaltiesFaced} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={activeData.form} onChange={handleChange} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={activeData.minutes} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={activeData.starts} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={activeData.subs} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={activeData.goalsConceded} onChange={handleChange} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={activeData.cleanSheets} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={activeData.penaltiesSaved} onChange={handleChange} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={activeData.penaltiesFaced} onChange={handleChange} className={inputClass} /></div>
           </div>
         </div>
         <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
           <button onClick={onClose} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm">Cancelar</button>
-          <button onClick={handleSubmit} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/30">Guardar Estadísticas</button>
+          <button onClick={handleSubmit} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/30">Guardar Todo</button>
         </div>
       </div>
     </div>
