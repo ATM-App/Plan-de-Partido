@@ -242,13 +242,18 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
   });
 };
 
-const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotification, darkMode) => {
-  try {
-    showNotification("Generando Reporte Premium con Fotografía y Gráficos...", "success");
-    const jspdfModule = await loadJsPDF();
-    const JsPDFClass = jspdfModule.jsPDF;
-    
-    const doc = new JsPDFClass({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, darkMode) => {
+    try {
+      // NUEVO: Ventana emergente que te pregunta qué tipo de reporte quieres descargar en PDF
+      const chosenTab = window.prompt("¿Qué estadísticas deseas exportar al PDF?\nEscribe exactamente una opción: Global, Liga, Pretemporada o Torneo", "Global") || "Global";
+      
+      // Ajustamos el clon del jugador en base a la elección del usuario antes de pintar el PDF
+      const validTab = ['Liga', 'Pretemporada', 'Torneo'].includes(chosenTab) ? chosenTab : 'Global';
+      if (validTab !== 'Global') {
+         gk = { ...gk, stats: gk[`stats${validTab}`] || {}, form: gk[`form${validTab}`] || gk.form };
+      }
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
     
     // Cargar Fuentes Personalizadas
     await loadCustomFonts(doc);
@@ -2774,10 +2779,33 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
     teamMatches: initialData?.statsTorneo?.teamMatches || 0, calledUpMatches: initialData?.statsTorneo?.calledUpMatches || 0, playedMatches: initialData?.statsTorneo?.playedMatches || 0, teamMinutes: initialData?.statsTorneo?.teamMinutes || 0
   });
 
-  const activeData = currentTab === 'Liga' ? ligaData : currentTab === 'Pretemporada' ? preData : currentTab === 'Torneo' ? torneoData : globalData;
-  const setActiveData = currentTab === 'Liga' ? setLigaData : currentTab === 'Pretemporada' ? setPreData : currentTab === 'Torneo' ? setTorneoData : setGlobalData;
+  // NUEVO: Bloqueamos la edición manual en la pestaña Global y hacemos que sume en tiempo real lo que vas escribiendo en las otras
+  const lData = cleanObj(ligaData);
+  const pData = cleanObj(preData);
+  const tData = cleanObj(torneoData);
 
-  const handleChange = (e) => { setActiveData({ ...activeData, [e.target.name]: e.target.value }); };
+  const autoGlobalData = {
+    form: ((parseFloat(ligaData.form) + parseFloat(preData.form) + parseFloat(torneoData.form)) / 3).toFixed(1),
+    minutes: lData.minutes + pData.minutes + tData.minutes,
+    starts: lData.starts + pData.starts + tData.starts,
+    subs: lData.subs + pData.subs + tData.subs,
+    goalsConceded: lData.goalsConceded + pData.goalsConceded + tData.goalsConceded,
+    cleanSheets: lData.cleanSheets + pData.cleanSheets + tData.cleanSheets,
+    penaltiesSaved: lData.penaltiesSaved + pData.penaltiesSaved + tData.penaltiesSaved,
+    penaltiesFaced: lData.penaltiesFaced + pData.penaltiesFaced + tData.penaltiesFaced,
+    teamMatches: lData.teamMatches + pData.teamMatches + tData.teamMatches,
+    calledUpMatches: lData.calledUpMatches + pData.calledUpMatches + tData.calledUpMatches,
+    playedMatches: lData.playedMatches + pData.playedMatches + tData.playedMatches,
+    teamMinutes: lData.teamMinutes + pData.teamMinutes + tData.teamMinutes
+  };
+
+  const activeData = currentTab === 'Liga' ? ligaData : currentTab === 'Pretemporada' ? preData : currentTab === 'Torneo' ? torneoData : autoGlobalData;
+  const setActiveData = currentTab === 'Liga' ? setLigaData : currentTab === 'Pretemporada' ? setPreData : currentTab === 'Torneo' ? setTorneoData : null;
+
+  const handleChange = (e) => { 
+    if (currentTab === 'Global') return; // No deja escribir si estás en la pestaña global
+    setActiveData({ ...activeData, [e.target.name]: e.target.value }); 
+  };
 
   const cleanObj = (obj) => ({
     minutes: parseInt(obj.minutes) || 0, starts: parseInt(obj.starts) || 0, subs: parseInt(obj.subs) || 0,
@@ -2788,11 +2816,34 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
   });
 
   const handleSubmit = () => {
+    const lData = cleanObj(ligaData);
+    const pData = cleanObj(preData);
+    const tData = cleanObj(torneoData);
+
+    // Suma automática de todas las métricas para el Global
+    const sumStats = {
+      minutes: lData.minutes + pData.minutes + tData.minutes,
+      starts: lData.starts + pData.starts + tData.starts,
+      subs: lData.subs + pData.subs + tData.subs,
+      goalsConceded: lData.goalsConceded + pData.goalsConceded + tData.goalsConceded,
+      cleanSheets: lData.cleanSheets + pData.cleanSheets + tData.cleanSheets,
+      penaltiesSaved: lData.penaltiesSaved + pData.penaltiesSaved + tData.penaltiesSaved,
+      penaltiesFaced: lData.penaltiesFaced + pData.penaltiesFaced + tData.penaltiesFaced,
+      teamMatches: lData.teamMatches + pData.teamMatches + tData.teamMatches,
+      calledUpMatches: lData.calledUpMatches + pData.calledUpMatches + tData.calledUpMatches,
+      playedMatches: lData.playedMatches + pData.playedMatches + tData.playedMatches,
+      teamMinutes: lData.teamMinutes + pData.teamMinutes + tData.teamMinutes
+    };
+
+    // Calculamos la media del estado de forma de las 3 competiciones
+    const formValues = [parseFloat(ligaData.form), parseFloat(preData.form), parseFloat(torneoData.form)].filter(v => v > 0);
+    const avgForm = formValues.length > 0 ? (formValues.reduce((a, b) => a + b, 0) / formValues.length).toFixed(1) : 5.0;
+
     onSave({
-      form: parseFloat(globalData.form) || 5.0, stats: cleanObj(globalData),
-      formLiga: parseFloat(ligaData.form) || 5.0, statsLiga: cleanObj(ligaData),
-      formPretemporada: parseFloat(preData.form) || 5.0, statsPretemporada: cleanObj(preData),
-      formTorneo: parseFloat(torneoData.form) || 5.0, statsTorneo: cleanObj(torneoData)
+      form: parseFloat(avgForm), stats: sumStats,
+      formLiga: parseFloat(ligaData.form) || 5.0, statsLiga: lData,
+      formPretemporada: parseFloat(preData.form) || 5.0, statsPretemporada: pData,
+      formTorneo: parseFloat(torneoData.form) || 5.0, statsTorneo: tData
     });
   };
 
