@@ -242,15 +242,16 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
   });
 };
 
-const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, darkMode) => {
+const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
     try {
-      // NUEVO: Ventana emergente que te pregunta qué tipo de reporte quieres descargar en PDF
-      const chosenTab = window.prompt("¿Qué estadísticas deseas exportar al PDF?\nEscribe exactamente una opción: Global, Liga, Pretemporada o Torneo", "Global") || "Global";
+      // Creamos una copia para no alterar lo que se ve en la pantalla de la app
+      let gk = JSON.parse(JSON.stringify(gkOrig));
       
-      // Ajustamos el clon del jugador en base a la elección del usuario antes de pintar el PDF
-      const validTab = ['Liga', 'Pretemporada', 'Torneo'].includes(chosenTab) ? chosenTab : 'Global';
-      if (validTab !== 'Global') {
-         gk = { ...gk, stats: gk[`stats${validTab}`] || {}, form: gk[`form${validTab}`] || gk.form };
+      // Si el tipo no es Global, inyectamos los datos específicos en el hueco principal
+      if (reportType !== 'Global') {
+         const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
+         gk.stats = gk[`stats${suffix}`] || {};
+         gk.form = gk[`form${suffix}`] || gk.form;
       }
 
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -886,6 +887,8 @@ export default function App() {
   const [isMatchPlanModalOpen, setIsMatchPlanModalOpen] = useState(false);
   const [isAddSeasonModalOpen, setIsAddSeasonModalOpen] = useState(false);
   const [exportTrigger, setExportTrigger] = useState(0);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [gkToExport, setGkToExport] = useState(null);
 
   // Estados del Vestuario e Plan táctico inmersivo
   const [viewLockerRoom, setViewLockerRoom] = useState(true);
@@ -1086,6 +1089,20 @@ export default function App() {
       showNotification("Estadísticas actualizadas con éxito");
       setIsStatsModalOpen(false);
     } catch(e) { showNotification("Error al guardar estadísticas", "error"); }
+  };
+
+  // ✅ NUEVAS FUNCIONES DE CONTROL DE EXPORTACIÓN PDF INTERCALADAS AQUÍ
+  const handleDownloadPdf = (gk) => {
+    setGkToExport(gk);
+    setIsExportModalOpen(true);
+  };
+
+  const confirmDownload = async (type) => {
+    setIsExportModalOpen(false);
+    if (gkToExport) {
+      await exportarPDFVectorial(gkToExport, matches, rivals, activeSeason, darkMode, type);
+      setGkToExport(null);
+    }
   };
 
   const handleDeleteDoc = async (collectionName, id) => {
@@ -1362,6 +1379,9 @@ export default function App() {
             darkMode={darkMode}
           />
         )}
+
+        {/* NUEVO MODAL DE EXPORTACIÓN PDF */}
+        {isExportModalOpen && <ExportPdfModal onClose={() => setIsExportModalOpen(false)} onConfirm={confirmDownload} theme={theme} />}
 
       </main>
     </div>
@@ -3335,3 +3355,61 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
     </div>
   </div>
 );
+// ==========================================
+// NUEVO MODAL DE EXPORTACIÓN PDF PREMIUM
+// ==========================================
+function ExportPdfModal({ onClose, onConfirm, theme }) {
+  const [selected, setSelected] = useState('Global');
+  
+  const options = [
+    { id: 'Global', label: 'Informe Temporada (Suma Total)', icon: '📊' },
+    { id: 'Liga', label: 'Estadísticas de Liga', icon: '🏆' },
+    { id: 'Pretemporada', label: 'Pretemporada / Amistosos', icon: '🔥' },
+    { id: 'Torneo', label: 'Torneos / Copas', icon: '⭐' }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
+      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200`}>
+        <div className="p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-red-50 dark:bg-red-950/10 rounded-t-[3rem]">
+          <h2 className="text-xl font-black italic uppercase tracking-tighter text-blue-950 dark:text-white flex items-center gap-3">
+             📄 Exportar Informe
+          </h2>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm font-black">✕</button>
+        </div>
+        
+        <div className="p-8 space-y-4">
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Selecciona el tipo de informe:</p>
+          <div className="space-y-3">
+            {options.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setSelected(opt.id)}
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
+                  selected === opt.id 
+                  ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' 
+                  : 'border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                <span className="text-xl">{opt.icon}</span>
+                <span className="font-black uppercase text-[10px] tracking-widest">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-8 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-3">
+          <button 
+            type="button"
+            onClick={() => onConfirm(selected)}
+            className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-red-600 hover:bg-red-700 text-white transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
+          >
+            📥 Generar Documento PDF
+          </button>
+          <button type="button" onClick={onClose} className="w-full py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
