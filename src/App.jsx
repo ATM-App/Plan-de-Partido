@@ -2753,14 +2753,9 @@ function AddSeasonModal({ onClose, onSave, theme }) {
 }
 
 function GkStatsModal({ initialData, onClose, onSave, theme }) {
-  const [currentTab, setCurrentTab] = useState('Global');
+  // Ahora iniciamos directamente en Liga para que no intentes editar el Global
+  const [currentTab, setCurrentTab] = useState('Liga');
   
-  const [globalData, setGlobalData] = useState({
-    form: initialData?.form || 5.0, minutes: initialData?.stats?.minutes || 0, starts: initialData?.stats?.starts || 0, subs: initialData?.stats?.subs || 0,
-    goalsConceded: initialData?.stats?.goalsConceded || 0, cleanSheets: initialData?.stats?.cleanSheets || 0, penaltiesSaved: initialData?.stats?.penaltiesSaved || 0, penaltiesFaced: initialData?.stats?.penaltiesFaced || 0,
-    teamMatches: initialData?.stats?.teamMatches || 0, calledUpMatches: initialData?.stats?.calledUpMatches || 0, playedMatches: initialData?.stats?.playedMatches || 0, teamMinutes: initialData?.stats?.teamMinutes || 0
-  });
-
   const [ligaData, setLigaData] = useState({
     form: initialData?.formLiga || 5.0, minutes: initialData?.statsLiga?.minutes || 0, starts: initialData?.statsLiga?.starts || 0, subs: initialData?.statsLiga?.subs || 0,
     goalsConceded: initialData?.statsLiga?.goalsConceded || 0, cleanSheets: initialData?.statsLiga?.cleanSheets || 0, penaltiesSaved: initialData?.statsLiga?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsLiga?.penaltiesFaced || 0,
@@ -2779,13 +2774,22 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
     teamMatches: initialData?.statsTorneo?.teamMatches || 0, calledUpMatches: initialData?.statsTorneo?.calledUpMatches || 0, playedMatches: initialData?.statsTorneo?.playedMatches || 0, teamMinutes: initialData?.statsTorneo?.teamMinutes || 0
   });
 
-  // NUEVO: Bloqueamos la edición manual en la pestaña Global y hacemos que sume en tiempo real lo que vas escribiendo en las otras
+  // 1. CORRECCIÓN: Definimos la herramienta PRIMERO
+  const cleanObj = (obj) => ({
+    minutes: parseInt(obj.minutes) || 0, starts: parseInt(obj.starts) || 0, subs: parseInt(obj.subs) || 0,
+    goalsConceded: parseInt(obj.goalsConceded) || 0, cleanSheets: parseInt(obj.cleanSheets) || 0,
+    penaltiesSaved: parseInt(obj.penaltiesSaved) || 0, penaltiesFaced: parseInt(obj.penaltiesFaced) || 0,
+    teamMatches: parseInt(obj.teamMatches) || 0, calledUpMatches: parseInt(obj.calledUpMatches) || 0,
+    playedMatches: parseInt(obj.playedMatches) || 0, teamMinutes: parseInt(obj.teamMinutes) || 0
+  });
+
+  // 2. Y LUEGO sumamos (así ya no da error de "before initialization")
   const lData = cleanObj(ligaData);
   const pData = cleanObj(preData);
   const tData = cleanObj(torneoData);
 
   const autoGlobalData = {
-    form: ((parseFloat(ligaData.form) + parseFloat(preData.form) + parseFloat(torneoData.form)) / 3).toFixed(1),
+    form: ((parseFloat(ligaData.form || 5.0) + parseFloat(preData.form || 5.0) + parseFloat(torneoData.form || 5.0)) / 3).toFixed(1),
     minutes: lData.minutes + pData.minutes + tData.minutes,
     starts: lData.starts + pData.starts + tData.starts,
     subs: lData.subs + pData.subs + tData.subs,
@@ -2803,51 +2807,23 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
   const setActiveData = currentTab === 'Liga' ? setLigaData : currentTab === 'Pretemporada' ? setPreData : currentTab === 'Torneo' ? setTorneoData : null;
 
   const handleChange = (e) => { 
-    if (currentTab === 'Global') return; // No deja escribir si estás en la pestaña global
+    if (currentTab === 'Global') return; // Bloqueo extra por seguridad
     setActiveData({ ...activeData, [e.target.name]: e.target.value }); 
   };
 
-  const cleanObj = (obj) => ({
-    minutes: parseInt(obj.minutes) || 0, starts: parseInt(obj.starts) || 0, subs: parseInt(obj.subs) || 0,
-    goalsConceded: parseInt(obj.goalsConceded) || 0, cleanSheets: parseInt(obj.cleanSheets) || 0,
-    penaltiesSaved: parseInt(obj.penaltiesSaved) || 0, penaltiesFaced: parseInt(obj.penaltiesFaced) || 0,
-    teamMatches: parseInt(obj.teamMatches) || 0, calledUpMatches: parseInt(obj.calledUpMatches) || 0,
-    playedMatches: parseInt(obj.playedMatches) || 0, teamMinutes: parseInt(obj.teamMinutes) || 0
-  });
-
   const handleSubmit = () => {
-    const lData = cleanObj(ligaData);
-    const pData = cleanObj(preData);
-    const tData = cleanObj(torneoData);
-
-    // Suma automática de todas las métricas para el Global
-    const sumStats = {
-      minutes: lData.minutes + pData.minutes + tData.minutes,
-      starts: lData.starts + pData.starts + tData.starts,
-      subs: lData.subs + pData.subs + tData.subs,
-      goalsConceded: lData.goalsConceded + pData.goalsConceded + tData.goalsConceded,
-      cleanSheets: lData.cleanSheets + pData.cleanSheets + tData.cleanSheets,
-      penaltiesSaved: lData.penaltiesSaved + pData.penaltiesSaved + tData.penaltiesSaved,
-      penaltiesFaced: lData.penaltiesFaced + pData.penaltiesFaced + tData.penaltiesFaced,
-      teamMatches: lData.teamMatches + pData.teamMatches + tData.teamMatches,
-      calledUpMatches: lData.calledUpMatches + pData.calledUpMatches + tData.calledUpMatches,
-      playedMatches: lData.playedMatches + pData.playedMatches + tData.playedMatches,
-      teamMinutes: lData.teamMinutes + pData.teamMinutes + tData.teamMinutes
-    };
-
-    // Calculamos la media del estado de forma de las 3 competiciones
-    const formValues = [parseFloat(ligaData.form), parseFloat(preData.form), parseFloat(torneoData.form)].filter(v => v > 0);
+    const formValues = [parseFloat(ligaData.form), parseFloat(preData.form), parseFloat(torneoData.form)].filter(v => !isNaN(v) && v > 0);
     const avgForm = formValues.length > 0 ? (formValues.reduce((a, b) => a + b, 0) / formValues.length).toFixed(1) : 5.0;
 
     onSave({
-      form: parseFloat(avgForm), stats: sumStats,
+      form: parseFloat(avgForm), stats: cleanObj(autoGlobalData),
       formLiga: parseFloat(ligaData.form) || 5.0, statsLiga: lData,
       formPretemporada: parseFloat(preData.form) || 5.0, statsPretemporada: pData,
       formTorneo: parseFloat(torneoData.form) || 5.0, statsTorneo: tData
     });
   };
 
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner";
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
@@ -2857,7 +2833,6 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
         </div>
         
-        {/* Selector de Pestañas dentro del Modal */}
         <div className="flex justify-center gap-2 mt-4 px-8 no-print">
           {['Global', 'Liga', 'Pretemporada', 'Torneo'].map(tab => (
             <button key={tab} type="button" onClick={() => setCurrentTab(tab)} className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${currentTab === tab ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>{tab}</button>
@@ -2865,27 +2840,31 @@ function GkStatsModal({ initialData, onClose, onSave, theme }) {
         </div>
 
         <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Editando métricas de la categoría: <strong className="text-emerald-500 uppercase font-black">{currentTab}</strong></p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+            {currentTab === 'Global' 
+              ? <span className="text-blue-500 font-bold">Mostrando suma automática de todas las competiciones (No editable)</span> 
+              : <>Editando métricas de la categoría: <strong className="text-emerald-500 uppercase font-black">{currentTab}</strong></>}
+          </p>
           
           <div className="mb-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos del Bloque ({currentTab})</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={activeData.teamMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={activeData.calledUpMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={activeData.playedMatches} onChange={handleChange} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={activeData.teamMinutes} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={activeData.teamMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={activeData.calledUpMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={activeData.playedMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={activeData.teamMinutes} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={activeData.form} onChange={handleChange} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={activeData.minutes} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={activeData.starts} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={activeData.subs} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={activeData.goalsConceded} onChange={handleChange} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={activeData.cleanSheets} onChange={handleChange} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={activeData.penaltiesSaved} onChange={handleChange} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={activeData.penaltiesFaced} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={activeData.form} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={activeData.minutes} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={activeData.starts} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={activeData.subs} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={activeData.goalsConceded} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={activeData.cleanSheets} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={activeData.penaltiesSaved} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={activeData.penaltiesFaced} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
           </div>
         </div>
         <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
