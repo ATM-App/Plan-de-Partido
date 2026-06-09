@@ -326,7 +326,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       loadIconB64('gitCompare', '#3b82f6'), loadIconB64('goal', '#eab308'), loadIconB64('calendar', '#3b82f6'),
       loadIconB64('mapPin', '#ef4444'), loadIconB64('activity', iconActColor),
       loadImgToB64(rivalPdf?.shieldUrl),
-      loadImgToB64(qrApiUrl)
+      loadImgToB64(qrApiUrl),
+      loadImgToB64(ESCUDO_ATM_URL)
     ]);
 
     const pageWidth = 297; const pageHeight = 210;
@@ -410,7 +411,11 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       const shieldY = 90;
 
       // Atleti
-      if (iShield) doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      if (atletiShieldB64) {
+          doc.addImage(atletiShieldB64, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      } else if (iShield) {
+          doc.addImage(iShield, 'PNG', leftCX - 40 - 15, shieldY, 32, 32);
+      }
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
@@ -1187,7 +1192,7 @@ export default function App() {
       {/* SIDEBAR (Desktop Only) */}
       <aside className={`hidden md:flex w-24 lg:w-28 h-screen overflow-hidden flex-shrink-0 flex-col bg-blue-950 text-white no-print z-20 transition-colors`}>
         <div className={`h-24 flex items-center justify-center border-b border-blue-900/50 pt-4 pb-4 shrink-0`}>
-          <Shield className="w-12 h-12 text-red-600 drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-12 h-12 object-contain drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
         </div>
 
         <nav className="flex-1 py-2 flex flex-col gap-0 items-center justify-center w-full">
@@ -1238,7 +1243,7 @@ export default function App() {
 
           <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
             <div className="flex items-center gap-2 px-6 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-auto">
-               <Shield size={18} className="text-red-600" />
+               <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-5 h-5 object-contain" />
                <span className="text-lg lg:text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white drop-shadow-sm">
                  ATLETI <span className="text-red-600">PLAN PARTIDO</span>
                </span>
@@ -1350,7 +1355,7 @@ const LoginScreen = ({ users, onLogin }) => {
       {/* Lado Izquierdo */}
       <div className="hidden lg:flex flex-1 relative bg-gradient-to-br from-blue-900 to-blue-950 overflow-hidden flex-col justify-end p-24">
         <div className="absolute inset-0 z-0 opacity-20 pointer-events-none flex items-center justify-center">
-            <Shield className="w-[800px] h-[800px] text-white transform -rotate-12" />
+            <img src={ESCUDO_ATM_URL} alt="" className="w-[800px] h-[800px] object-contain transform -rotate-12 opacity-50 grayscale" />
         </div>
         <div className="relative z-20 flex flex-col">
           <h3 className="text-3xl xl:text-4xl font-black text-red-500/90 italic uppercase tracking-tighter mb-4 drop-shadow-xl">
@@ -1372,7 +1377,7 @@ const LoginScreen = ({ users, onLogin }) => {
         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-blue-600"></div>
         
         <div className="flex flex-col items-center text-center mb-12">
-          <Shield className="h-20 w-20 text-red-600 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="h-24 w-auto mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
           <h1 className="text-blue-950 text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4 whitespace-nowrap">ATLETI <span className="text-red-600">PLAN PARTIDO</span></h1>
           <div className="flex flex-col items-center">
             <span className="text-slate-500 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">
@@ -1477,7 +1482,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
       {/* Escudos y Hora */}
       <div className="flex items-center justify-between px-6 md:px-12 py-6 relative z-10 border-b border-slate-100 dark:border-slate-700/50">
         <div className="flex flex-col items-center flex-1">
-          <Shield className="w-16 h-16 md:w-24 md:h-24 text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
+          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
           <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase">Atleti</span>
         </div>
 
@@ -1581,7 +1586,7 @@ function VestuarioVirtual({ gks, onOpenPlan, theme }) {
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Selecciona a un portero para configurar su plan táctico</p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg">
-            <Shield size={16} className="text-red-500"/>
+            <img src={ESCUDO_ATM_URL} alt="" className="w-4 h-4 object-contain" />
             <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Atleti KMP Report</span>
         </div>
       </div>
