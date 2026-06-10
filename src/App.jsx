@@ -242,20 +242,21 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
   });
 };
 
-const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
+const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
+    // 1. Guardamos una copia de seguridad limpia de los datos numéricos originales
+    const originalStats = { ...gk.stats };
+    const originalForm = gk.form;
+
     try {
-      // 1. SOLUCIÓN AL ERROR: Forzamos la carga y definición de jsPDF antes de hacer nada más
+      // 2. Forzamos la carga correcta de la librería jsPDF
       const jspdfLib = await loadJsPDF();
       const jsPDF = jspdfLib.jsPDF;
-
-      // Creamos una copia para no alterar lo que se ve en la pantalla de la app
-      let gk = JSON.parse(JSON.stringify(gkOrig));
       
-      // Si el tipo no es Global, inyectamos los datos específicos en el hueco principal
+      // 3. Si el usuario elige filtrar, alteramos temporalmente SOLO los números sin romper las fotos
       if (reportType !== 'Global') {
          const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
-         gk.stats = gk[`stats${suffix}`] || {};
-         gk.form = gk[`form${suffix}`] || gk.form;
+         gk.stats = gk[`stats${suffix}`] || { minutes:0, starts:0, subs:0, goalsConceded:0, cleanSheets:0, penaltiesSaved:0, penaltiesFaced:0, teamMatches:0, calledUpMatches:0, playedMatches:0, teamMinutes:0 };
+         gk.form = gk[`form${suffix}`] || originalForm;
       }
 
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -795,14 +796,19 @@ const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkM
       });
     }
 
-    doc.save(`PLAN_PARTIDO_${gk.name.replace(/\s+/g, '_').toUpperCase()}.pdf`);
-    showNotification("PDF Vectorial exportado con éxito.", "success");
-
-  } catch (e) {
+    doc.save(`PLAN_PARTIDO_${gk.name.toUpperCase().replace(/\s+/g, '_')}.pdf`);
+      
+      // Restauramos los datos numéricos originales en la memoria de la app
+      gk.stats = originalStats;
+      gk.form = originalForm;
+    } catch (e) {
+      // Si falla, también restauramos por seguridad para evitar datos congelados
+      gk.stats = originalStats;
+      gk.form = originalForm;
       console.error("Error generando PDF:", e);
       alert("Error al generar el PDF: " + e.message);
     }
-};
+  };
 
 // ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
