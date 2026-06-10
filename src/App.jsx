@@ -244,9 +244,19 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
 
 const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
     try {
-      // 1. Forzamos la carga correcta y secuencial de la librería jsPDF
       const jspdfLib = await loadJsPDF();
       const jsPDF = jspdfLib.jsPDF;
+
+      const gk = Object.create(gkOrig);
+
+      if (reportType !== 'Global') {
+         const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
+         gk.stats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
+         gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
+      }
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      await loadCustomFonts(doc);
 
       // CONSIGNAS DE SEGURIDAD 1: NO CREAR COPIAS NI MODIFICAR EL OBJETO ORIGINAL 'gkOrig'.
       // jsPDF colapsa el lienzo visual (así como se ve en la captura) si se tocan las referencias Base64 de las fotos.
