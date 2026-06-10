@@ -202,20 +202,55 @@ const loadCustomFonts = async (doc) => {
   }
 };
 
-const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
+// Cargador de fotos con FADE OUT en el fondo (Recrea la UI)
+const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const width = 400; const height = 480; // Proporción retrato 4:5
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      // Recorte ajustado (equivalente a object-position: center 15%)
+      const imgRatio = img.width / img.height;
+      const targetRatio = width / height;
+      let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+      
+      if (imgRatio > targetRatio) {
+        sWidth = img.height * targetRatio; sx = (img.width - sWidth) / 2;
+      } else {
+        sHeight = img.width / targetRatio; sy = (img.height - sHeight) * 0.15; 
+      }
+      
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
+      
+      // Aplicar máscara de fundido suave (Mask linear gradient desde el 40%)
+      const gradient = ctx.createLinearGradient(0, height * 0.4, 0, height);
+      gradient.addColorStop(0, 'rgba(0,0,0,1)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(null);
+    const bgColor = darkMode ? '0f172a' : 'f8fafc';
+    img.src = url || `https://api.dicebear.com/7.x/initials/png?seed=${fallbackName}&backgroundColor=${bgColor}`;
+  });
+};
+
+const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotification, darkMode) => {
   try {
-    const jspdfLib = await loadJsPDF();
-    const jsPDF = jspdfLib.jsPDF;
-
-    const gk = Object.create(gkOrig);
-
-    if (reportType !== 'Global') {
-      const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
-      gk.stats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
-      gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
-    }
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    showNotification("Generando Reporte Premium con Fotografía y Gráficos...", "success");
+    const jspdfModule = await loadJsPDF();
+    const JsPDFClass = jspdfModule.jsPDF;
+    
+    const doc = new JsPDFClass({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    
+    // Cargar Fuentes Personalizadas
     await loadCustomFonts(doc);
 
     // --- HELPER PARA ESCUDO RIVAL ---
@@ -750,19 +785,14 @@ const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkM
       });
     }
 
-    doc.save(`PLAN_PARTIDO_${gk.name.toUpperCase().replace(/\s+/g, '_')}.pdf`);
-      
-      // Restauramos los datos numéricos originales en la memoria de la app
-      gk.stats = originalStats;
-      gk.form = originalForm;
-    } catch (e) {
-      // Si falla, también restauramos por seguridad para evitar datos congelados
-      gk.stats = originalStats;
-      gk.form = originalForm;
-      console.error("Error generando PDF:", e);
-      alert("Error al generar el PDF: " + e.message);
-    }
-  };
+    doc.save(`PLAN_PARTIDO_${gk.name.replace(/\s+/g, '_').toUpperCase()}.pdf`);
+    showNotification("PDF Vectorial exportado con éxito.", "success");
+
+  } catch (error) {
+    console.error("Error generando PDF:", error);
+    showNotification("Error exportando PDF.", "error");
+  }
+};
 
 // ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
@@ -851,8 +881,6 @@ export default function App() {
   const [isMatchPlanModalOpen, setIsMatchPlanModalOpen] = useState(false);
   const [isAddSeasonModalOpen, setIsAddSeasonModalOpen] = useState(false);
   const [exportTrigger, setExportTrigger] = useState(0);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [gkToExport, setGkToExport] = useState(null);
 
   // Estados del Vestuario e Plan táctico inmersivo
   const [viewLockerRoom, setViewLockerRoom] = useState(true);
@@ -1044,29 +1072,15 @@ export default function App() {
       setIsMatchPlanModalOpen(false);
     } catch(e) { showNotification("Error al guardar plan de partido", "error"); }
   };
- 
+
   const handleSaveStats = async (statsData) => {
     if (!db || !selectedGkId) return;
     try {
       const gkRef = doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', selectedGkId);
-      await setDoc(gkRef, statsData, { merge: true });
+      await setDoc(gkRef, { form: statsData.form, stats: statsData.stats }, { merge: true });
       showNotification("Estadísticas actualizadas con éxito");
       setIsStatsModalOpen(false);
     } catch(e) { showNotification("Error al guardar estadísticas", "error"); }
-  };
-
-  // ✅ NUEVAS FUNCIONES DE CONTROL DE EXPORTACIÓN PDF INTERCALADAS AQUÍ
-  const handleDownloadPdf = (gk) => {
-    setGkToExport(gk);
-    setIsExportModalOpen(true);
-  };
-
-  const confirmDownload = async (type) => {
-    setIsExportModalOpen(false);
-    if (gkToExport) {
-      await exportarPDFVectorial(gkToExport, matches, rivals, activeSeason, darkMode, type);
-      setGkToExport(null);
-    }
   };
 
   const handleDeleteDoc = async (collectionName, id) => {
@@ -1344,9 +1358,6 @@ export default function App() {
           />
         )}
 
-        {/* NUEVO MODAL DE EXPORTACIÓN PDF */}
-        {isExportModalOpen && <ExportPdfModal onClose={() => setIsExportModalOpen(false)} onConfirm={confirmDownload} theme={theme} />}
-
       </main>
     </div>
   );
@@ -1511,17 +1522,6 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
           {match.league || 'Competición por definir'} {match.group && ` • ${match.group}`} {match.matchday && ` • JORNADA ${match.matchday}`}
         </span>
         <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{match.season || '2026/27'}</span>
-        
-        {/* Píldora de color dinámica según el tipo de partido */}
-        <span className={`text-[9px] px-2.5 py-1 rounded-lg font-black uppercase border ${
-          match.matchType === 'Pretemporada' 
-            ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/60' 
-            : match.matchType === 'Torneo'
-              ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/60'
-              : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60'
-        }`}>
-          {match.matchType || 'Liga'}
-        </span>
       </div>
 
       {/* Cabecera */}
@@ -2036,41 +2036,16 @@ function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, d
 }
 
 function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
-  // NUEVO: Estado para controlar el filtro seleccionado
-  const [filterType, setFilterType] = useState('Todos');
-
-  // NUEVO: Lógica de filtrado antes de ordenar
-  const filteredMatches = matches.filter(m => filterType === 'Todos' || (m.matchType || 'Liga') === filterType);
-  const sortedMatches = [...filteredMatches].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sortedMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="flex flex-col gap-3">
-          <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
-          
-          {/* BOTONES DE FILTRADO DINÁMICO */}
-          <div className="flex flex-wrap gap-2">
-            {['Todos', 'Liga', 'Pretemporada', 'Torneo'].map(type => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${
-                  filterType === type 
-                    ? 'bg-red-600 text-white border-red-600' 
-                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
+        <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
         {role !== 'staff' && (
-          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-950 hover:bg-blue-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shrink-0">
+          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20">
             <Plus size={16} /> Añadir Partido
           </button>
         )}
@@ -2085,9 +2060,8 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
         {sortedMatches.length === 0 && (
           <div className="col-span-full py-20 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-200 dark:border-slate-700 shadow-sm">
             <CalendarDays className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" />
-            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">
-              {filterType === 'Todos' ? 'No hay partidos programados' : `No hay partidos de ${filterType}`}
-            </p>
+            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No hay partidos programados</p>
+            <p className="text-xs text-slate-400 mt-2 font-medium">Haz clic en "Añadir Partido" para crear la próxima jornada.</p>
           </div>
         )}
       </div>
@@ -2384,33 +2358,16 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
   const recommendation = gk.technicalDecision || { title: 'PENDIENTE', reason: 'Aún no se ha introducido una valoración técnica para este portero.' };
 
-  // NUEVO: Estado para alternar la visualización en el Dashboard
-  const [statsTab, setStatsTab] = useState('Global');
-
-  const currentStats = useMemo(() => {
-    if (statsTab === 'Liga') return gk.statsLiga || {};
-    if (statsTab === 'Pretemporada') return gk.statsPretemporada || {};
-    if (statsTab === 'Torneo') return gk.statsTorneo || {};
-    return gk.stats || {};
-  }, [gk, statsTab]);
-
-  const currentForm = useMemo(() => {
-    if (statsTab === 'Liga') return gk.formLiga || gk.form || 5.0;
-    if (statsTab === 'Pretemporada') return gk.formPretemporada || gk.form || 5.0;
-    if (statsTab === 'Torneo') return gk.formTorneo || gk.form || 5.0;
-    return gk.form || 5.0;
-  }, [gk, statsTab]);
-
-  const teamMatches = currentStats.teamMatches || Math.max(matches.length, (currentStats.starts || 0) + (currentStats.subs || 0));
-  const teamMinutes = currentStats.teamMinutes || teamMatches * 90;
-  const playedMatches = currentStats.playedMatches || ((currentStats.starts || 0) + (currentStats.subs || 0));
+  const teamMatches = gk.stats?.teamMatches || Math.max(matches.length, (gk.stats?.starts || 0) + (gk.stats?.subs || 0));
+  const teamMinutes = gk.stats?.teamMinutes || teamMatches * 90;
+  const playedMatches = gk.stats?.playedMatches || ((gk.stats?.starts || 0) + (gk.stats?.subs || 0));
   
-  const minsPercent = teamMinutes > 0 ? Math.round(((currentStats.minutes || 0) / teamMinutes) * 100) : 0;
-  const startsPercent = teamMatches > 0 ? Math.round(((currentStats.starts || 0) / teamMatches) * 100) : 0;
-  const subsPercent = teamMatches > 0 ? Math.round(((currentStats.subs || 0) / teamMatches) * 100) : 0;
-  const goalsPercent = playedMatches > 0 ? Math.min(100, Math.round(((currentStats.goalsConceded || 0) / playedMatches) * 50)) : 0;
-  const cleanSheetsPercent = playedMatches > 0 ? Math.round(((currentStats.cleanSheets || 0) / playedMatches) * 100) : 0;
-  const penaltiesPercent = (currentStats.penaltiesFaced || 0) > 0 ? Math.round(((currentStats.penaltiesSaved || 0) / currentStats.penaltiesFaced) * 100) : 0;
+  const minsPercent = teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0;
+  const startsPercent = teamMatches > 0 ? Math.round(((gk.stats?.starts || 0) / teamMatches) * 100) : 0;
+  const subsPercent = teamMatches > 0 ? Math.round(((gk.stats?.subs || 0) / teamMatches) * 100) : 0;
+  const goalsPercent = (gk.stats?.goalsConceded || 0) > 0 ? Math.min(100, Math.round(((gk.stats?.goalsConceded || 0) / Math.max(1, playedMatches)) * 50)) : 0;
+  const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / playedMatches) * 100) : 0;
+  const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-8 relative">
@@ -2486,65 +2443,45 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
       {/* ESTADÍSTICAS GRID */}
       <div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 ml-2">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
-          </div>
-          
-          {/* Pestañas de Filtrado en el Dashboard */}
-          <div className="flex items-center gap-1.5 bg-slate-200 dark:bg-slate-800 p-1 rounded-xl border border-slate-300 dark:border-slate-700 shadow-inner no-print">
-            {['Global', 'Liga', 'Pretemporada', 'Torneo'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setStatsTab(tab)}
-                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                  statsTab === tab 
-                    ? 'bg-blue-950 dark:bg-red-600 text-white shadow' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
+        <div className="flex justify-between items-center mb-6 ml-2 group">
+          <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
           {role !== 'staff' && (
-            <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print" title="Editar Estadísticas">
+            <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas">
               <Edit2 size={16} strokeWidth={3} />
             </button>
           )}
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 print:grid-cols-4">
-          <StatCard title="Minutos Jugados" value={currentStats.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Titular" value={currentStats.starts || 0} subtitle={`${currentStats.starts || 0} / ${teamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Suplente" value={currentStats.subs || 0} subtitle={`${currentStats.subs || 0} / ${teamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Goles Encajados" value={currentStats.goalsConceded || 0} subtitle={`Promedio: ${playedMatches ? ((currentStats.goalsConceded || 0) / playedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Porterías a Cero" value={currentStats.cleanSheets || 0} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Penaltis Parados" value={currentStats.penaltiesSaved || 0} subtitle={`de ${currentStats.penaltiesFaced || 0} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Minutos Jugados" value={gk.stats?.minutes || 0} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Titular" value={gk.stats?.starts || 0} subtitle={`${gk.stats?.starts || 0} / ${teamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Suplente" value={gk.stats?.subs || 0} subtitle={`${gk.stats?.subs || 0} / ${teamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Goles Encajados" value={gk.stats?.goalsConceded || 0} subtitle={`Promedio: ${playedMatches ? ((gk.stats?.goalsConceded || 0) / playedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Porterías a Cero" value={gk.stats?.cleanSheets || 0} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Penaltis Parados" value={gk.stats?.penaltiesSaved || 0} subtitle={`de ${gk.stats?.penaltiesFaced || 0} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
           
           <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center relative overflow-hidden shadow-sm`}>
-             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos {statsTab}</h4>
+             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
              <div className="space-y-3 flex-1 flex flex-col justify-center">
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.calledUpMatches || 0}/{currentStats.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((currentStats.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.calledUpMatches || 0}/{gk.stats?.teamMatches || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{teamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / teamMatches) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.playedMatches || 0}/{currentStats.teamMatches || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((currentStats.playedMatches || 0) / teamMatches) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.playedMatches || 0}/{gk.stats?.teamMatches || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{teamMatches > 0 ? Math.round(((gk.stats?.playedMatches || 0) / teamMatches) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{currentStats.minutes || 0}/{currentStats.teamMinutes || 0}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((currentStats.minutes || 0) / teamMinutes) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.minutes || 0}/{gk.stats?.teamMinutes || 0}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamMinutes > 0 ? Math.round(((gk.stats?.minutes || 0) / teamMinutes) * 100) : 0}%</span>
                   </div>
                 </div>
              </div>
@@ -2737,123 +2674,51 @@ function AddSeasonModal({ onClose, onSave, theme }) {
 }
 
 function GkStatsModal({ initialData, onClose, onSave, theme }) {
-  // Ahora iniciamos directamente en Liga para que no intentes editar el Global
-  const [currentTab, setCurrentTab] = useState('Liga');
-  
-  const [ligaData, setLigaData] = useState({
-    form: initialData?.formLiga || 5.0, minutes: initialData?.statsLiga?.minutes || 0, starts: initialData?.statsLiga?.starts || 0, subs: initialData?.statsLiga?.subs || 0,
-    goalsConceded: initialData?.statsLiga?.goalsConceded || 0, cleanSheets: initialData?.statsLiga?.cleanSheets || 0, penaltiesSaved: initialData?.statsLiga?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsLiga?.penaltiesFaced || 0,
-    teamMatches: initialData?.statsLiga?.teamMatches || 0, calledUpMatches: initialData?.statsLiga?.calledUpMatches || 0, playedMatches: initialData?.statsLiga?.playedMatches || 0, teamMinutes: initialData?.statsLiga?.teamMinutes || 0
+  const [formData, setFormData] = useState({
+    form: initialData?.form || 5.0, minutes: initialData?.stats?.minutes || 0, starts: initialData?.stats?.starts || 0, subs: initialData?.stats?.subs || 0,
+    goalsConceded: initialData?.stats?.goalsConceded || 0, cleanSheets: initialData?.stats?.cleanSheets || 0, penaltiesSaved: initialData?.stats?.penaltiesSaved || 0, penaltiesFaced: initialData?.stats?.penaltiesFaced || 0,
+    teamMatches: initialData?.stats?.teamMatches || 0, calledUpMatches: initialData?.stats?.calledUpMatches || 0, playedMatches: initialData?.stats?.playedMatches || 0, teamMinutes: initialData?.stats?.teamMinutes || 0
   });
 
-  const [preData, setPreData] = useState({
-    form: initialData?.formPretemporada || 5.0, minutes: initialData?.statsPretemporada?.minutes || 0, starts: initialData?.statsPretemporada?.starts || 0, subs: initialData?.statsPretemporada?.subs || 0,
-    goalsConceded: initialData?.statsPretemporada?.goalsConceded || 0, cleanSheets: initialData?.statsPretemporada?.cleanSheets || 0, penaltiesSaved: initialData?.statsPretemporada?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsPretemporada?.penaltiesFaced || 0,
-    teamMatches: initialData?.statsPretemporada?.teamMatches || 0, calledUpMatches: initialData?.statsPretemporada?.calledUpMatches || 0, playedMatches: initialData?.statsPretemporada?.playedMatches || 0, teamMinutes: initialData?.statsPretemporada?.teamMinutes || 0
-  });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleSubmit = () => { onSave({ form: parseFloat(formData.form) || 5.0, stats: { minutes: parseInt(formData.minutes) || 0, starts: parseInt(formData.starts) || 0, subs: parseInt(formData.subs) || 0, goalsConceded: parseInt(formData.goalsConceded) || 0, cleanSheets: parseInt(formData.cleanSheets) || 0, penaltiesSaved: parseInt(formData.penaltiesSaved) || 0, penaltiesFaced: parseInt(formData.penaltiesFaced) || 0, teamMatches: parseInt(formData.teamMatches) || 0, calledUpMatches: parseInt(formData.calledUpMatches) || 0, playedMatches: parseInt(formData.playedMatches) || 0, teamMinutes: parseInt(formData.teamMinutes) || 0 } }); };
 
-  const [torneoData, setTorneoData] = useState({
-    form: initialData?.formTorneo || 5.0, minutes: initialData?.statsTorneo?.minutes || 0, starts: initialData?.statsTorneo?.starts || 0, subs: initialData?.statsTorneo?.subs || 0,
-    goalsConceded: initialData?.statsTorneo?.goalsConceded || 0, cleanSheets: initialData?.statsTorneo?.cleanSheets || 0, penaltiesSaved: initialData?.statsTorneo?.penaltiesSaved || 0, penaltiesFaced: initialData?.statsTorneo?.penaltiesFaced || 0,
-    teamMatches: initialData?.statsTorneo?.teamMatches || 0, calledUpMatches: initialData?.statsTorneo?.calledUpMatches || 0, playedMatches: initialData?.statsTorneo?.playedMatches || 0, teamMinutes: initialData?.statsTorneo?.teamMinutes || 0
-  });
-
-  // 1. CORRECCIÓN: Definimos la herramienta PRIMERO
-  const cleanObj = (obj) => ({
-    minutes: parseInt(obj.minutes) || 0, starts: parseInt(obj.starts) || 0, subs: parseInt(obj.subs) || 0,
-    goalsConceded: parseInt(obj.goalsConceded) || 0, cleanSheets: parseInt(obj.cleanSheets) || 0,
-    penaltiesSaved: parseInt(obj.penaltiesSaved) || 0, penaltiesFaced: parseInt(obj.penaltiesFaced) || 0,
-    teamMatches: parseInt(obj.teamMatches) || 0, calledUpMatches: parseInt(obj.calledUpMatches) || 0,
-    playedMatches: parseInt(obj.playedMatches) || 0, teamMinutes: parseInt(obj.teamMinutes) || 0
-  });
-
-  // 2. Y LUEGO sumamos (así ya no da error de "before initialization")
-  const lData = cleanObj(ligaData);
-  const pData = cleanObj(preData);
-  const tData = cleanObj(torneoData);
-
-  const autoGlobalData = {
-    form: ((parseFloat(ligaData.form || 5.0) + parseFloat(preData.form || 5.0) + parseFloat(torneoData.form || 5.0)) / 3).toFixed(1),
-    minutes: lData.minutes + pData.minutes + tData.minutes,
-    starts: lData.starts + pData.starts + tData.starts,
-    subs: lData.subs + pData.subs + tData.subs,
-    goalsConceded: lData.goalsConceded + pData.goalsConceded + tData.goalsConceded,
-    cleanSheets: lData.cleanSheets + pData.cleanSheets + tData.cleanSheets,
-    penaltiesSaved: lData.penaltiesSaved + pData.penaltiesSaved + tData.penaltiesSaved,
-    penaltiesFaced: lData.penaltiesFaced + pData.penaltiesFaced + tData.penaltiesFaced,
-    teamMatches: lData.teamMatches + pData.teamMatches + tData.teamMatches,
-    calledUpMatches: lData.calledUpMatches + pData.calledUpMatches + tData.calledUpMatches,
-    playedMatches: lData.playedMatches + pData.playedMatches + tData.playedMatches,
-    teamMinutes: lData.teamMinutes + pData.teamMinutes + tData.teamMinutes
-  };
-
-  const activeData = currentTab === 'Liga' ? ligaData : currentTab === 'Pretemporada' ? preData : currentTab === 'Torneo' ? torneoData : autoGlobalData;
-  const setActiveData = currentTab === 'Liga' ? setLigaData : currentTab === 'Pretemporada' ? setPreData : currentTab === 'Torneo' ? setTorneoData : null;
-
-  const handleChange = (e) => { 
-    if (currentTab === 'Global') return; // Bloqueo extra por seguridad
-    setActiveData({ ...activeData, [e.target.name]: e.target.value }); 
-  };
-
-  const handleSubmit = () => {
-    const formValues = [parseFloat(ligaData.form), parseFloat(preData.form), parseFloat(torneoData.form)].filter(v => !isNaN(v) && v > 0);
-    const avgForm = formValues.length > 0 ? (formValues.reduce((a, b) => a + b, 0) / formValues.length).toFixed(1) : 5.0;
-
-    onSave({
-      form: parseFloat(avgForm), stats: cleanObj(autoGlobalData),
-      formLiga: parseFloat(ligaData.form) || 5.0, statsLiga: lData,
-      formPretemporada: parseFloat(preData.form) || 5.0, statsPretemporada: pData,
-      formTorneo: parseFloat(torneoData.form) || 5.0, statsTorneo: tData
-    });
-  };
-
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner disabled:opacity-50 disabled:cursor-not-allowed";
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none text-slate-800 dark:text-white font-black focus:border-emerald-500 transition-colors shadow-inner";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
       <div className={`w-full max-w-3xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
         <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/10 rounded-t-[3rem]`}>
-          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-emerald-950 dark:text-white"><Activity className="text-emerald-500 w-8 h-8" /> Configurar Métricas</h2>
+          <h2 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-3 text-emerald-950 dark:text-white"><Activity className="text-emerald-500 w-8 h-8" /> Editar Estadísticas</h2>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
         </div>
-        
-        <div className="flex justify-center gap-2 mt-4 px-8 no-print">
-          {['Global', 'Liga', 'Pretemporada', 'Torneo'].map(tab => (
-            <button key={tab} type="button" onClick={() => setCurrentTab(tab)} className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${currentTab === tab ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>{tab}</button>
-          ))}
-        </div>
-
         <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-            {currentTab === 'Global' 
-              ? <span className="text-blue-500 font-bold">Mostrando suma automática de todas las competiciones (No editable)</span> 
-              : <>Editando métricas de la categoría: <strong className="text-emerald-500 uppercase font-black">{currentTab}</strong></>}
-          </p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-4">Actualiza las estadísticas acumuladas y el estado de forma general de <strong className="text-slate-800 dark:text-white font-black uppercase">{initialData?.name}</strong>.</p>
           
           <div className="mb-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos del Bloque ({currentTab})</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Datos Globales (Para Porcentajes)</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={activeData.teamMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={activeData.calledUpMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={activeData.playedMatches} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={activeData.teamMinutes} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Equipo</label><input type="number" name="teamMatches" value={formData.teamMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Convocado</label><input type="number" name="calledUpMatches" value={formData.calledUpMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Partidos Jugados</label><input type="number" name="playedMatches" value={formData.playedMatches} onChange={handleChange} className={inputClass} /></div>
+              <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Equipo</label><input type="number" name="teamMinutes" value={formData.teamMinutes} onChange={handleChange} className={inputClass} /></div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={activeData.form} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={activeData.minutes} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={activeData.starts} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={activeData.subs} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={activeData.goalsConceded} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={activeData.cleanSheets} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={activeData.penaltiesSaved} onChange={handleChange} disabled={currentTab === 'Global'} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
-            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={activeData.penaltiesFaced} onChange={handleChange} disabled={currentTab === 'Global'} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Estado Forma (0-10)</label><input type="number" step="0.1" name="form" value={formData.form} onChange={handleChange} className={`${inputClass} text-emerald-600 dark:text-emerald-400 text-lg`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Minutos Jugados</label><input type="number" name="minutes" value={formData.minutes} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Titularidades</label><input type="number" name="starts" value={formData.starts} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Suplencias</label><input type="number" name="subs" value={formData.subs} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Goles Encajados</label><input type="number" name="goalsConceded" value={formData.goalsConceded} onChange={handleChange} className={`${inputClass} text-red-600 dark:text-red-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Porterías a Cero</label><input type="number" name="cleanSheets" value={formData.cleanSheets} onChange={handleChange} className={inputClass} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Parados</label><input type="number" name="penaltiesSaved" value={formData.penaltiesSaved} onChange={handleChange} className={`${inputClass} text-blue-600 dark:text-blue-400`} /></div>
+            <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Penaltis Totales</label><input type="number" name="penaltiesFaced" value={formData.penaltiesFaced} onChange={handleChange} className={inputClass} /></div>
           </div>
         </div>
         <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
           <button onClick={onClose} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm">Cancelar</button>
-          <button onClick={handleSubmit} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/30">Guardar Todo</button>
+          <button onClick={handleSubmit} className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/30">Guardar Estadísticas</button>
         </div>
       </div>
     </div>
@@ -2894,7 +2759,7 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '', matchType: 'Liga' });
+  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '' });
   
   const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
   
@@ -2941,14 +2806,6 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-right-4">
               <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Temporada</label><input type="text" name="season" value={formData.season} onChange={handleChange} className={inputClass} placeholder="Ej: 2026/27" /></div>
               <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Jornada</label><input type="text" name="matchday" value={formData.matchday} onChange={handleChange} className={inputClass} placeholder="Ej: 14" /></div>
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Tipo de Partido</label>
-                <select name="matchType" value={formData.matchType || 'Liga'} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                  <option value="Liga">Liga</option>
-                  <option value="Pretemporada">Pretemporada / Amistoso</option>
-                  <option value="Torneo">Torneo / Copa</option>
-                </select>
-              </div>
             </div>
           )}
 
@@ -3319,61 +3176,3 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
     </div>
   </div>
 );
-// ==========================================
-// NUEVO MODAL DE EXPORTACIÓN PDF PREMIUM
-// ==========================================
-function ExportPdfModal({ onClose, onConfirm, theme }) {
-  const [selected, setSelected] = useState('Global');
-  
-  const options = [
-    { id: 'Global', label: 'Informe Temporada (Suma Total)', icon: '📊' },
-    { id: 'Liga', label: 'Estadísticas de Liga', icon: '🏆' },
-    { id: 'Pretemporada', label: 'Pretemporada / Amistosos', icon: '🔥' },
-    { id: 'Torneo', label: 'Torneos / Copas', icon: '⭐' }
-  ];
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200`}>
-        <div className="p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-red-50 dark:bg-red-950/10 rounded-t-[3rem]">
-          <h2 className="text-xl font-black italic uppercase tracking-tighter text-blue-950 dark:text-white flex items-center gap-3">
-             📄 Exportar Informe
-          </h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm font-black">✕</button>
-        </div>
-        
-        <div className="p-8 space-y-4">
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Selecciona el tipo de informe:</p>
-          <div className="space-y-3">
-            {options.map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setSelected(opt.id)}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
-                  selected === opt.id 
-                  ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' 
-                  : 'border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <span className="text-xl">{opt.icon}</span>
-                <span className="font-black uppercase text-[10px] tracking-widest">{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-8 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-3">
-          <button 
-            type="button"
-            onClick={() => onConfirm(selected)}
-            className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-red-600 hover:bg-red-700 text-white transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
-          >
-            📥 Generar Documento PDF
-          </button>
-          <button type="button" onClick={onClose} className="w-full py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
