@@ -244,6 +244,10 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
 
 const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
     try {
+      // 1. SOLUCIÓN AL ERROR: Forzamos la carga y definición de jsPDF antes de hacer nada más
+      const jspdfLib = await loadJsPDF();
+      const jsPDF = jspdfLib.jsPDF;
+
       // Creamos una copia para no alterar lo que se ve en la pantalla de la app
       let gk = JSON.parse(JSON.stringify(gkOrig));
       
@@ -794,10 +798,10 @@ const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkM
     doc.save(`PLAN_PARTIDO_${gk.name.replace(/\s+/g, '_').toUpperCase()}.pdf`);
     showNotification("PDF Vectorial exportado con éxito.", "success");
 
-  } catch (error) {
-    console.error("Error generando PDF:", error);
-    showNotification("Error exportando PDF.", "error");
-  }
+  } catch (e) {
+      console.error("Error generando PDF:", e);
+      alert("Error al generar el PDF: " + e.message);
+    }
 };
 
 // ==========================================
