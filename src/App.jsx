@@ -202,103 +202,21 @@ const loadCustomFonts = async (doc) => {
   }
 };
 
-// Cargador de fotos con FADE OUT en el fondo (Recrea la UI)
-const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const width = 400; const height = 480; // Proporción retrato 4:5
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      
-      // Recorte ajustado (equivalente a object-position: center 15%)
-      const imgRatio = img.width / img.height;
-      const targetRatio = width / height;
-      let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
-      
-      if (imgRatio > targetRatio) {
-        sWidth = img.height * targetRatio; sx = (img.width - sWidth) / 2;
-      } else {
-        sHeight = img.width / targetRatio; sy = (img.height - sHeight) * 0.15; 
-      }
-      
-      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
-      
-      // Aplicar máscara de fundido suave (Mask linear gradient desde el 40%)
-      const gradient = ctx.createLinearGradient(0, height * 0.4, 0, height);
-      gradient.addColorStop(0, 'rgba(0,0,0,1)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalCompositeOperation = 'destination-in';
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
-      
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => resolve(null);
-    const bgColor = darkMode ? '0f172a' : 'f8fafc';
-    img.src = url || `https://api.dicebear.com/7.x/initials/png?seed=${fallbackName}&backgroundColor=${bgColor}`;
-  });
-};
-
 const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
-    try {
-      const jspdfLib = await loadJsPDF();
-      const jsPDF = jspdfLib.jsPDF;
+  try {
+    const jspdfLib = await loadJsPDF();
+    const jsPDF = jspdfLib.jsPDF;
 
-      const gk = Object.create(gkOrig);
+    const gk = Object.create(gkOrig);
 
-      if (reportType !== 'Global') {
-         const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
-         gk.stats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
-         gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
-      }
+    if (reportType !== 'Global') {
+      const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
+      gk.stats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
+      gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
+    }
 
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-      await loadCustomFonts(doc);
-
-      // CONSIGNAS DE SEGURIDAD 1: NO CREAR COPIAS NI MODIFICAR EL OBJETO ORIGINAL 'gkOrig'.
-      // jsPDF colapsa el lienzo visual (así como se ve en la captura) si se tocan las referencias Base64 de las fotos.
-
-      // 2. Cálculo estricto de variables numéricas LOCALES basadas en el 'reportType'
-      let pdfStats;
-      let pdfForm;
-
-      if (reportType === 'Global') {
-         // Usar estadísticas globales originales directamente
-         pdfStats = gkOrig.stats;
-         pdfForm = gkOrig.form;
-      } else {
-         // Cálculo dinámico del sufijo (Liga, Pretemporada, Torneo)
-         const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
-         
-         // Mapear SOLO los números, asegurando ceros por seguridad para no romper la app
-         pdfStats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
-         
-         // Mapear SOLO el estado de forma (racha)
-         pdfForm = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
-      }
-
-      // 3. Inicialización estándar del lienzo A4 en jsPDF
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-         
-         // Inyectamos las estadísticas de la pestaña seleccionada o forzamos ceros por seguridad
-         gk.stats = gkOrig[`stats${suffix}`] ? { ...gkOrig[`stats${suffix}`] } : { 
-           minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, 
-           penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, 
-           calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 
-         };
-         
-         // Inyectamos el estado de forma o racha específico de la pestaña seleccionada
-         gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
-      }
-
-      // 4. Inicialización estándar del lienzo A4 en jsPDF
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-
-      // Cargar Fuentes Personalizadas
-      await loadCustomFonts(doc);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    await loadCustomFonts(doc);
 
     // --- HELPER PARA ESCUDO RIVAL ---
     const loadImgToB64 = (url) => new Promise(resolve => {
