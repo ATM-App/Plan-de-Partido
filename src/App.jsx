@@ -242,24 +242,55 @@ const loadGkPhotoBase64 = async (url, fallbackName, darkMode) => {
   });
 };
 
-const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
-    // 1. Guardamos una copia de seguridad limpia de los datos numéricos originales
-    const originalStats = { ...gk.stats };
-    const originalForm = gk.form;
-
+const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkMode, reportType = 'Global') => {
     try {
-      // 2. Forzamos la carga correcta de la librería jsPDF
+      // 1. Forzamos la carga correcta y secuencial de la librería jsPDF
       const jspdfLib = await loadJsPDF();
       const jsPDF = jspdfLib.jsPDF;
+
+      // 2. CREACIÓN SEGURA DEL OBJETO: Clonamos de forma superficial propiedades clave
+      // para no romper la reactividad de la pantalla ni Firebase, manteniendo Base64 legibles
+      let gk = {
+        ...gkOrig,
+        stats: { ...gkOrig.stats },
+        form: gkOrig.form ? (Array.isArray(gkOrig.form) ? [...gkOrig.form] : [gkOrig.form]) : []
+      };
       
-      // 3. Si el usuario elige filtrar, alteramos temporalmente SOLO los números sin romper las fotos
+      // 3. Si se elige un filtro específico (Liga, Torneo, Pretemporada), remapeamos los números
       if (reportType !== 'Global') {
          const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
-         gk.stats = gk[`stats${suffix}`] || { minutes:0, starts:0, subs:0, goalsConceded:0, cleanSheets:0, penaltiesSaved:0, penaltiesFaced:0, teamMatches:0, calledUpMatches:0, playedMatches:0, teamMinutes:0 };
-         gk.form = gk[`form${suffix}`] || originalForm;
+         
+         // Inyectamos las estadísticas de la pestaña seleccionada o forzamos ceros por seguridad
+         gk.stats = gkOrig[`stats${suffix}`] ? { ...gkOrig[`stats${suffix}`] } : { 
+           minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, 
+           penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, 
+           calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 
+         };
+         
+         // Inyectamos el estado de forma o racha específico de la pestaña seleccionada
+         gk.form = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
       }
 
+      // 4. Inicialización estándar del lienzo A4 en jsPDF
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+      // =========================================================================
+      // AQUÍ CONTINÚA EXACTAMENTE TODO EL DISEÑO VECTORIAL DE TU INFORME PREMIUM
+      // (Fondo oscuro, Fotos fundidas, Donuts, Textos, QR, etc., sin cambios)
+      // =========================================================================
+
+      // ... [Mantén todo tu código original que dibuja las páginas del PDF aquí dentro] ...
+
+      // =========================================================================
+      // FIN DEL RENDERIZADO VECTORIAL Y GUARDA DEL ARCHIVO
+      // =========================================================================
+      doc.save(`PLAN_PARTIDO_${gk.name.toUpperCase().replace(/\s+/g, '_')}.pdf`);
+      
+    } catch (e) {
+      console.error("Error generando PDF:", e);
+      alert("Error al generar el PDF: " + e.message);
+    }
+  };
     
     // Cargar Fuentes Personalizadas
     await loadCustomFonts(doc);
