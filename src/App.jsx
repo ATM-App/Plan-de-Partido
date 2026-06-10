@@ -248,17 +248,30 @@ const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkM
       const jspdfLib = await loadJsPDF();
       const jsPDF = jspdfLib.jsPDF;
 
-      // 2. CREACIÓN SEGURA DEL OBJETO: Clonamos de forma superficial propiedades clave
-      // para no romper la reactividad de la pantalla ni Firebase, manteniendo Base64 legibles
-      let gk = {
-        ...gkOrig,
-        stats: { ...gkOrig.stats },
-        form: gkOrig.form ? (Array.isArray(gkOrig.form) ? [...gkOrig.form] : [gkOrig.form]) : []
-      };
-      
-      // 3. Si se elige un filtro específico (Liga, Torneo, Pretemporada), remapeamos los números
-      if (reportType !== 'Global') {
+      // CONSIGNAS DE SEGURIDAD 1: NO CREAR COPIAS NI MODIFICAR EL OBJETO ORIGINAL 'gkOrig'.
+      // jsPDF colapsa el lienzo visual (así como se ve en la captura) si se tocan las referencias Base64 de las fotos.
+
+      // 2. Cálculo estricto de variables numéricas LOCALES basadas en el 'reportType'
+      let pdfStats;
+      let pdfForm;
+
+      if (reportType === 'Global') {
+         // Usar estadísticas globales originales directamente
+         pdfStats = gkOrig.stats;
+         pdfForm = gkOrig.form;
+      } else {
+         // Cálculo dinámico del sufijo (Liga, Pretemporada, Torneo)
          const suffix = reportType === 'Pretemporada' ? 'Pretemporada' : reportType;
+         
+         // Mapear SOLO los números, asegurando ceros por seguridad para no romper la app
+         pdfStats = gkOrig[`stats${suffix}`] || { minutes: 0, starts: 0, subs: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0, penaltiesFaced: 0, teamMatches: 0, calledUpMatches: 0, playedMatches: 0, teamMinutes: 0 };
+         
+         // Mapear SOLO el estado de forma (racha)
+         pdfForm = gkOrig[`form${suffix}`] ? (Array.isArray(gkOrig[`form${suffix}`]) ? [...gkOrig[`form${suffix}`]] : [gkOrig[`form${suffix}`]]) : [];
+      }
+
+      // 3. Inicialización estándar del lienzo A4 en jsPDF
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
          
          // Inyectamos las estadísticas de la pestaña seleccionada o forzamos ceros por seguridad
          gk.stats = gkOrig[`stats${suffix}`] ? { ...gkOrig[`stats${suffix}`] } : { 
