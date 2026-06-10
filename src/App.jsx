@@ -274,26 +274,8 @@ const exportarPDFVectorial = async (gkOrig, matches, rivals, activeSeason, darkM
       // 4. Inicialización estándar del lienzo A4 en jsPDF
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-      // =========================================================================
-      // AQUÍ CONTINÚA EXACTAMENTE TODO EL DISEÑO VECTORIAL DE TU INFORME PREMIUM
-      // (Fondo oscuro, Fotos fundidas, Donuts, Textos, QR, etc., sin cambios)
-      // =========================================================================
-
-      // ... [Mantén todo tu código original que dibuja las páginas del PDF aquí dentro] ...
-
-      // =========================================================================
-      // FIN DEL RENDERIZADO VECTORIAL Y GUARDA DEL ARCHIVO
-      // =========================================================================
-      doc.save(`PLAN_PARTIDO_${gk.name.toUpperCase().replace(/\s+/g, '_')}.pdf`);
-      
-    } catch (e) {
-      console.error("Error generando PDF:", e);
-      alert("Error al generar el PDF: " + e.message);
-    }
-  };
-    
-    // Cargar Fuentes Personalizadas
-    await loadCustomFonts(doc);
+      // Cargar Fuentes Personalizadas
+      await loadCustomFonts(doc);
 
     // --- HELPER PARA ESCUDO RIVAL ---
     const loadImgToB64 = (url) => new Promise(resolve => {
@@ -1121,7 +1103,7 @@ export default function App() {
       setIsMatchPlanModalOpen(false);
     } catch(e) { showNotification("Error al guardar plan de partido", "error"); }
   };
-
+ 
   const handleSaveStats = async (statsData) => {
     if (!db || !selectedGkId) return;
     try {
