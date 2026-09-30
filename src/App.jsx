@@ -78,6 +78,14 @@ const DUMMY_GOALKEEPER = {
   assignedTo: 'all'
 };
 
+// --- LISTA DE TUS EQUIPOS ---
+const TEAMS_LIST = [
+  "ALEVÍN A",
+  "BENJAMÍN A",
+  "BENJAMÍN B",
+  "PREBENJAMÍN A"
+];
+
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
@@ -1537,7 +1545,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
       <div className="flex items-center justify-between px-6 md:px-12 py-6 relative z-10 border-b border-slate-100 dark:border-slate-700/50">
         <div className="flex flex-col items-center flex-1">
           <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
-          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase">Atleti</span>
+          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase break-words whitespace-normal px-2 w-full max-w-[120px]">{match.myTeam || 'Atleti'}</span>
         </div>
 
         <div className="flex flex-col items-center px-4 md:px-8">
@@ -1553,7 +1561,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
           ) : (
              <Swords className="w-16 h-16 md:w-24 md:h-24 text-slate-300 dark:text-slate-600" />
           )}
-          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase truncate w-24 md:w-32">
+          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase break-words whitespace-normal px-2 w-full max-w-[120px]">
              {rival?.name || 'Rival'}
           </span>
         </div>
@@ -2759,7 +2767,7 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '' });
+  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] });
   
   const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
   
@@ -2811,6 +2819,19 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
 
           {step === 2 && (
             <div className="grid grid-cols-1 gap-5 animate-in fade-in slide-in-from-right-4">
+              {/* Selector de Mi Equipo AÑADIDO AQUI */}
+              <div className="mb-5">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Mi Equipo</label>
+                <select 
+                  name="myTeam" 
+                  value={formData.myTeam} 
+                  onChange={handleChange} 
+                  className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}
+                >
+                  {TEAMS_LIST.map(team => <option key={team} value={team}>{team}</option>)}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-5">
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha *</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Hora</label><input type="time" name="time" value={formData.time} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} /></div>
