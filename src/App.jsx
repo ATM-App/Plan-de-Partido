@@ -428,7 +428,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
-      doc.text("ATLETI", leftCX - 25, shieldY + 42, { align: 'center' });
+      // El escudo local está centrado en: leftCX - 40 - 15 + (32/2) = leftCX - 39
+doc.text((nextMatchPdf.myTeam || 'ATLETI').toUpperCase(), leftCX - 39, shieldY + 42, { align: 'center', maxWidth: 45 });
 
       // Time
       doc.setFillColor(255, 255, 255);
@@ -454,7 +455,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
-      doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 25, shieldY + 42, { align: 'center', maxWidth: 45 });
+      // El escudo visitante está centrado en: leftCX + 10 + 15 + (32/2) = leftCX + 41
+doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
 
       // Match Stats Bottom Left
       const statsY = 168;
