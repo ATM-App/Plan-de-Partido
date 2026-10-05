@@ -3220,52 +3220,54 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Actualizado con campos originales)
+// MÓDULO DE INFORMES (Completado con todos los datos y sin saltos de scroll)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
   const [porteroSeleccionado, setPorteroSeleccionado] = useState('');
   
-  // Estado general consolidado para todos los posibles campos
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
-    titulo: '',
-    contenido: '',
-    objetivo1: '', objetivo2: '', objetivo3: '',
-    nota: '5',
-    rival: '',
+    titulo: '', contenido: '', rival: '', nota: '5',
     
-    // Campos Informe Semestral
+    // --- SEMESTRAL ---
     jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '',
     golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '',
     torneosAsistidos: '', torneosConvocado: '',
-    
-    // Valoraciones (1-4)
     repTecDefensivo: '1', repTecOfensivo: '1', adecuacionRecursos: '1', nivelCompetitivo: '1',
     constanciaRendimiento: '1', comprensionJuego: '1', implicacionEntrenamientos: '1',
-    liderazgoGrupo: '1', destrezaGeneral: '1', concienciaObjetivos: '1',
-    motivacionIndividual: '1', comportamientoActitudinal: '1',
+    liderazgoGrupo: '1', destrezaGeneral: '1', concienciaObjetivos: '1', motivacionIndividual: '1', comportamientoActitudinal: '1',
     posicionBasica: '1', blocaje: '1', colocacion: '1', desplazamientosCaidas: '1',
     dominioArea: '1', reinicioJuego: '1', unoContraUno: '1', velocidadEspecifica: '1', agilidad: '1',
-    
-    // Fase de Juego (1-5)
     ataque: '1', transDef: '1', defensa: '1', transOf: '1',
-    
-    // Actitudinales (1-5)
     sociabilidad: '1', constanciaAct: '1', disciplina: '1', actitud: '1', compromiso: '1', evolucion: '1',
+    eval1: '', eval2: '', eval3: '', valoracionGeneral: 'MEDIA',
     
-    // Académico
-    eval1: '', eval2: '', eval3: '',
+    // --- TORNEO ---
+    ubicacionTorneo: '', posFinalTorneo: '', superficieTorneo: 'Césped Natural',
+    ctxNivel: '1', ctxLogistica: '1', ctxCarga: '1', ctxInstalaciones: '1',
+    medInicial: '', medIncidencias: '',
+    valPersonalidad: '1', valMando: '1', valConc: '1', valError: '1', valConfianza: '1', valMentalidad: '1',
+    valActitudGol: '1', valPrimerUltimo: '1', valRitmo: '1', valMejoraBajon: '1', valEntorno: '1',
+    val1v1: '1', valOrg: '1', valCom: '1',
+    obsPenaltis: '', obsDecisivas: '', obsPos: '', obsNeg: '', obsTrans: '',
     
-    // Valoración General
-    valoracionGeneral: 'MEDIA'
+    // --- FLASH ---
+    flashTipo: '', flashAltura: '', flashNivel: '', flashPotencial: '',
+    flashPersonalidad: '', flashComunicacion: '', flashConcentracion: '', flashResiliencia: '',
+    flashObsOf: '', flashObsDef: '', flashEstado: '', flashPropuesta: '', flashJustificacion: '',
+    
+    // --- OBJETIVOS ---
+    objetivo1: '', objetivo2: '', objetivo3: ''
   });
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!porteroSeleccionado) { alert("Debes seleccionar un portero"); return; }
+    if (tipoInforme === 'flash' && !formData.flashEstado) { alert("Debes seleccionar un estado (Semáforo) en el informe Flash"); return; }
+    if (tipoInforme === 'flash' && formData.flashEstado === 'CONTINÚA' && !formData.flashPropuesta) { alert("Debes seleccionar una propuesta si el portero CONTINÚA"); return; }
     
     const gkInfo = gks.find(g => g.id === porteroSeleccionado);
     const informeAguardar = {
@@ -3277,16 +3279,14 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
     };
 
     onSave(informeAguardar);
-    
-    // Reset
-    setFormData({ ...formData, titulo: '', contenido: '' }); 
+    setFormData(prev => ({ ...prev, titulo: '', contenido: '' })); 
   };
 
   const inputClass = "w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 outline-none transition-all text-sm";
   const sectionTitleClass = "text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8 flex items-center gap-2";
   const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 pl-1";
 
-  // Helper para renderizar Radios de 1 a N
+  // Helper Radios numéricos (Sin saltos de scroll)
   const renderRadioGroup = (name, max, label) => (
     <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50 flex-wrap gap-2">
       <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
@@ -3321,8 +3321,6 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* BLOQUE FIJO: TIPO Y PORTERO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-900/20 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700/50">
             <div>
               <label className={labelClass}>Tipo de Informe</label>
@@ -3330,7 +3328,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
                 <option value="semestral">📊 Informe Semestral (Completo)</option>
                 <option value="partido">📝 Informe de Partido</option>
                 <option value="torneo">🏆 Informe de Torneo</option>
-                <option value="flash">⚡ Informe Flash</option>
+                <option value="flash">⚡ Informe Flash (Scouting)</option>
                 <option value="objetivos">🎯 Fijación de Objetivos</option>
               </select>
             </div>
@@ -3338,15 +3336,15 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
               <label className={labelClass}>1. Datos e Información de Portero *</label>
               <select value={porteroSeleccionado} onChange={(e) => setPorteroSeleccionado(e.target.value)} className={`${inputClass} cursor-pointer font-bold`} required>
                 <option value="">-- Seleccionar... --</option>
-                {gks && gks.length > 0 ? gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>) : null}
+                {gks && gks.length > 0 ? gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()} ({g.team})</option>) : null}
               </select>
             </div>
           </div>
 
-          <div className="space-y-8 pb-10">
+          <div className="animate-in fade-in duration-300 space-y-8 pb-10">
             
             {/* ============================================================== */}
-            {/* INFORME SEMESTRAL (EL COMPLETO DEL HTML)                       */}
+            {/* INFORME SEMESTRAL                                              */}
             {/* ============================================================== */}
             {tipoInforme === 'semestral' && (
               <div className="space-y-8">
@@ -3434,10 +3432,13 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
                   <h3 className={sectionTitleClass}>7. Valoración General</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
-                      <label key={val} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
-                        <input type="radio" name="valoracionGeneral" value={val} checked={formData.valoracionGeneral === val} onChange={handleChange} className="sr-only" />
+                      <div 
+                        key={val} 
+                        onClick={() => setFormData(prev => ({ ...prev, valoracionGeneral: val }))}
+                        className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all select-none ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}
+                      >
                         {val}
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -3472,23 +3473,146 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
             )}
 
             {/* ============================================================== */}
-            {/* INFORME TORNEO / FLASH                                         */}
+            {/* INFORME TORNEO                                                 */}
             {/* ============================================================== */}
-            {(tipoInforme === 'torneo' || tipoInforme === 'flash') && (
-              <div className="grid grid-cols-1 gap-6">
+            {tipoInforme === 'torneo' && (
+              <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className={labelClass}>Fecha</label>
-                    <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Título / Nombre del Torneo</label>
-                    <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder={tipoInforme === 'torneo' ? 'Ej: Torneo MIC 2026' : 'Ej: Evolución Primera Vuelta'} className={inputClass} required/>
+                  <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
+                  <div><label className={labelClass}>Nombre del Torneo</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Torneo MIC 2026" className={inputClass} required/></div>
+                  <div><label className={labelClass}>Ubicación</label><input type="text" name="ubicacionTorneo" value={formData.ubicacionTorneo} onChange={handleChange} placeholder="Ciudad / País" className={inputClass} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className={labelClass}>Posición Final</label><input type="text" name="posFinalTorneo" value={formData.posFinalTorneo} onChange={handleChange} placeholder="Ej: Campeón" className={inputClass} /></div>
+                    <div>
+                      <label className={labelClass}>Superficie</label>
+                      <select name="superficieTorneo" value={formData.superficieTorneo} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                        <option value="Césped Natural">Natural</option>
+                        <option value="Césped Artificial">Artificial</option>
+                        <option value="Fútbol Sala">Sala / Pista</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
+
                 <div>
-                  <label className={labelClass}>Cuerpo del Informe</label>
-                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="8" className={`${inputClass} resize-none`} placeholder="Escribe aquí el informe detallado..." required></textarea>
+                  <h3 className={sectionTitleClass}>Contexto del Torneo (1-5)</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    {renderRadioGroup('ctxNivel', 5, 'Nivel de Rivales')}
+                    {renderRadioGroup('ctxLogistica', 5, 'Logística y Hotel')}
+                    {renderRadioGroup('ctxCarga', 5, 'Tiempos Recuperación')}
+                    {renderRadioGroup('ctxInstalaciones', 5, 'Campos / Arbitraje')}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div><label className={labelClass}>Estado Inicial Médico</label><input type="text" name="medInicial" value={formData.medInicial} onChange={handleChange} placeholder="Ej: Óptimo" className={inputClass} /></div>
+                  <div><label className={labelClass}>Incidencias Torneo</label><input type="text" name="medIncidencias" value={formData.medIncidencias} onChange={handleChange} placeholder="Ej: Ninguna" className={inputClass} /></div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>Perfil Psicológico y Técnico (1-5)</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    <div className="col-span-full mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Psicología & Evolución</span></div>
+                    {renderRadioGroup('valPersonalidad', 5, 'Personalidad')}
+                    {renderRadioGroup('valMando', 5, 'Mando / Liderazgo')}
+                    {renderRadioGroup('valConc', 5, 'Concentración')}
+                    {renderRadioGroup('valConfianza', 5, 'Confianza')}
+                    {renderRadioGroup('valPrimerUltimo', 5, 'Evolución: 1º vs Último')}
+                    {renderRadioGroup('valRitmo', 5, 'Adaptación al Ritmo')}
+                    {renderRadioGroup('valMejoraBajon', 5, 'Mejora o Bajón General')}
+                    {renderRadioGroup('valEntorno', 5, 'Adaptación Entorno')}
+                    
+                    <div className="col-span-full mt-4 mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Resiliencia & Táctica</span></div>
+                    {renderRadioGroup('valError', 5, 'Gestión Error')}
+                    {renderRadioGroup('valMentalidad', 5, 'Mentalidad Competitiva')}
+                    {renderRadioGroup('valActitudGol', 5, 'Actitud tras Gol')}
+                    {renderRadioGroup('val1v1', 5, 'Rendimiento 1vs1')}
+                    {renderRadioGroup('valOrg', 5, 'Organización defensiva')}
+                    {renderRadioGroup('valCom', 5, 'Comunicación')}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>Observaciones Técnicas Específicas</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                     <div><label className={labelClass}>Puntos Positivos</label><textarea name="obsPos" value={formData.obsPos} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Áreas de Mejora</label><textarea name="obsNeg" value={formData.obsNeg} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="..." /></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <div><label className={labelClass}>Rendimiento en Penaltis</label><textarea name="obsPenaltis" value={formData.obsPenaltis} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Acciones Decisivas</label><textarea name="obsDecisivas" value={formData.obsDecisivas} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Trascendencia Torneo</label><textarea name="obsTrans" value={formData.obsTrans} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className={sectionTitleClass}>Valoración General del Torneo</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
+                      <div key={val} onClick={() => setFormData(prev => ({ ...prev, valoracionGeneral: val }))} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all select-none ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
+                        {val}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* INFORME FLASH (SCOUTING)                                       */}
+            {/* ============================================================== */}
+            {tipoInforme === 'flash' && (
+              <div className="space-y-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/50">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">⚽ Perfil General</h4>
+                      <div className="space-y-4">
+                         <div><label className={labelClass}>Tipo Portero</label><input type="text" name="flashTipo" value={formData.flashTipo} onChange={handleChange} className={inputClass} placeholder="Ej: Atajador, Libero..." /></div>
+                         <div><label className={labelClass}>Altura/Envergadura</label><input type="text" name="flashAltura" value={formData.flashAltura} onChange={handleChange} className={inputClass} placeholder="Ej: 1.85m, Alto" /></div>
+                         <div><label className={labelClass}>Nivel Actual</label><input type="text" name="flashNivel" value={formData.flashNivel} onChange={handleChange} className={inputClass} placeholder="Ej: Titular indiscutible" /></div>
+                         <div><label className={labelClass}>Potencial</label><input type="text" name="flashPotencial" value={formData.flashPotencial} onChange={handleChange} className={inputClass} placeholder="Ej: Primer equipo" /></div>
+                      </div>
+                   </div>
+                   
+                   <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/50">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">🧠 Aspectos Psicológicos</h4>
+                      <div className="space-y-4">
+                         <div><label className={labelClass}>Personalidad</label><input type="text" name="flashPersonalidad" value={formData.flashPersonalidad} onChange={handleChange} className={inputClass} placeholder="Ej: Líder natural" /></div>
+                         <div><label className={labelClass}>Comunicación</label><input type="text" name="flashComunicacion" value={formData.flashComunicacion} onChange={handleChange} className={inputClass} placeholder="Ej: Habla constantemente" /></div>
+                         <div><label className={labelClass}>Concentración</label><input type="text" name="flashConcentracion" value={formData.flashConcentracion} onChange={handleChange} className={inputClass} placeholder="Ej: Mantiene el foco" /></div>
+                         <div><label className={labelClass}>Resiliencia (Error)</label><input type="text" name="flashResiliencia" value={formData.flashResiliencia} onChange={handleChange} className={inputClass} placeholder="Ej: Se recupera rápido" /></div>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div><label className={labelClass}>Valoración Ofensiva</label><textarea name="flashObsOf" value={formData.flashObsOf} onChange={handleChange} rows="4" className={`${inputClass} resize-none`} placeholder="Distribución, juego de pies..." /></div>
+                   <div><label className={labelClass}>Valoración Defensiva</label><textarea name="flashObsDef" value={formData.flashObsDef} onChange={handleChange} rows="4" className={`${inputClass} resize-none`} placeholder="Blocaje, 1vs1, salidas..." /></div>
+                </div>
+
+                <div className="bg-slate-100 dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 mt-8">
+                   <h3 className="text-center font-black text-sm uppercase tracking-widest text-blue-950 dark:text-white mb-6">Estado de Seguimiento (Semáforo) *</h3>
+                   <div className="flex flex-col md:flex-row justify-center gap-4 mb-8">
+                     <div onClick={() => setFormData(prev => ({ ...prev, flashEstado: 'NO CONTINÚA', flashPropuesta: '' }))} className={`cursor-pointer flex-1 py-4 text-center font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-sm ${formData.flashEstado === 'NO CONTINÚA' ? 'bg-red-600 text-white border-2 border-red-800 shadow-md scale-105' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-red-400'}`}>🔴 NO CONTINÚA</div>
+                     <div onClick={() => setFormData(prev => ({ ...prev, flashEstado: 'SEGUIMIENTO', flashPropuesta: '' }))} className={`cursor-pointer flex-1 py-4 text-center font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-sm ${formData.flashEstado === 'SEGUIMIENTO' ? 'bg-orange-500 text-white border-2 border-orange-700 shadow-md scale-105' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400'}`}>🟠 SEGUIMIENTO</div>
+                     <div onClick={() => setFormData(prev => ({ ...prev, flashEstado: 'CONTINÚA' }))} className={`cursor-pointer flex-1 py-4 text-center font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-sm ${formData.flashEstado === 'CONTINÚA' ? 'bg-emerald-600 text-white border-2 border-emerald-800 shadow-md scale-105' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-emerald-400'}`}>🟢 CONTINÚA</div>
+                   </div>
+
+                   {formData.flashEstado === 'CONTINÚA' && (
+                     <div className="mb-8 animate-in slide-in-from-top-4 fade-in">
+                       <label className="block text-center text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-3">Propuesta para el jugador *</label>
+                       <div className="flex justify-center gap-4">
+                         <div onClick={() => setFormData(prev => ({ ...prev, flashPropuesta: 'ACADEMIA' }))} className={`cursor-pointer px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all border-2 ${formData.flashPropuesta === 'ACADEMIA' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-emerald-300'}`}>Academia</div>
+                         <div onClick={() => setFormData(prev => ({ ...prev, flashPropuesta: 'ALTO RENDIMIENTO' }))} className={`cursor-pointer px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all border-2 ${formData.flashPropuesta === 'ALTO RENDIMIENTO' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-emerald-300'}`}>Alto Rendimiento</div>
+                       </div>
+                     </div>
+                   )}
+
+                   <div><label className={labelClass}>Justificación Técnica</label><textarea name="flashJustificacion" value={formData.flashJustificacion} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="Explica brevemente la decisión tomada..." /></div>
                 </div>
               </div>
             )}
@@ -3521,7 +3645,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-slate-100 dark:border-slate-700/50">
+          <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-slate-100 dark:border-slate-700/50 mt-12">
              <button type="button" onClick={() => alert("Función de guardar borrador en desarrollo.")} className="px-6 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
                ⏳ Guardar Borrador
              </button>
