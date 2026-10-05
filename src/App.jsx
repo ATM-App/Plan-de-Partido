@@ -962,12 +962,7 @@ export default function App() {
 
     const unsubGk = onSnapshot(gkRef, (snapshot) => {
       const gks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if (gks.length === 0 && user.uid) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'goalkeepers', DUMMY_GOALKEEPER.id), DUMMY_GOALKEEPER);
-        setGoalkeepers([DUMMY_GOALKEEPER]);
-      } else {
-        setGoalkeepers(gks);
-      }
+      setGoalkeepers(gks);
       setDataLoaded(prev => ({...prev, gks: true}));
     });
 
@@ -1806,7 +1801,10 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
 function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
-  const upcomingMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingMatches = [...matches]
+    .filter(m => m.date >= todayStr)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
   const [weatherData, setWeatherData] = useState({ temp: '--', desc: 'Cargando...', city: 'Madrid', isRainy: false });
 
   useEffect(() => {
@@ -2046,13 +2044,15 @@ function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, d
 }
 
 function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
-  const sortedMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingMatches = [...matches].filter(m => m.date >= todayStr).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const pastMatches = [...matches].filter(m => m.date < todayStr).sort((a, b) => new Date(b.date) - new Date(a.date)); // Descendente
 
   if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+    <div className="space-y-10">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
         {role !== 'staff' && (
           <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20">
@@ -2061,20 +2061,36 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {sortedMatches.map(match => {
-          const rival = rivals.find(r => r.id === match.rivalId);
-          return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
-        })}
-        
-        {sortedMatches.length === 0 && (
-          <div className="col-span-full py-20 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-200 dark:border-slate-700 shadow-sm">
-            <CalendarDays className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" />
-            <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No hay partidos programados</p>
-            <p className="text-xs text-slate-400 mt-2 font-medium">Haz clic en "Añadir Partido" para crear la próxima jornada.</p>
-          </div>
-        )}
+      {/* SECCIÓN PRÓXIMOS PARTIDOS */}
+      <div>
+        <h3 className="text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white mb-6 flex items-center gap-2"><CalendarDays className="text-red-500"/> Próximos Partidos</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {upcomingMatches.map(match => {
+            const rival = rivals.find(r => r.id === match.rivalId);
+            return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
+          })}
+          
+          {upcomingMatches.length === 0 && (
+            <div className="col-span-full py-12 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-200 dark:border-slate-700 shadow-sm">
+              <CalendarDays className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
+              <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No hay próximos partidos</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* SECCIÓN HISTORIAL */}
+      {pastMatches.length > 0 && (
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50">
+          <h3 className="text-xl font-black italic tracking-tighter uppercase text-slate-500 dark:text-slate-400 mb-6 flex items-center gap-2"><RotateCcw className="text-slate-400"/> Historial de Partidos</h3>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 opacity-80 hover:opacity-100 transition-opacity">
+            {pastMatches.map(match => {
+              const rival = rivals.find(r => r.id === match.rivalId);
+              return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2345,8 +2361,9 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   if (isDataLoading) return <div className="space-y-6"><SkeletonCard/><SkeletonCard/></div>;
   if (!gk) return null;
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const gkMatches = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const nextMatch = gkMatches[0];
+  const nextMatch = gkMatches.filter(m => m.date >= todayStr)[0];
   const nextMatchRival = nextMatch ? rivals.find(r => r.id === nextMatch.rivalId) : null;
 
   const getGkState = (formScore) => {
