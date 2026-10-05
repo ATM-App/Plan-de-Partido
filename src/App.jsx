@@ -3220,9 +3220,6 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Nueva pantalla del menú)
-// ==========================================
-// ==========================================
 // MÓDULO DE INFORMES (Actualizado con campos originales)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave }) {
@@ -3281,7 +3278,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
     onSave(informeAguardar);
     
-    // Reset (opcional, podrías querer mantener los datos si guardas como borrador)
+    // Reset
     setFormData({ ...formData, titulo: '', contenido: '' }); 
   };
 
@@ -3291,13 +3288,13 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
   // Helper para renderizar Radios de 1 a N
   const renderRadioGroup = (name, max, label) => (
-    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
-      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-1/2 leading-tight">{label}</span>
-      <div className="flex gap-2 w-1/2 justify-end">
+    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50 flex-wrap gap-2">
+      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
+      <div className="flex gap-2 w-full sm:w-auto justify-end">
         {Array.from({ length: max }, (_, i) => i + 1).map(num => (
           <label key={num} className="cursor-pointer">
             <input type="radio" name={name} value={num} checked={formData[name] === String(num)} onChange={handleChange} className="sr-only peer" />
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
+            <div className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
               {num}
             </div>
           </label>
@@ -3308,15 +3305,15 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm`}>
+      <div className={`p-4 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm`}>
         
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/50">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/30">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/30 shrink-0">
               <FileText size={24} className="text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Generador de Informes</h2>
+              <h2 className="text-xl sm:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Generador de Informes</h2>
               <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted} mt-1`}>Departamento de Porteros</p>
             </div>
           </div>
@@ -3373,7 +3370,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
                 <div>
                   <h3 className={sectionTitleClass}>3. Valoración Deportiva (1-4)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                     <div className="col-span-full mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Cualidades Generales</span></div>
                     {renderRadioGroup('repTecDefensivo', 4, 'Repertorio técnico defensivo')}
                     {renderRadioGroup('repTecOfensivo', 4, 'Repertorio técnico ofensivo')}
@@ -3403,7 +3400,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
                 <div>
                   <h3 className={sectionTitleClass}>4. Valores por fase de Juego (1-5)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                     {renderRadioGroup('ataque', 5, 'Ataque')}
                     {renderRadioGroup('transDef', 5, 'Transición Defensiva')}
                     {renderRadioGroup('defensa', 5, 'Defensa')}
@@ -3413,7 +3410,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
                 <div>
                   <h3 className={sectionTitleClass}>5. Valores Actitudinales (1-5)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                     {renderRadioGroup('sociabilidad', 5, 'Sociabilidad')}
                     {renderRadioGroup('constanciaAct', 5, 'Constancia')}
                     {renderRadioGroup('disciplina', 5, 'Disciplina')}
@@ -3436,7 +3433,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
                   <h3 className={sectionTitleClass}>7. Valoración General</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
-                      <label key={val} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
+                      <label key={val} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
                         <input type="radio" name="valoracionGeneral" value={val} checked={formData.valoracionGeneral === val} onChange={handleChange} className="sr-only" />
                         {val}
                       </label>
