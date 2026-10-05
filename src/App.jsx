@@ -3,7 +3,7 @@ import {
   Shield, User, Settings, Sun, Moon, 
   Download, Plus, ChevronDown, CheckCircle2, AlertCircle, Goal, Edit2, X, Upload,
   Home, Users, CalendarDays, Swords, BarChart2, Database, Key, MapPin, RotateCcw, Activity,
-  GitCompare, ArrowRight, ArrowLeft, LogOut, CloudRain, Target, Eye, Monitor, FileText
+  GitCompare, ArrowRight, ArrowLeft, LogOut, CloudRain, Target, Eye, Monitor, FileText, Trophy, Zap, UploadCloud, Search, FileText, ChevronRight, X, User, Users,
 } from 'lucide-react';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -3219,13 +3219,18 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
     </div>
   </div>
 );
-// ==========================================
 // MÓDULO DE INFORMES (Completado con todos los datos, secciones nuevas y sin saltos de scroll)
 // ==========================================
-function ModuleInformes({ gks, theme, darkMode, onSave }) {
+function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
   const [porteroSeleccionado, setPorteroSeleccionado] = useState('');
   
+  const MATCHDAY_OPTIONS = [
+    'Grupos J1', 'Grupos J2', 'Grupos J3', 'Grupos J4', 'Grupos J5', 
+    'Grupos J6', 'Grupos J7', 'Grupos J8', '1/16 final', '1/8 final', 
+    '1/4 final', 'Semifinal', 'Final', '3º-4º puesto'
+  ];
+
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     titulo: '', contenido: '', rival: '', nota: '5',
@@ -3239,30 +3244,20 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
     liderazgoGrupo: '3', destrezaGeneral: '3', concienciaObjetivos: '3', motivacionIndividual: '3', comportamientoActitudinal: '3',
     posicionBasica: '3', blocaje: '3', colocacion: '3', desplazamientosCaidas: '3',
     dominioArea: '3', reinicioJuego: '3', unoContraUno: '3', velocidadEspecifica: '3', agilidad: '3',
-    
-    // Fase de Juego (1-5)
     ataque: '3', transDef: '3', defensa: '3', transOf: '3',
-    obsTecnicoTacticas: '', // NUEVO CAMPO
-    
-    // Actitudinales (1-5)
+    obsTecnicoTacticas: '', 
     sociabilidad: '3', constanciaAct: '3', disciplina: '3', actitud: '3', compromiso: '3', evolucion: '3',
-    obsActitudinales: '', // NUEVO CAMPO
-    
-    // Académico (NUEVOS CAMPOS)
+    obsActitudinales: '', 
     eval1Media: '', eval1Asig: '', eval1Susp: '',
     eval2Media: '', eval2Asig: '', eval2Susp: '',
     eval3Media: '', eval3Asig: '', eval3Susp: '',
-    
     valoracionGeneral: 'MEDIA',
     
     // --- TORNEO ---
-    ubicacionTorneo: '', posFinalTorneo: '', superficieTorneo: 'Césped Natural',
-    ctxNivel: '3', ctxLogistica: '3', ctxCarga: '3', ctxInstalaciones: '3',
-    medInicial: '', medIncidencias: '',
-    valPersonalidad: '3', valMando: '3', valConc: '3', valError: '3', valConfianza: '3', valMentalidad: '3',
-    valActitudGol: '3', valPrimerUltimo: '3', valRitmo: '3', valMejoraBajon: '3', valEntorno: '3',
-    val1v1: '3', valOrg: '3', valCom: '3',
-    obsPenaltis: '', obsDecisivas: '', obsPos: '', obsNeg: '', obsTrans: '',
+    ubicacionTorneo: '', hotelTorneo: '', logoTorneo: '',
+    partidosTorneo: [], // Array para los partidos
+    valTechnical: '5', valTactical: '5', valPhysical: '5', valPsychological: '5',
+    obsPenaltis: '', obsDecisivas: '', obsPos: '', obsImprovements: '',
     
     // --- FLASH ---
     flashTipo: '', flashAltura: '', flashNivel: '', flashPotencial: '',
@@ -3274,6 +3269,56 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
   });
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  // --- LÓGICA ESPECÍFICA TORNEOS ---
+  const handleCopyData = (reportId) => {
+     // En una app real, existingReports vendría de Firebase buscando los informes_torneo
+     const report = existingReports.find(r => r.id === reportId);
+     if(report) {
+        setFormData(prev => ({
+           ...prev,
+           titulo: report.titulo || '',
+           fecha: report.fecha || prev.fecha,
+           ubicacionTorneo: report.ubicacionTorneo || '',
+           hotelTorneo: report.hotelTorneo || '',
+           logoTorneo: report.logoTorneo || '',
+           partidosTorneo: (report.partidosTorneo || []).map(m => ({
+              ...m,
+              id: Date.now() + Math.random(), 
+              goalsRival: '-', 
+              minutes: ''      
+           }))
+        }));
+     }
+  };
+
+  const handleImageUpload = (e) => {
+     const file = e.target.files[0];
+     if(file) {
+        const reader = new FileReader();
+        reader.onloadend = () => { setFormData(prev => ({ ...prev, logoTorneo: reader.result })); };
+        reader.readAsDataURL(file);
+     }
+  };
+
+  const addMatch = () => {
+     setFormData(prev => ({
+        ...prev,
+        partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', minutes: '' }]
+     }));
+  };
+
+  const removeMatch = (id) => {
+     setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.filter(m => m.id !== id) }));
+  };
+
+  const updateMatch = (id, field, value) => {
+     setFormData(prev => ({
+        ...prev,
+        partidosTorneo: prev.partidosTorneo.map(m => m.id === id ? { ...m, [field]: value } : m)
+     }));
+  };
+  // ---------------------------------
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -3315,6 +3360,9 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
       </div>
     </div>
   );
+
+  // Generar la lista de torneos previos para el selector de copia (Simulado si existingReports viene vacío)
+  const torneosPrevios = existingReports.filter(r => r.tipo === 'torneo');
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto h-full overflow-y-auto">
@@ -3445,7 +3493,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
                 <div>
                   <h3 className={sectionTitleClass}>6. Control Académico</h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* EVALUACIÓN 1 */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
                       <h4 className="text-center font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">1ª Evaluación</h4>
@@ -3525,82 +3573,111 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
             {/* ============================================================== */}
             {tipoInforme === 'torneo' && (
               <div className="space-y-8">
+                
+                {torneosPrevios.length > 0 && (
+                   <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-3xl p-5 shadow-inner">
+                     <label className="flex items-center gap-2 text-amber-600 dark:text-amber-500 font-bold text-xs uppercase tracking-widest mb-3">
+                        <Zap size={16} className="fill-amber-500" /> Copiar datos de un torneo previo (Opcional):
+                     </label>
+                     <select onChange={(e) => handleCopyData(e.target.value)} className={`${inputClass} border-amber-200 dark:border-amber-500/30 focus:ring-amber-500 cursor-pointer font-bold text-amber-900 dark:text-amber-100`}>
+                        <option value="">-- Selecciona un torneo para importar datos generales --</option>
+                        {torneosPrevios.map(r => (
+                           <option key={r.id} value={r.id}>{r.titulo} - {r.gkName}</option>
+                        ))}
+                     </select>
+                     <p className="text-[10px] text-amber-700/70 dark:text-amber-500/80 mt-2 font-bold uppercase tracking-wider">
+                        * Copiará el nombre, hotel, logo y los equipos rivales (sin copiar valoraciones, goles en contra ni minutos).
+                     </p>
+                   </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
                   <div><label className={labelClass}>Nombre del Torneo</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Torneo MIC 2026" className={inputClass} required/></div>
                   <div><label className={labelClass}>Ubicación</label><input type="text" name="ubicacionTorneo" value={formData.ubicacionTorneo} onChange={handleChange} placeholder="Ciudad / País" className={inputClass} /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className={labelClass}>Posición Final</label><input type="text" name="posFinalTorneo" value={formData.posFinalTorneo} onChange={handleChange} placeholder="Ej: Campeón" className={inputClass} /></div>
-                    <div>
-                      <label className={labelClass}>Superficie</label>
-                      <select name="superficieTorneo" value={formData.superficieTorneo} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
-                        <option value="Césped Natural">Natural</option>
-                        <option value="Césped Artificial">Artificial</option>
-                        <option value="Fútbol Sala">Sala / Pista</option>
-                      </select>
-                    </div>
+                  <div><label className={labelClass}>Hotel de Concentración</label><input type="text" name="hotelTorneo" value={formData.hotelTorneo} onChange={handleChange} placeholder="Nombre del hotel" className={inputClass} /></div>
+                </div>
+
+                <div>
+                   <label className={labelClass}>Logo del Torneo (Para PDF)</label>
+                   <div className="flex items-center gap-4">
+                     {formData.logoTorneo && (
+                       <div className="relative shrink-0">
+                         <img src={formData.logoTorneo} alt="Logo" className="w-20 h-20 rounded-2xl object-contain bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 shadow-sm" />
+                         <button type="button" onClick={() => setFormData(prev => ({...prev, logoTorneo: ''}))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-md transition-colors"><X size={12} strokeWidth={4}/></button>
+                       </div>
+                     )}
+                     <label className="flex-1 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                       <UploadCloud size={24} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                       <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-hover:text-blue-500 transition-colors text-center">Haz clic para subir el logo</span>
+                       <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                     </label>
+                   </div>
+                </div>
+
+                {/* BLOQUE DINÁMICO DE PARTIDOS Y RENDIMIENTO */}
+                <div>
+                   <h3 className={sectionTitleClass}>2. Partidos y Rendimiento</h3>
+                   <div className="space-y-4">
+                      {formData.partidosTorneo.map(match => (
+                         <div key={match.id} className="bg-slate-900 dark:bg-slate-900/80 p-5 rounded-2xl border border-slate-800 relative shadow-inner">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <select value={match.matchday} onChange={(e) => updateMatch(match.id, 'matchday', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors">
+                                   {MATCHDAY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                                <input type="text" placeholder="Nombre Rival" value={match.rival} onChange={(e) => updateMatch(match.id, 'rival', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
+                                <input type="text" placeholder="País (Opcional - Ej: 🇪🇸)" value={match.country} onChange={(e) => updateMatch(match.id, 'country', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div>
+                                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Goles ATM</label>
+                                   <select value={match.goalsATM} onChange={(e) => updateMatch(match.id, 'goalsATM', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors">
+                                      <option value="-">-</option>{[0,1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}</option>)}
+                                   </select>
+                                </div>
+                                <div>
+                                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Goles Rival (Recibidos por GK)</label>
+                                   <select value={match.goalsRival} onChange={(e) => updateMatch(match.id, 'goalsRival', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors">
+                                      <option value="-">-</option>{[0,1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}</option>)}
+                                   </select>
+                                </div>
+                                <div className="flex gap-3 items-center">
+                                   <div className="flex-1">
+                                       <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Min. Jugados</label>
+                                       <input type="number" placeholder="Min" value={match.minutes} onChange={(e) => updateMatch(match.id, 'minutes', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-600 outline-none focus:border-blue-500 transition-colors" />
+                                   </div>
+                                   <button type="button" onClick={() => removeMatch(match.id)} className="mt-6 w-12 h-12 flex items-center justify-center text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl transition-colors shrink-0"><X size={24} strokeWidth={3}/></button>
+                                </div>
+                            </div>
+                         </div>
+                      ))}
+                   </div>
+                   <button type="button" onClick={addMatch} className="w-full mt-4 py-5 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#1e2336] text-slate-600 dark:text-slate-300 font-bold uppercase tracking-widest text-sm hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm">
+                      + AÑADIR PARTIDO
+                   </button>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>3. Valoración General (1-10)</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     {['valTechnical', 'valTactical', 'valPhysical', 'valPsychological'].map(skill => (
+                       <div key={skill} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 text-center">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
+                            {skill === 'valTechnical' ? 'Técnico' : skill === 'valTactical' ? 'Táctico' : skill === 'valPhysical' ? 'Físico' : 'Psicológico'}
+                          </label>
+                          <input type="number" min="1" max="10" name={skill} value={formData[skill]} onChange={handleChange} className="w-16 bg-white dark:bg-[#0b1120] border border-slate-200 dark:border-slate-700 rounded-xl py-2 text-center font-black text-lg text-blue-950 dark:text-white outline-none focus:border-blue-500 mx-auto block"/>
+                       </div>
+                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className={sectionTitleClass}>Contexto del Torneo (1-5)</h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    {renderRadioGroup('ctxNivel', 5, 'Nivel de Rivales')}
-                    {renderRadioGroup('ctxLogistica', 5, 'Logística y Hotel')}
-                    {renderRadioGroup('ctxCarga', 5, 'Tiempos Recuperación')}
-                    {renderRadioGroup('ctxInstalaciones', 5, 'Campos / Arbitraje')}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div><label className={labelClass}>Estado Inicial Médico</label><input type="text" name="medInicial" value={formData.medInicial} onChange={handleChange} placeholder="Ej: Óptimo" className={inputClass} /></div>
-                  <div><label className={labelClass}>Incidencias Torneo</label><input type="text" name="medIncidencias" value={formData.medIncidencias} onChange={handleChange} placeholder="Ej: Ninguna" className={inputClass} /></div>
-                </div>
-
-                <div>
-                  <h3 className={sectionTitleClass}>Perfil Psicológico y Técnico (1-5)</h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    <div className="col-span-full mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Psicología & Evolución</span></div>
-                    {renderRadioGroup('valPersonalidad', 5, 'Personalidad')}
-                    {renderRadioGroup('valMando', 5, 'Mando / Liderazgo')}
-                    {renderRadioGroup('valConc', 5, 'Concentración')}
-                    {renderRadioGroup('valConfianza', 5, 'Confianza')}
-                    {renderRadioGroup('valPrimerUltimo', 5, 'Evolución: 1º vs Último')}
-                    {renderRadioGroup('valRitmo', 5, 'Adaptación al Ritmo')}
-                    {renderRadioGroup('valMejoraBajon', 5, 'Mejora o Bajón General')}
-                    {renderRadioGroup('valEntorno', 5, 'Adaptación Entorno')}
-                    
-                    <div className="col-span-full mt-4 mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Resiliencia & Táctica</span></div>
-                    {renderRadioGroup('valError', 5, 'Gestión Error')}
-                    {renderRadioGroup('valMentalidad', 5, 'Mentalidad Competitiva')}
-                    {renderRadioGroup('valActitudGol', 5, 'Actitud tras Gol')}
-                    {renderRadioGroup('val1v1', 5, 'Rendimiento 1vs1')}
-                    {renderRadioGroup('valOrg', 5, 'Organización defensiva')}
-                    {renderRadioGroup('valCom', 5, 'Comunicación')}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className={sectionTitleClass}>Observaciones Técnicas Específicas</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                     <div><label className={labelClass}>Puntos Positivos</label><textarea name="obsPos" value={formData.obsPos} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="..." /></div>
-                     <div><label className={labelClass}>Áreas de Mejora</label><textarea name="obsNeg" value={formData.obsNeg} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="..." /></div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <div><label className={labelClass}>Rendimiento en Penaltis</label><textarea name="obsPenaltis" value={formData.obsPenaltis} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
-                     <div><label className={labelClass}>Acciones Decisivas</label><textarea name="obsDecisivas" value={formData.obsDecisivas} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
-                     <div><label className={labelClass}>Trascendencia Torneo</label><textarea name="obsTrans" value={formData.obsTrans} onChange={handleChange} rows="2" className={`${inputClass} resize-none`} placeholder="..." /></div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className={sectionTitleClass}>Valoración General del Torneo</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
-                      <div key={val} onClick={() => setFormData(prev => ({ ...prev, valoracionGeneral: val }))} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all select-none ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
-                        {val}
-                      </div>
-                    ))}
+                  <h3 className={sectionTitleClass}>4. Observaciones Finales</h3>
+                  <div className="grid grid-cols-1 gap-6">
+                     <div><label className={labelClass}>Rendimiento en penaltis (si los hubo)</label><textarea name="obsPenaltis" value={formData.obsPenaltis} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Acciones decisivas del torneo</label><textarea name="obsDecisivas" value={formData.obsDecisivas} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Puntos positivos Globales</label><textarea name="obsPos" value={formData.obsPos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Áreas de Mejora / Errores clave / Transcendencia en torneo</label><textarea name="obsImprovements" value={formData.obsImprovements} onChange={handleChange} rows="4" className={`${inputClass} resize-y`} placeholder="..." /></div>
                   </div>
                 </div>
               </div>
