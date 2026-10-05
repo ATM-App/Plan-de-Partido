@@ -3337,7 +3337,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
               <label className={labelClass}>1. Datos e Información de Portero *</label>
               <select value={porteroSeleccionado} onChange={(e) => setPorteroSeleccionado(e.target.value)} className={`${inputClass} cursor-pointer font-bold`} required>
                 <option value="">-- Seleccionar... --</option>
-                {gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>)}
+                {gks && gks.length > 0 ? gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>) : null}
               </select>
             </div>
           </div>
