@@ -3304,8 +3304,8 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
   );
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className={`p-4 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm`}>
+    <div className="space-y-6 max-w-5xl mx-auto h-full overflow-y-auto">
+      <div className={`p-4 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm mb-12`}>
         
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/50">
           <div className="flex items-center gap-4">
@@ -3342,7 +3342,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
             </div>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-8 pb-10">
             
             {/* ============================================================== */}
             {/* INFORME SEMESTRAL (EL COMPLETO DEL HTML)                       */}
