@@ -3220,7 +3220,7 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Actualizado y blindado contra saltos)
+// MÓDULO DE INFORMES (Completado con todos los datos, secciones nuevas y sin saltos de scroll)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
@@ -3232,16 +3232,11 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     '1/4 final', 'Semifinal', 'Final', '3º-4º puesto'
   ];
 
-  // Estado general consolidado para todos los posibles campos
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
-    titulo: '',
-    contenido: '',
-    objetivo1: '', objetivo2: '', objetivo3: '',
-    nota: '5',
-    rival: '',
+    titulo: '', contenido: '', rival: '', nota: '5',
     
-    // Campos Informe Semestral
+    // --- SEMESTRAL ---
     jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '',
     golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '',
     torneosAsistidos: '', torneosConvocado: '',
@@ -3259,6 +3254,16 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     eval3Media: '', eval3Asig: '', eval3Susp: '',
     valoracionGeneral: 'MEDIA',
     
+    // --- PARTIDO ---
+    partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '',
+    // Nivel 1: Registro Rápido (Contadores)
+    statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0,
+    // Análisis Cualitativo
+    obsParadas: '', obsGoles: '', obsAereo: '', obsPies: '', obsFueraArea: '', obs1v1: '', obsABP: '', obsComunicacion: '', obsMental: '',
+    partidoCronologia: '', partidoVideos: '', partidoComparativa: '',
+    valTecnicoPartido: '3', valTacticoPartido: '3', valFisicoPartido: '3', valMentalPartido: '3',
+    planFortalezas: '', planDebilidades: '', planObjetivos: '',
+
     // --- TORNEO ---
     ubicacionTorneo: '', hotelTorneo: '', logoTorneo: '',
     partidosTorneo: [],
@@ -3272,10 +3277,18 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     // --- FLASH ---
     flashTipo: '', flashAltura: '', flashNivel: '', flashPotencial: '',
     flashPersonalidad: '', flashComunicacion: '', flashConcentracion: '', flashResiliencia: '',
-    flashObsOf: '', flashObsDef: '', flashEstado: '', flashPropuesta: '', flashJustificacion: ''
+    flashObsOf: '', flashObsDef: '', flashEstado: '', flashPropuesta: '', flashJustificacion: '',
+    
+    // --- OBJETIVOS ---
+    objetivo1: '', objetivo2: '', objetivo3: ''
   });
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  // Helper para incrementar/decrementar contadores del informe de partido
+  const handleCounter = (field, delta) => {
+    setFormData(prev => ({ ...prev, [field]: Math.max(0, (parseInt(prev[field]) || 0) + delta) }));
+  };
 
   const handleCopyData = (reportId) => {
      const report = existingReports.find(r => r.id === reportId);
@@ -3375,13 +3388,12 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-900/20 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700/50">
             <div>
               <label className={labelClass}>Tipo de Informe</label>
               <select value={tipoInforme} onChange={(e) => setTipoInforme(e.target.value)} className={`${inputClass} cursor-pointer font-bold text-blue-950 dark:text-blue-400`}>
-                <option value="semestral">📊 Informe Semestral (Completo)</option>
-                <option value="partido">📝 Informe de Partido</option>
+                <option value="partido">📝 Informe de Partido (Completo)</option>
+                <option value="semestral">📊 Informe Semestral</option>
                 <option value="torneo">🏆 Informe de Torneo</option>
                 <option value="flash">⚡ Informe Flash (Scouting)</option>
                 <option value="objetivos">🎯 Fijación de Objetivos</option>
@@ -3398,6 +3410,117 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
 
           <div className="space-y-8 pb-10">
             
+            {/* ============================================================== */}
+            {/* INFORME DE PARTIDO (NUEVA ESTRUCTURA PROFESIONAL)              */}
+            {/* ============================================================== */}
+            {tipoInforme === 'partido' && (
+              <div className="space-y-10">
+                {/* 01 Y 02 - DATOS DEL PARTIDO */}
+                <div>
+                  <h3 className={sectionTitleClass}>01 y 02 — Datos del Partido y Portero</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
+                    <div><label className={labelClass}>Rival</label><input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid" className={inputClass} required/></div>
+                    <div><label className={labelClass}>Competición</label><input type="text" name="partidoCompeticion" value={formData.partidoCompeticion} onChange={handleChange} placeholder="Ej: Liga Autonómica" className={inputClass} /></div>
+                    <div><label className={labelClass}>Jornada</label><input type="text" name="partidoJornada" value={formData.partidoJornada} onChange={handleChange} placeholder="Ej: 14" className={inputClass} /></div>
+                    <div><label className={labelClass}>Resultado</label><input type="text" name="partidoResultado" value={formData.partidoResultado} onChange={handleChange} placeholder="ATM 2 - 1 RIV" className={inputClass} /></div>
+                    <div className="flex gap-2">
+                       <div className="flex-1">
+                          <label className={labelClass}>Condición</label>
+                          <select name="partidoTitular" value={formData.partidoTitular} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                            <option value="Titular">Titular</option>
+                            <option value="Suplente">Suplente</option>
+                          </select>
+                       </div>
+                       <div className="w-1/3">
+                          <label className={labelClass}>Minutos</label>
+                          <input type="number" name="partidoMinutos" value={formData.partidoMinutos} onChange={handleChange} placeholder="Ej: 90" className={inputClass} />
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 03 - NIVEL 1 REGISTRO RÁPIDO */}
+                <div>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8">
+                     <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">⚡ Nivel 1 — Registro Rápido (En Partido)</h3>
+                     <span className="text-[10px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">03 - Resumen Estadístico</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { id: 'statParadas', label: 'Paradas' }, { id: 'statSalidas', label: 'Salidas' },
+                      { id: 'statCentros', label: 'Centros' }, { id: 'statPases', label: 'Pases' },
+                      { id: 'stat1v1', label: '1 vs 1' }, { id: 'statABP', label: 'A.B.P.' },
+                      { id: 'statErrores', label: 'Errores' }, { id: 'statGoles', label: 'Goles Rec.' }
+                    ].map(stat => (
+                      <div key={stat.id} className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-3 flex flex-col items-center border border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{stat.label}</span>
+                        <div className="flex items-center gap-3 w-full justify-center">
+                          <div onClick={() => handleCounter(stat.id, -1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 cursor-pointer hover:bg-red-100 hover:text-red-600 select-none shadow-sm">-</div>
+                          <span className="text-xl font-black text-blue-950 dark:text-white w-8 text-center">{formData[stat.id]}</span>
+                          <div onClick={() => handleCounter(stat.id, 1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 cursor-pointer hover:bg-emerald-100 hover:text-emerald-600 select-none shadow-sm">+</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 04 AL 12 - ANÁLISIS CUALITATIVO */}
+                <div>
+                  <h3 className={sectionTitleClass}>04 al 12 — Análisis Específico Post-Partido</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div><label className={labelClass}>04 - Paradas Relevantes</label><textarea name="obsParadas" value={formData.obsParadas} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Análisis de intervenciones clave..." /></div>
+                     <div><label className={labelClass}>05 - Goles Recibidos</label><textarea name="obsGoles" value={formData.obsGoles} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Análisis individual de cada gol..." /></div>
+                     <div><label className={labelClass}>06 - Juego Aéreo</label><textarea name="obsAereo" value={formData.obsAereo} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Centros, salidas, dominio aéreo..." /></div>
+                     <div><label className={labelClass}>07 - Juego con los Pies</label><textarea name="obsPies" value={formData.obsPies} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Pases, precisión, decisiones..." /></div>
+                     <div><label className={labelClass}>08 - Fuera del Área</label><textarea name="obsFueraArea" value={formData.obsFueraArea} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Anticipaciones, despejes, coberturas..." /></div>
+                     <div><label className={labelClass}>09 - 1 VS 1</label><textarea name="obs1v1" value={formData.obs1v1} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Achiques, timing..." /></div>
+                     <div><label className={labelClass}>10 - A.B.P.</label><textarea name="obsABP" value={formData.obsABP} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Córners, faltas, penaltis..." /></div>
+                     <div><label className={labelClass}>11 - Comunicación y Organización</label><textarea name="obsComunicacion" value={formData.obsComunicacion} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Liderazgo, posicionamiento de la defensa..." /></div>
+                     <div className="col-span-1 md:col-span-2"><label className={labelClass}>12 - Aspecto Mental</label><textarea name="obsMental" value={formData.obsMental} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="Concentración, reacción al error, presión..." /></div>
+                  </div>
+                </div>
+
+                {/* 13 AL 15 - CRONOLOGÍA, VÍDEOS Y COMPARATIVA */}
+                <div>
+                  <h3 className={sectionTitleClass}>13 al 15 — Datos Adicionales</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <div><label className={labelClass}>13 - Cronología</label><textarea name="partidoCronologia" value={formData.partidoCronologia} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="Minuto a minuto de acciones importantes..." /></div>
+                     <div><label className={labelClass}>14 - Enlaces a Vídeos</label><textarea name="partidoVideos" value={formData.partidoVideos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="Pega aquí los enlaces a los clips..." /></div>
+                     <div><label className={labelClass}>15 - Comparativa (Opcional)</label><textarea name="partidoComparativa" value={formData.partidoComparativa} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="Comparativa con Portero B..." /></div>
+                  </div>
+                </div>
+
+                {/* 16 - VALORACIÓN GLOBAL */}
+                <div>
+                  <h3 className={sectionTitleClass}>16 — Valoración Global (1-5)</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    {renderRadioGroup('valTecnicoPartido', 5, 'Rendimiento Técnico')}
+                    {renderRadioGroup('valTacticoPartido', 5, 'Rendimiento Táctico')}
+                    {renderRadioGroup('valFisicoPartido', 5, 'Rendimiento Físico')}
+                    {renderRadioGroup('valMentalPartido', 5, 'Rendimiento Mental')}
+                  </div>
+                  <div className="mt-6">
+                    <label className={labelClass}>Nota Global del Partido (1-10)</label>
+                    <input type="range" name="nota" min="1" max="10" step="0.5" value={formData.nota} onChange={handleChange} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-600" />
+                    <div className="text-center mt-2 font-black text-2xl text-red-600">{formData.nota}</div>
+                  </div>
+                </div>
+
+                {/* 17 - PLAN DE MEJORA */}
+                <div>
+                  <h3 className={sectionTitleClass}>17 — Plan de Mejora (Post-Partido)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <div><label className={labelClass}>Fortalezas mostradas</label><textarea name="planFortalezas" value={formData.planFortalezas} onChange={handleChange} rows="3" className={`${inputClass} resize-y border-emerald-200 focus:ring-emerald-500`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Debilidades a corregir</label><textarea name="planDebilidades" value={formData.planDebilidades} onChange={handleChange} rows="3" className={`${inputClass} resize-y border-red-200 focus:ring-red-500`} placeholder="..." /></div>
+                     <div><label className={labelClass}>Objetivos para la semana</label><textarea name="planObjetivos" value={formData.planObjetivos} onChange={handleChange} rows="3" className={`${inputClass} resize-y border-blue-200 focus:ring-blue-500`} placeholder="..." /></div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
             {/* ============================================================== */}
             {/* INFORME SEMESTRAL                                              */}
             {/* ============================================================== */}
@@ -3529,33 +3652,6 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* ============================================================== */}
-            {/* INFORME DE PARTIDO                                             */}
-            {/* ============================================================== */}
-            {tipoInforme === 'partido' && (
-              <div className="grid grid-cols-1 gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className={labelClass}>Fecha del Partido</label>
-                    <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Rival</label>
-                    <input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid" className={inputClass} required/>
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Evaluación Táctica y Técnica (Análisis Post-Partido)</label>
-                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="6" className={`${inputClass} resize-none`} placeholder="Análisis del rendimiento, fallos, aciertos, cumplimiento del plan de partido..." required></textarea>
-                </div>
-                <div>
-                  <label className={labelClass}>Valoración Global del Partido (1-10)</label>
-                  <input type="range" name="nota" min="1" max="10" step="0.5" value={formData.nota} onChange={handleChange} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-600" />
-                  <div className="text-center mt-2 font-black text-2xl text-red-600">{formData.nota}</div>
                 </div>
               </div>
             )}
