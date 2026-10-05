@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Download, Plus, ChevronDown, CheckCircle2, AlertCircle, Goal, Edit2, X, Upload,
   Home, Users, CalendarDays, Swords, BarChart2, Database, Key, MapPin, RotateCcw, Activity,
-  GitCompare, ArrowRight, ArrowLeft, LogOut, CloudRain, Target, Eye, Monitor, FileText, Trophy, Zap, UploadCloud, Search, ChevronRight, User
+  GitCompare, ArrowRight, ArrowLeft, LogOut, CloudRain, Target, Eye, Monitor, FileText, Trophy, Zap, UploadCloud, Search, ChevronRight, User, Settings
 } from 'lucide-react';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
