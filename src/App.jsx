@@ -3222,27 +3222,54 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
 // ==========================================
 // MÓDULO DE INFORMES (Nueva pantalla del menú)
 // ==========================================
+// ==========================================
+// MÓDULO DE INFORMES (Actualizado con campos originales)
+// ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave }) {
-  const [tipoInforme, setTipoInforme] = useState('partido');
+  const [tipoInforme, setTipoInforme] = useState('semestral');
   const [porteroSeleccionado, setPorteroSeleccionado] = useState('');
   
+  // Estado general consolidado para todos los posibles campos
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     titulo: '',
     contenido: '',
     objetivo1: '', objetivo2: '', objetivo3: '',
     nota: '5',
-    rival: ''
+    rival: '',
+    
+    // Campos Informe Semestral
+    jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '',
+    golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '',
+    torneosAsistidos: '', torneosConvocado: '',
+    
+    // Valoraciones (1-4)
+    repTecDefensivo: '1', repTecOfensivo: '1', adecuacionRecursos: '1', nivelCompetitivo: '1',
+    constanciaRendimiento: '1', comprensionJuego: '1', implicacionEntrenamientos: '1',
+    liderazgoGrupo: '1', destrezaGeneral: '1', concienciaObjetivos: '1',
+    motivacionIndividual: '1', comportamientoActitudinal: '1',
+    posicionBasica: '1', blocaje: '1', colocacion: '1', desplazamientosCaidas: '1',
+    dominioArea: '1', reinicioJuego: '1', unoContraUno: '1', velocidadEspecifica: '1', agilidad: '1',
+    
+    // Fase de Juego (1-5)
+    ataque: '1', transDef: '1', defensa: '1', transOf: '1',
+    
+    // Actitudinales (1-5)
+    sociabilidad: '1', constanciaAct: '1', disciplina: '1', actitud: '1', compromiso: '1', evolucion: '1',
+    
+    // Académico
+    eval1: '', eval2: '', eval3: '',
+    
+    // Valoración General
+    valoracionGeneral: 'MEDIA'
   });
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!porteroSeleccionado) {
-      alert("Debes seleccionar un portero");
-      return;
-    }
+    if (!porteroSeleccionado) { alert("Debes seleccionar un portero"); return; }
+    
     const gkInfo = gks.find(g => g.id === porteroSeleccionado);
     const informeAguardar = {
       tipo: tipoInforme,
@@ -3253,194 +3280,259 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
     };
 
     onSave(informeAguardar);
-    setFormData({ fecha: new Date().toISOString().split('T')[0], titulo: '', contenido: '', objetivo1: '', objetivo2: '', objetivo3: '', nota: '5', rival: '' });
+    
+    // Reset (opcional, podrías querer mantener los datos si guardas como borrador)
+    setFormData({ ...formData, titulo: '', contenido: '' }); 
   };
 
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 outline-none transition-all";
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 outline-none transition-all text-sm";
+  const sectionTitleClass = "text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8 flex items-center gap-2";
+  const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 pl-1";
+
+  // Helper para renderizar Radios de 1 a N
+  const renderRadioGroup = (name, max, label) => (
+    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
+      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-1/2 leading-tight">{label}</span>
+      <div className="flex gap-2 w-1/2 justify-end">
+        {Array.from({ length: max }, (_, i) => i + 1).map(num => (
+          <label key={num} className="cursor-pointer">
+            <input type="radio" name={name} value={num} checked={formData[name] === String(num)} onChange={handleChange} className="sr-only peer" />
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
+              {num}
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm`}>
+        
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/50">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/30">
               <FileText size={24} className="text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Redacción de Informes</h2>
-              <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted} mt-1`}>Evaluación y seguimiento</p>
+              <h2 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Generador de Informes</h2>
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted} mt-1`}>Departamento de Porteros</p>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* BLOQUE FIJO: TIPO Y PORTERO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-900/20 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700/50">
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Tipo de Informe</label>
+              <label className={labelClass}>Tipo de Informe</label>
               <select value={tipoInforme} onChange={(e) => setTipoInforme(e.target.value)} className={`${inputClass} cursor-pointer font-bold text-blue-950 dark:text-blue-400`}>
-                <option value="partido">📝 Informe de Partido (Nuevo)</option>
-                <option value="semestral">📊 Informe Semestral</option>
+                <option value="semestral">📊 Informe Semestral (Completo)</option>
+                <option value="partido">📝 Informe de Partido</option>
                 <option value="torneo">🏆 Informe de Torneo</option>
                 <option value="flash">⚡ Informe Flash</option>
                 <option value="objetivos">🎯 Fijación de Objetivos</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Seleccionar Portero *</label>
-              <select value={porteroSeleccionado} onChange={(e) => setPorteroSeleccionado(e.target.value)} className={`${inputClass} cursor-pointer`} required>
-                <option value="">-- Elige un portero --</option>
-                {gks.map(g => <option key={g.id} value={g.id}>{g.name} ({g.team})</option>)}
+              <label className={labelClass}>1. Datos e Información de Portero *</label>
+              <select value={porteroSeleccionado} onChange={(e) => setPorteroSeleccionado(e.target.value)} className={`${inputClass} cursor-pointer font-bold`} required>
+                <option value="">-- Seleccionar... --</option>
+                {gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>)}
               </select>
             </div>
           </div>
 
           <div className="animate-in fade-in duration-300">
+            
+            {/* ============================================================== */}
+            {/* INFORME SEMESTRAL (EL COMPLETO DEL HTML)                       */}
+            {/* ============================================================== */}
+            {tipoInforme === 'semestral' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className={sectionTitleClass}>2. Datos de Competición</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><label className={labelClass}>Jornada Actual</label><input type="number" name="jornadaActual" value={formData.jornadaActual} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Convocatorias</label><input type="number" name="convocatorias" value={formData.convocatorias} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Titular</label><input type="number" name="titular" value={formData.titular} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Goles Encajados</label><input type="number" name="golesEncajados" value={formData.golesEncajados} onChange={handleChange} className={inputClass} /></div>
+                    
+                    <div><label className={labelClass}>Min. Pos 1</label><input type="number" name="minPos1" value={formData.minPos1} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Min. Pos 2</label><input type="number" name="minPos2" value={formData.minPos2} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Torneos Convocado</label><input type="number" name="torneosConvocado" value={formData.torneosConvocado} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Torneos Asistidos</label><input type="number" name="torneosAsistidos" value={formData.torneosAsistidos} onChange={handleChange} className={inputClass} /></div>
+
+                    <div><label className={labelClass}>Ausencia Lesión</label><input type="number" name="ausenciaLesion" value={formData.ausenciaLesion} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Aus. Disciplina</label><input type="number" name="ausenciaDisciplina" value={formData.ausenciaDisciplina} onChange={handleChange} className={inputClass} /></div>
+                    <div className="col-span-2"><label className={labelClass}>Aus. Dec. Técnica</label><input type="number" name="ausenciaDecTecnica" value={formData.ausenciaDecTecnica} onChange={handleChange} className={inputClass} /></div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>3. Valoración Deportiva (1-4)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                    <div className="col-span-full mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Cualidades Generales</span></div>
+                    {renderRadioGroup('repTecDefensivo', 4, 'Repertorio técnico defensivo')}
+                    {renderRadioGroup('repTecOfensivo', 4, 'Repertorio técnico ofensivo')}
+                    {renderRadioGroup('adecuacionRecursos', 4, 'Adecuación de uso recursos')}
+                    {renderRadioGroup('nivelCompetitivo', 4, 'Nivel competitivo')}
+                    {renderRadioGroup('constanciaRendimiento', 4, 'Constancia en el rendimiento')}
+                    {renderRadioGroup('comprensionJuego', 4, 'Comprensión del juego')}
+                    {renderRadioGroup('implicacionEntrenamientos', 4, 'Implicación entrenamientos')}
+                    {renderRadioGroup('liderazgoGrupo', 4, 'Liderazgo con el grupo')}
+                    {renderRadioGroup('destrezaGeneral', 4, 'Destreza general etapa')}
+                    {renderRadioGroup('concienciaObjetivos', 4, 'Conciencia objetivos')}
+                    {renderRadioGroup('motivacionIndividual', 4, 'Motivación individual')}
+                    {renderRadioGroup('comportamientoActitudinal', 4, 'Comportamiento actitudinal')}
+                    
+                    <div className="col-span-full mt-4 mb-2"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md">Cualidades Puesto 1: PORTERO</span></div>
+                    {renderRadioGroup('posicionBasica', 4, 'Posición básica')}
+                    {renderRadioGroup('blocaje', 4, 'Blocaje')}
+                    {renderRadioGroup('colocacion', 4, 'Colocación')}
+                    {renderRadioGroup('desplazamientosCaidas', 4, 'Desplazamientos y caídas')}
+                    {renderRadioGroup('dominioArea', 4, 'Dominio del área (aéreo)')}
+                    {renderRadioGroup('reinicioJuego', 4, 'Reinicio (mano y pie)')}
+                    {renderRadioGroup('unoContraUno', 4, 'Uno contra uno')}
+                    {renderRadioGroup('velocidadEspecifica', 4, 'Velocidad específica')}
+                    {renderRadioGroup('agilidad', 4, 'Agilidad')}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>4. Valores por fase de Juego (1-5)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                    {renderRadioGroup('ataque', 5, 'Ataque')}
+                    {renderRadioGroup('transDef', 5, 'Transición Defensiva')}
+                    {renderRadioGroup('defensa', 5, 'Defensa')}
+                    {renderRadioGroup('transOf', 5, 'Transición Ofensiva')}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>5. Valores Actitudinales (1-5)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                    {renderRadioGroup('sociabilidad', 5, 'Sociabilidad')}
+                    {renderRadioGroup('constanciaAct', 5, 'Constancia')}
+                    {renderRadioGroup('disciplina', 5, 'Disciplina')}
+                    {renderRadioGroup('actitud', 5, 'Actitud')}
+                    {renderRadioGroup('compromiso', 5, 'Compromiso')}
+                    {renderRadioGroup('evolucion', 5, 'Evolución')}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>6. Control Académico</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div><label className={labelClass}>1ª Evaluación</label><input type="text" name="eval1" value={formData.eval1} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
+                    <div><label className={labelClass}>2ª Evaluación</label><input type="text" name="eval2" value={formData.eval2} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
+                    <div><label className={labelClass}>3ª Evaluación</label><input type="text" name="eval3" value={formData.eval3} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={sectionTitleClass}>7. Valoración General</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
+                      <label key={val} className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}>
+                        <input type="radio" name="valoracionGeneral" value={val} checked={formData.valoracionGeneral === val} onChange={handleChange} className="sr-only" />
+                        {val}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* INFORME DE PARTIDO                                             */}
+            {/* ============================================================== */}
             {tipoInforme === 'partido' && (
               <div className="grid grid-cols-1 gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha del Partido</label>
+                    <label className={labelClass}>Fecha del Partido</label>
                     <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Rival</label>
+                    <label className={labelClass}>Rival</label>
                     <input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid" className={inputClass} required/>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Evaluación Táctica y Técnica</label>
-                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="6" className={`${inputClass} resize-none`} placeholder="Análisis del rendimiento..." required></textarea>
+                  <label className={labelClass}>Evaluación Táctica y Técnica (Análisis Post-Partido)</label>
+                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="6" className={`${inputClass} resize-none`} placeholder="Análisis del rendimiento, fallos, aciertos, cumplimiento del plan de partido..." required></textarea>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Valoración Global (1-10)</label>
+                  <label className={labelClass}>Valoración Global del Partido (1-10)</label>
                   <input type="range" name="nota" min="1" max="10" step="0.5" value={formData.nota} onChange={handleChange} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-600" />
                   <div className="text-center mt-2 font-black text-2xl text-red-600">{formData.nota}</div>
                 </div>
               </div>
             )}
 
-            {(tipoInforme === 'semestral' || tipoInforme === 'torneo' || tipoInforme === 'flash') && (
+            {/* ============================================================== */}
+            {/* INFORME TORNEO / FLASH                                         */}
+            {/* ============================================================== */}
+            {(tipoInforme === 'torneo' || tipoInforme === 'flash') && (
               <div className="grid grid-cols-1 gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha</label>
+                    <label className={labelClass}>Fecha</label>
                     <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Título / Asunto</label>
-                    <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Evolución" className={inputClass} required/>
+                    <label className={labelClass}>Título / Nombre del Torneo</label>
+                    <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder={tipoInforme === 'torneo' ? 'Ej: Torneo MIC 2026' : 'Ej: Evolución Primera Vuelta'} className={inputClass} required/>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Cuerpo del Informe</label>
-                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="8" className={`${inputClass} resize-none`} placeholder="Escribe aquí el informe..." required></textarea>
+                  <label className={labelClass}>Cuerpo del Informe</label>
+                  <textarea name="contenido" value={formData.contenido} onChange={handleChange} rows="8" className={`${inputClass} resize-none`} placeholder="Escribe aquí el informe detallado..." required></textarea>
                 </div>
               </div>
             )}
 
+            {/* ============================================================== */}
+            {/* FIJACIÓN DE OBJETIVOS                                          */}
+            {/* ============================================================== */}
             {tipoInforme === 'objetivos' && (
               <div className="grid grid-cols-1 gap-6">
                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Título de la Planificación</label>
+                    <label className={labelClass}>Título de la Planificación</label>
                     <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Objetivos Mes de Octubre" className={inputClass} required/>
                   </div>
                  <div className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Principal</label>
-                    <input type="text" name="objetivo1" value={formData.objetivo1} onChange={handleChange} className={inputClass} required/>
+                    <label className={labelClass}>Objetivo Principal (Corto Plazo)</label>
+                    <input type="text" name="objetivo1" value={formData.objetivo1} onChange={handleChange} placeholder="Ej: Mejorar blocaje frontal" className={inputClass} required/>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Secundario</label>
-                    <input type="text" name="objetivo2" value={formData.objetivo2} onChange={handleChange} className={inputClass}/>
+                    <label className={labelClass}>Objetivo Secundario (Medio Plazo)</label>
+                    <input type="text" name="objetivo2" value={formData.objetivo2} onChange={handleChange} placeholder="Ej: Comunicación con la línea defensiva" className={inputClass}/>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Objetivo Físico/Mental</label>
-                    <input type="text" name="objetivo3" value={formData.objetivo3} onChange={handleChange} className={inputClass}/>
+                    <label className={labelClass}>Objetivo Físico/Mental</label>
+                    <input type="text" name="objetivo3" value={formData.objetivo3} onChange={handleChange} placeholder="Ej: Mantener concentración tras error" className={inputClass}/>
                   </div>
                  </div>
               </div>
             )}
+
           </div>
 
-          <div className="flex justify-end pt-6 border-t border-slate-100 dark:border-slate-700/50">
-             <button type="submit" className="flex items-center gap-2 px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-900/20">
-               <CheckCircle2 size={18} strokeWidth={3} /> Guardar Informe
+          <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-slate-100 dark:border-slate-700/50">
+             <button type="button" onClick={() => alert("Función de guardar borrador en desarrollo.")} className="px-6 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
+               ⏳ Guardar Borrador
+             </button>
+             <button type="submit" className="flex items-center justify-center gap-2 px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-900/20">
+               💾 Generar y Guardar (Final)
              </button>
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-// ==========================================
-// MODO PRESENTACIÓN (PANTALLA COMPLETA)
-// ==========================================
-function PresentationModal({ gk, match, rival, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex flex-col p-8 md:p-12 animate-in fade-in zoom-in-95 duration-300 overflow-hidden">
-      <button onClick={onClose} className="absolute top-8 right-8 p-4 bg-slate-800/50 hover:bg-red-600 text-white rounded-2xl transition-all shadow-xl backdrop-blur-md z-50">
-         <X size={32} strokeWidth={3} />
-      </button>
-
-      <div className="flex items-center gap-6 mb-12">
-         <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-20 h-20 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]" />
-         <div>
-           <h1 className="text-5xl font-black italic tracking-tighter uppercase text-white leading-none">CHARLA TÉCNICA</h1>
-           <h2 className="text-2xl font-black text-red-500 uppercase tracking-widest mt-2">PLAN DE PARTIDO • {gk.team}</h2>
-         </div>
-      </div>
-
-      <div className="flex-1 flex flex-col xl:flex-row gap-12 h-full overflow-hidden">
-         <div className="w-full xl:w-1/3 flex flex-col gap-8 h-full">
-           <div className="relative rounded-[3rem] overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl flex-1 flex-shrink-0 min-h-[300px]">
-              <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="absolute inset-0 w-full h-full object-cover opacity-80" style={{ objectPosition: 'center 15%' }} alt=""/>
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
-              <div className="absolute bottom-10 left-10 right-10">
-                 <span className="text-9xl font-black italic tracking-tighter text-white drop-shadow-2xl leading-none">{gk.number}</span>
-                 <h3 className="text-4xl font-black uppercase text-white leading-tight mt-2 drop-shadow-lg">{gk.name}</h3>
-              </div>
-           </div>
-
-           {match && (
-             <div className="bg-slate-900/80 backdrop-blur-md rounded-[3rem] p-8 border border-slate-800 flex items-center justify-between shadow-2xl shrink-0">
-                <div className="flex flex-col items-center">
-                   <span className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 truncate w-32 text-center">{match.myTeam || 'ATLETI'}</span>
-                   <img src={ESCUDO_ATM_URL} className="w-20 h-20 object-contain drop-shadow-[0_0_15px_rgba(220,38,38,0.4)]" alt="Local"/>
-                </div>
-                <div className="flex flex-col items-center px-4">
-                   <span className="text-5xl font-black text-white italic drop-shadow-lg">{match.time}</span>
-                   <span className="text-xs font-black text-slate-500 uppercase tracking-widest mt-2">KICK OFF</span>
-                </div>
-                <div className="flex flex-col items-center">
-                   <span className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 truncate w-32 text-center">{rival?.name || 'RIVAL'}</span>
-                   {rival?.shieldUrl ? <img src={rival.shieldUrl} className="w-20 h-20 object-contain drop-shadow-lg" alt="Rival"/> : <Swords className="w-20 h-20 text-slate-600"/>}
-                </div>
-             </div>
-           )}
-         </div>
-
-         <div className="w-full xl:w-2/3 grid grid-cols-2 gap-8 h-full pb-8">
-            <PresBox title="Objetivo Defensivo" text={gk.matchPlan?.defensive} icon={<Shield size={40} className="text-red-500" />} />
-            <PresBox title="Objetivo Ofensivo" text={gk.matchPlan?.offensive} icon={<Swords size={40} className="text-emerald-500" />} />
-            <PresBox title="Objetivo Táctico" text={gk.matchPlan?.tactical} icon={<GitCompare size={40} className="text-blue-500" />} />
-            <PresBox title="Aspectos Claves" text={gk.matchPlan?.keyAspects} icon={<Goal size={40} className="text-yellow-500" />} />
-         </div>
-      </div>
-    </div>
-  );
-}
-
-function PresBox({ title, text, icon }) {
-  return (
-    <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-[3rem] p-10 flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-       <div className="flex items-center gap-5 mb-8 border-b border-slate-800 pb-6 shrink-0">
-          {icon}
-          <span className="text-2xl md:text-3xl font-black uppercase tracking-widest text-slate-300">{title}</span>
-       </div>
-       <p className="text-2xl font-medium text-white leading-relaxed whitespace-pre-wrap">
-         {text || <span className="text-slate-600 italic font-medium">Concepto táctico no definido...</span>}
-       </p>
     </div>
   );
 }
