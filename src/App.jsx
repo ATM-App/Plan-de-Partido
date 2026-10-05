@@ -3342,7 +3342,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
             </div>
           </div>
 
-          <div className="animate-in fade-in duration-300">
+          <div className="space-y-8">
             
             {/* ============================================================== */}
             {/* INFORME SEMESTRAL (EL COMPLETO DEL HTML)                       */}
