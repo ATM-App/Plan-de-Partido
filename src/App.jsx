@@ -3292,12 +3292,13 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
       <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
       <div className="flex gap-2 w-full sm:w-auto justify-end">
         {Array.from({ length: max }, (_, i) => i + 1).map(num => (
-          <label key={num} className="cursor-pointer">
-            <input type="radio" name={name} value={num} checked={formData[name] === String(num)} onChange={handleChange} className="sr-only peer" />
-            <div className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
-              {num}
-            </div>
-          </label>
+          <div
+            key={num}
+            onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))}
+            className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all select-none ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}
+          >
+            {num}
+          </div>
         ))}
       </div>
     </div>
