@@ -3220,7 +3220,7 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Completado con todos los datos y sin saltos de scroll)
+// MÓDULO DE INFORMES (Completado con todos los datos, secciones nuevas y sin saltos de scroll)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
@@ -3234,22 +3234,34 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
     jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '',
     golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '',
     torneosAsistidos: '', torneosConvocado: '',
-    repTecDefensivo: '1', repTecOfensivo: '1', adecuacionRecursos: '1', nivelCompetitivo: '1',
-    constanciaRendimiento: '1', comprensionJuego: '1', implicacionEntrenamientos: '1',
-    liderazgoGrupo: '1', destrezaGeneral: '1', concienciaObjetivos: '1', motivacionIndividual: '1', comportamientoActitudinal: '1',
-    posicionBasica: '1', blocaje: '1', colocacion: '1', desplazamientosCaidas: '1',
-    dominioArea: '1', reinicioJuego: '1', unoContraUno: '1', velocidadEspecifica: '1', agilidad: '1',
-    ataque: '1', transDef: '1', defensa: '1', transOf: '1',
-    sociabilidad: '1', constanciaAct: '1', disciplina: '1', actitud: '1', compromiso: '1', evolucion: '1',
-    eval1: '', eval2: '', eval3: '', valoracionGeneral: 'MEDIA',
+    repTecDefensivo: '3', repTecOfensivo: '3', adecuacionRecursos: '3', nivelCompetitivo: '3',
+    constanciaRendimiento: '3', comprensionJuego: '3', implicacionEntrenamientos: '3',
+    liderazgoGrupo: '3', destrezaGeneral: '3', concienciaObjetivos: '3', motivacionIndividual: '3', comportamientoActitudinal: '3',
+    posicionBasica: '3', blocaje: '3', colocacion: '3', desplazamientosCaidas: '3',
+    dominioArea: '3', reinicioJuego: '3', unoContraUno: '3', velocidadEspecifica: '3', agilidad: '3',
+    
+    // Fase de Juego (1-5)
+    ataque: '3', transDef: '3', defensa: '3', transOf: '3',
+    obsTecnicoTacticas: '', // NUEVO CAMPO
+    
+    // Actitudinales (1-5)
+    sociabilidad: '3', constanciaAct: '3', disciplina: '3', actitud: '3', compromiso: '3', evolucion: '3',
+    obsActitudinales: '', // NUEVO CAMPO
+    
+    // Académico (NUEVOS CAMPOS)
+    eval1Media: '', eval1Asig: '', eval1Susp: '',
+    eval2Media: '', eval2Asig: '', eval2Susp: '',
+    eval3Media: '', eval3Asig: '', eval3Susp: '',
+    
+    valoracionGeneral: 'MEDIA',
     
     // --- TORNEO ---
     ubicacionTorneo: '', posFinalTorneo: '', superficieTorneo: 'Césped Natural',
-    ctxNivel: '1', ctxLogistica: '1', ctxCarga: '1', ctxInstalaciones: '1',
+    ctxNivel: '3', ctxLogistica: '3', ctxCarga: '3', ctxInstalaciones: '3',
     medInicial: '', medIncidencias: '',
-    valPersonalidad: '1', valMando: '1', valConc: '1', valError: '1', valConfianza: '1', valMentalidad: '1',
-    valActitudGol: '1', valPrimerUltimo: '1', valRitmo: '1', valMejoraBajon: '1', valEntorno: '1',
-    val1v1: '1', valOrg: '1', valCom: '1',
+    valPersonalidad: '3', valMando: '3', valConc: '3', valError: '3', valConfianza: '3', valMentalidad: '3',
+    valActitudGol: '3', valPrimerUltimo: '3', valRitmo: '3', valMejoraBajon: '3', valEntorno: '3',
+    val1v1: '3', valOrg: '3', valCom: '3',
     obsPenaltis: '', obsDecisivas: '', obsPos: '', obsNeg: '', obsTrans: '',
     
     // --- FLASH ---
@@ -3341,7 +3353,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
             </div>
           </div>
 
-          <div className="animate-in fade-in duration-300 space-y-8 pb-10">
+          <div className="space-y-8 pb-10">
             
             {/* ============================================================== */}
             {/* INFORME SEMESTRAL                                              */}
@@ -3399,32 +3411,68 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
 
                 <div>
                   <h3 className={sectionTitleClass}>4. Valores por fase de Juego (1-5)</h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    {renderRadioGroup('ataque', 5, 'Ataque')}
-                    {renderRadioGroup('transDef', 5, 'Transición Defensiva')}
-                    {renderRadioGroup('defensa', 5, 'Defensa')}
-                    {renderRadioGroup('transOf', 5, 'Transición Ofensiva')}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      {renderRadioGroup('ataque', 5, 'Ataque')}
+                      {renderRadioGroup('transDef', 5, 'Transición Defensiva')}
+                      {renderRadioGroup('defensa', 5, 'Defensa')}
+                      {renderRadioGroup('transOf', 5, 'Transición Ofensiva')}
+                    </div>
+                    <div className="flex flex-col">
+                      <label className={labelClass}>Observaciones Técnico-Tácticas</label>
+                      <textarea name="obsTecnicoTacticas" value={formData.obsTecnicoTacticas} onChange={handleChange} rows="6" className={`${inputClass} resize-none h-full`} placeholder="Añade observaciones sobre el desempeño técnico y táctico..."></textarea>
+                    </div>
                   </div>
                 </div>
 
                 <div>
                   <h3 className={sectionTitleClass}>5. Valores Actitudinales (1-5)</h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    {renderRadioGroup('sociabilidad', 5, 'Sociabilidad')}
-                    {renderRadioGroup('constanciaAct', 5, 'Constancia')}
-                    {renderRadioGroup('disciplina', 5, 'Disciplina')}
-                    {renderRadioGroup('actitud', 5, 'Actitud')}
-                    {renderRadioGroup('compromiso', 5, 'Compromiso')}
-                    {renderRadioGroup('evolucion', 5, 'Evolución')}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      {renderRadioGroup('sociabilidad', 5, 'Sociabilidad')}
+                      {renderRadioGroup('constanciaAct', 5, 'Constancia')}
+                      {renderRadioGroup('disciplina', 5, 'Disciplina')}
+                      {renderRadioGroup('actitud', 5, 'Actitud')}
+                      {renderRadioGroup('compromiso', 5, 'Compromiso')}
+                      {renderRadioGroup('evolucion', 5, 'Evolución')}
+                    </div>
+                    <div className="flex flex-col">
+                      <label className={labelClass}>Observaciones Actitudinales</label>
+                      <textarea name="obsActitudinales" value={formData.obsActitudinales} onChange={handleChange} rows="6" className={`${inputClass} resize-none h-full`} placeholder="Añade observaciones sobre el comportamiento, actitud, liderazgo..."></textarea>
+                    </div>
                   </div>
                 </div>
 
                 <div>
                   <h3 className={sectionTitleClass}>6. Control Académico</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><label className={labelClass}>1ª Evaluación</label><input type="text" name="eval1" value={formData.eval1} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
-                    <div><label className={labelClass}>2ª Evaluación</label><input type="text" name="eval2" value={formData.eval2} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
-                    <div><label className={labelClass}>3ª Evaluación</label><input type="text" name="eval3" value={formData.eval3} onChange={handleChange} className={inputClass} placeholder="Notas/Observaciones" /></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* EVALUACIÓN 1 */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
+                      <h4 className="text-center font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">1ª Evaluación</h4>
+                      <div className="space-y-4">
+                        <div><label className={labelClass}>Nota Media</label><input type="number" step="0.1" name="eval1Media" value={formData.eval1Media} onChange={handleChange} className={inputClass} placeholder="Ej: 7.5" /></div>
+                        <div><label className={labelClass}>Nº Asignaturas</label><input type="number" name="eval1Asig" value={formData.eval1Asig} onChange={handleChange} className={inputClass} placeholder="Total materias" /></div>
+                        <div><label className={labelClass}>Nº Suspensos</label><input type="number" name="eval1Susp" value={formData.eval1Susp} onChange={handleChange} className={inputClass} placeholder="Materias suspensas" /></div>
+                      </div>
+                    </div>
+                    {/* EVALUACIÓN 2 */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
+                      <h4 className="text-center font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">2ª Evaluación</h4>
+                      <div className="space-y-4">
+                        <div><label className={labelClass}>Nota Media</label><input type="number" step="0.1" name="eval2Media" value={formData.eval2Media} onChange={handleChange} className={inputClass} placeholder="Ej: 7.5" /></div>
+                        <div><label className={labelClass}>Nº Asignaturas</label><input type="number" name="eval2Asig" value={formData.eval2Asig} onChange={handleChange} className={inputClass} placeholder="Total materias" /></div>
+                        <div><label className={labelClass}>Nº Suspensos</label><input type="number" name="eval2Susp" value={formData.eval2Susp} onChange={handleChange} className={inputClass} placeholder="Materias suspensas" /></div>
+                      </div>
+                    </div>
+                    {/* EVALUACIÓN 3 */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
+                      <h4 className="text-center font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">3ª Evaluación</h4>
+                      <div className="space-y-4">
+                        <div><label className={labelClass}>Nota Media</label><input type="number" step="0.1" name="eval3Media" value={formData.eval3Media} onChange={handleChange} className={inputClass} placeholder="Ej: 7.5" /></div>
+                        <div><label className={labelClass}>Nº Asignaturas</label><input type="number" name="eval3Asig" value={formData.eval3Asig} onChange={handleChange} className={inputClass} placeholder="Total materias" /></div>
+                        <div><label className={labelClass}>Nº Suspensos</label><input type="number" name="eval3Susp" value={formData.eval3Susp} onChange={handleChange} className={inputClass} placeholder="Materias suspensas" /></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -3434,7 +3482,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave }) {
                     {['BAJA', 'MEDIA', 'ALTA', 'EXCEPCIONAL'].map(val => (
                       <div 
                         key={val} 
-                        onClick={() => setFormData(prev => ({ ...prev, valoracionGeneral: val }))}
+                        onClick={() => setFormData(prev => ({ ...prev, valoracionGeneral: val }))} 
                         className={`cursor-pointer border-2 rounded-xl py-4 text-center font-black text-xs uppercase tracking-widest transition-all select-none ${formData.valoracionGeneral === val ? 'border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-300'}`}
                       >
                         {val}
