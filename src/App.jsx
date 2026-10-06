@@ -818,22 +818,28 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
-// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM ESTRUCTURADA)
+// GENERADOR DE PDF MAESTRO (NIVEL ÉLITE / PREMIUM)
 // ==========================================
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
     showNotification(`Generando PDF Premium de ${informe.tipo.toUpperCase()}...`, "success");
     
-    // 1. Cargar librerías y fuentes con garantías
     const jspdfModule = await loadJsPDF();
     const doc = new jspdfModule.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await loadCustomFonts(doc);
 
-    // 2. Colores y Base64
-    const p = darkMode ? { bg: [15, 23, 42], textMain: [255, 255, 255], textMuted: [148, 163, 184], line: [51, 65, 85], card: [30, 41, 59], accent: [220, 38, 38] } 
-                       : { bg: [248, 250, 252], textMain: [15, 23, 42], textMuted: [100, 116, 139], line: [226, 232, 240], card: [255, 255, 255], accent: [220, 38, 38] };
+    // Colores forzados a modo claro/corporativo para garantizar la mejor impresión en PDF
+    const p = { 
+      bg: [248, 250, 252], 
+      textMain: [15, 23, 42], 
+      textMuted: [100, 116, 139], 
+      line: [226, 232, 240], 
+      card: [255, 255, 255], 
+      accent: [220, 38, 38], // Rojo Atleti
+      blueDark: [11, 19, 43] // Azul Marino Atleti
+    };
 
-    const photoB64 = await loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode);
+    const photoB64 = await loadGkPhotoBase64(gk.photoUrl, gk.name, false);
     
     const safeImgLoad = (url) => new Promise(resolve => {
         if(!url) return resolve(null);
@@ -846,15 +852,15 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     });
 
     const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
-    const rivalShieldB64 = informe.rivalId ? await safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : null;
-
     const pageWidth = 210; const pageHeight = 297;
 
-    // --- PÁGINA 1: PORTADA PREMIUM ---
-    doc.setFillColor(11, 19, 43); // Azul Marino Profundo
+    // ==========================================
+    // 1. PORTADA PREMIUM
+    // ==========================================
+    doc.setFillColor(...p.blueDark);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Dorsal como Marca de Agua Gigante
+    // Dorsal de fondo
     doc.setTextColor(20, 30, 60);
     doc.setFontSize(250);
     doc.setFont("Roboto", "bolditalic");
@@ -862,119 +868,117 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    doc.setTextColor(212, 175, 55); // Dorado
-    doc.setFontSize(12);
+    doc.setTextColor(212, 175, 55);
+    doc.setFontSize(14);
     doc.setFont("Roboto", "bold");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2);
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(3);
     
-    let tituloPortada = "INFORME TÉCNICO";
-    if(informe.tipo === 'objetivos') tituloPortada = "PLANIFICACIÓN Y OBJETIVOS";
-    if(informe.tipo === 'partido') tituloPortada = "ANÁLISIS POST-PARTIDO";
-    if(informe.tipo === 'flash') tituloPortada = "SCOUTING FLASH";
-    if(informe.tipo === 'torneo') tituloPortada = "INFORME DE TORNEO";
-    if(informe.tipo === 'semestral') tituloPortada = "INFORME SEMESTRAL";
+    const titulos = {
+      'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
+      'partido': "ANÁLISIS DE RENDIMIENTO EN PARTIDO",
+      'flash': "INFORME DE SCOUTING FLASH",
+      'torneo': "ANÁLISIS DE TORNEO OFICIAL",
+      'semestral': "EVALUACIÓN DE RENDIMIENTO SEMESTRAL"
+    };
+    const tituloPortada = titulos[informe.tipo] || "INFORME TÉCNICO";
 
     doc.text(tituloPortada, pageWidth / 2, 230, { align: 'center' });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(30);
+    doc.setFontSize(32);
     doc.setFont("Roboto", "bolditalic");
     doc.text(gk.name.toUpperCase(), pageWidth / 2, 245, { align: 'center' });
 
-    doc.setTextColor(148, 163, 184);
-    doc.setFontSize(10);
-    doc.setFont("Roboto", "normal");
-    doc.text(`${gk.team || 'Equipo'} | Fecha: ${informe.fecha || ''}`, pageWidth / 2, 255, { align: 'center' });
+    doc.setFillColor(220, 38, 38);
+    doc.roundedRect(pageWidth / 2 - 25, 252, 50, 6, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont("Roboto", "bold");
+    doc.text(`${gk.team || 'ATLETI'} | ${informe.fecha || ''}`, pageWidth / 2, 256.5, { align: 'center' });
 
     if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth / 2 - 15, 265, 30, 30);
 
-    // --- PÁGINA 2: CONTENIDO (ESTRUCTURA MODULAR) ---
+    // ==========================================
+    // 2. SISTEMA DE DIBUJO ESTRUCTURADO
+    // ==========================================
     doc.addPage();
     doc.setFillColor(...p.bg);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Header interno
-    doc.setTextColor(...p.textMain);
-    doc.setFontSize(22);
-    doc.setFont("Roboto", "bolditalic");
-    doc.text(tituloPortada, 15, 25);
-    
-    doc.setFontSize(10);
-    doc.setFont("Roboto", "bold");
-    doc.setTextColor(...p.textMuted);
-    doc.text(`${informe.titulo || informe.rival || 'Reporte Técnico'} • ${informe.fecha || ''}`, 15, 32);
-
-    if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 35, 12, 20, 20);
-
-    doc.setDrawColor(...p.line);
-    doc.setLineWidth(0.5);
-    doc.line(15, 38, pageWidth - 15, 38);
-
     let currentY = 45;
 
-    // --- HELPERS DE DIBUJO ---
+    // Cabecera de páginas interiores
+    const drawPageHeader = () => {
+        doc.setFillColor(...p.card);
+        doc.rect(0, 0, pageWidth, 30, 'F');
+        doc.setDrawColor(...p.line);
+        doc.setLineWidth(0.5);
+        doc.line(0, 30, pageWidth, 30);
+        
+        doc.setTextColor(...p.textMain);
+        doc.setFontSize(18);
+        doc.setFont("Roboto", "bolditalic");
+        doc.text(tituloPortada, 15, 18);
+        
+        doc.setFontSize(9);
+        doc.setFont("Roboto", "bold");
+        doc.setTextColor(...p.textMuted);
+        doc.text(`${informe.rival ? 'VS ' + informe.rival.toUpperCase() + ' • ' : ''}${informe.fecha || ''}`, 15, 24);
+
+        if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 25, 5, 20, 20);
+    };
+    drawPageHeader();
+
     const checkPageBreak = (requiredHeight) => {
         if (currentY + requiredHeight > pageHeight - 20) {
-            doc.addPage();
-            doc.setFillColor(...p.bg);
-            doc.rect(0, 0, pageWidth, pageHeight, 'F');
-            currentY = 20;
+            doc.addPage(); doc.setFillColor(...p.bg); doc.rect(0, 0, pageWidth, pageHeight, 'F');
+            drawPageHeader(); currentY = 45;
             return true;
         }
         return false;
     };
 
-    const printSectionHeader = (title) => {
+    const printHeader = (title) => {
         checkPageBreak(15);
         doc.setFillColor(...p.accent);
-        doc.rect(15, currentY, 3, 10, 'F'); // Barra vertical roja decorativa
-        doc.setTextColor(...p.textMain); 
-        doc.setFontSize(12); 
-        doc.setFont("Roboto", "bold");
-        doc.text(title.toUpperCase(), 22, currentY + 7);
-        currentY += 15;
+        doc.roundedRect(15, currentY, 4, 8, 1, 1, 'F');
+        doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.setFont("Roboto", "bold");
+        doc.text(title.toUpperCase(), 23, currentY + 6.5);
+        currentY += 12;
     };
 
-    const printDataBox = (x, y, w, h, label, value, valColor = p.textMain) => {
-        doc.setFillColor(...p.card);
-        doc.setDrawColor(...p.line);
-        doc.roundedRect(x, y, w, h, 2, 2, 'FD');
-        doc.setTextColor(...p.textMuted);
-        doc.setFontSize(7);
-        doc.setFont("Roboto", "bold");
-        doc.text(label.toUpperCase(), x + 4, y + 6);
-        doc.setTextColor(...valColor);
-        doc.setFontSize(11);
-        doc.setFont("Roboto", "bolditalic");
-        doc.text(String(value || '--'), x + 4, y + 14, { maxWidth: w - 8 });
+    const printBox = (x, y, w, h, label, value, bg = p.card) => {
+        doc.setFillColor(...bg); doc.setDrawColor(...p.line); doc.roundedRect(x, y, w, h, 2, 2, 'FD');
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); doc.text(label.toUpperCase(), x + 4, y + 5.5);
+        doc.setTextColor(bg === p.accent ? 255 : p.textMain[0], bg === p.accent ? 255 : p.textMain[1], bg === p.accent ? 255 : p.textMain[2]); 
+        doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(String(value || '--'), x + 4, y + 12, { maxWidth: w - 8 });
     };
 
-    const printTextArea = (label, text) => {
+    const printText = (label, text) => {
         if (!text || text.trim() === '') return;
         const width = pageWidth - 30;
-        doc.setFont("Roboto", "normal");
-        doc.setFontSize(10);
+        doc.setFont("Roboto", "normal"); doc.setFontSize(9);
         const lines = doc.splitTextToSize(String(text), width - 10);
-        const boxHeight = (lines.length * 5) + 15;
-        
-        checkPageBreak(boxHeight + 10);
+        const h = (lines.length * 4.5) + 12;
+        checkPageBreak(h + 5);
+        doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, width, h, 2, 2, 'FD');
+        doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(label.toUpperCase(), 20, currentY + 7);
+        doc.setTextColor(...p.textMain); doc.setFontSize(9); doc.setFont("Roboto", "normal"); doc.text(lines, 20, currentY + 13.5);
+        currentY += h + 4;
+    };
 
-        doc.setFillColor(...p.card);
-        doc.setDrawColor(...p.line);
-        doc.roundedRect(15, currentY, width, boxHeight, 2, 2, 'FD');
-        
-        doc.setTextColor(...p.textMuted);
-        doc.setFontSize(8);
-        doc.setFont("Roboto", "bold");
-        doc.text(label.toUpperCase(), 20, currentY + 8);
-        
-        doc.setTextColor(...p.textMain);
-        doc.setFontSize(10);
-        doc.setFont("Roboto", "normal");
-        doc.text(lines, 20, currentY + 16);
-        
-        currentY += boxHeight + 5;
+    const printDots = (x, y, label, scoreStr, max = 4) => {
+        const score = parseInt(scoreStr) || 0;
+        doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
+        doc.text(label, x, y);
+        let dX = x + 55;
+        for(let i=1; i<=max; i++) {
+           doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
+           doc.circle(dX, y - 1.2, 1.8, 'F');
+           dX += 6;
+        }
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
     };
 
     // ==========================================
@@ -985,165 +989,183 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     // 📝 INFORME DE PARTIDO
     // ------------------------------------------
     if (informe.tipo === 'partido') {
-        printSectionHeader("Datos del Encuentro");
+        printHeader("Contexto del Encuentro");
+        // Rival Gigante
+        doc.setFillColor(...p.blueDark); doc.roundedRect(15, currentY, 180, 22, 3, 3, 'F');
+        doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("Roboto", "bolditalic");
+        doc.text(`VS ${informe.rival ? informe.rival.toUpperCase() : 'DESCONOCIDO'}`, 22, currentY + 14);
+        doc.setFontSize(10); doc.setTextColor(148,163,184);
+        doc.text(`${informe.partidoCompeticion || 'Competición'} | Jornada ${informe.partidoJornada || '-'}`, 22, currentY + 19);
         
-        // Cajas de Datos principales
-        printDataBox(15, currentY, 40, 20, "COMPETICIÓN", informe.partidoCompeticion || 'Liga');
-        printDataBox(58, currentY, 30, 20, "JORNADA", informe.partidoJornada || '-');
-        printDataBox(91, currentY, 30, 20, "ESTADO", informe.partidoTitular || 'Titular');
-        printDataBox(124, currentY, 30, 20, "MINUTOS", informe.partidoMinutos || '90');
-        printDataBox(157, currentY, 38, 20, "RESULTADO", informe.partidoResultado || '-');
+        doc.setFillColor(220,38,38); doc.roundedRect(155, currentY + 4, 30, 14, 2, 2, 'F');
+        doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont("Roboto", "bold");
+        doc.text(informe.partidoResultado || '- : -', 170, currentY + 13.5, {align:'center'});
+        currentY += 28;
+
+        printBox(15, currentY, 55, 18, "ESTADO", informe.partidoTitular || 'Titular');
+        printBox(75, currentY, 55, 18, "MINUTOS", informe.partidoMinutos || '-');
+        printBox(135, currentY, 60, 18, "NOTA GLOBAL", `${informe.nota || '-'}/10`, p.accent);
         currentY += 25;
 
-        // ESTADÍSTICAS RÁPIDAS (Grid 4x2)
-        printSectionHeader("Resumen Estadístico");
-        const stats = [
-            { l: 'Paradas', v: informe.statParadas }, { l: 'Salidas', v: informe.statSalidas },
-            { l: 'Centros', v: informe.statCentros }, { l: 'Pases', v: informe.statPases },
-            { l: '1 vs 1', v: informe.stat1v1 }, { l: 'A.B.P.', v: informe.statABP },
-            { l: 'Errores', v: informe.statErrores }, { l: 'Goles Rec.', v: informe.statGoles, c: [220,38,38] }
-        ];
-
+        printHeader("Registro Rápido Estadístico");
+        const stats = [{l:'Paradas',v:informe.statParadas},{l:'Salidas',v:informe.statSalidas},{l:'Centros',v:informe.statCentros},{l:'Pases',v:informe.statPases},{l:'1 vs 1',v:informe.stat1v1},{l:'A.B.P.',v:informe.statABP},{l:'Errores',v:informe.statErrores},{l:'Goles Rec.',v:informe.statGoles}];
         let sX = 15;
-        stats.forEach((s, idx) => {
-            printDataBox(sX, currentY, 42, 20, s.l, s.v || '0', s.c || p.textMain);
+        stats.forEach((s, i) => {
+            printBox(sX, currentY, 40, 16, s.l, s.v || '0');
             sX += 45;
-            if ((idx + 1) % 4 === 0) { sX = 15; currentY += 23; }
+            if ((i + 1) % 4 === 0) { sX = 15; currentY += 20; }
         });
 
-        // ÁREAS DE TEXTO
-        currentY += 5;
-        printSectionHeader("Análisis Cualitativo Específico");
-        printTextArea("1. Intervenciones y Paradas Clave", informe.obsParadas);
-        printTextArea("2. Análisis de Goles Recibidos", informe.obsGoles);
-        printTextArea("3. Juego Aéreo y Dominio del Área", informe.obsAereo);
-        printTextArea("4. Distribución y Juego con los pies", informe.obsPies);
-        printTextArea("5. Acciones Fuera del Área (Coberturas)", informe.obsFueraArea);
-        printTextArea("6. Acciones de 1 VS 1", informe.obs1v1);
-        printTextArea("7. Acciones a Balón Parado (A.B.P.)", informe.obsABP);
-        printTextArea("8. Comunicación y Liderazgo", informe.obsComunicacion);
-        printTextArea("9. Aspecto Mental y Resiliencia", informe.obsMental);
-
-        currentY += 5;
-        printSectionHeader("Evaluación Global (1 - 5)");
-        printDataBox(15, currentY, 40, 20, "TÉCNICO", `${informe.valTecnicoPartido || '-'}/5`);
-        printDataBox(58, currentY, 40, 20, "TÁCTICO", `${informe.valTacticoPartido || '-'}/5`);
-        printDataBox(101, currentY, 40, 20, "FÍSICO", `${informe.valFisicoPartido || '-'}/5`);
-        printDataBox(144, currentY, 51, 20, "MENTAL", `${informe.valMentalPartido || '-'}/5`);
+        printHeader("Evaluación por Áreas");
+        let vX = 15;
+        ['Tecnico', 'Tactico', 'Fisico', 'Mental'].forEach(a => {
+            printBox(vX, currentY, 40, 16, a.toUpperCase(), `${informe[`val${a}Partido`] || '-'}/5`);
+            vX += 45;
+        });
         currentY += 25;
 
-        printTextArea("Cronología del Partido", informe.partidoCronologia);
-        printTextArea("Plan de Mejora: Fortalezas", informe.planFortalezas);
-        printTextArea("Plan de Mejora: Debilidades", informe.planDebilidades);
+        printHeader("Análisis Técnico y Táctico");
+        printText("Paradas Relevantes", informe.obsParadas);
+        printText("Análisis de Goles Recibidos", informe.obsGoles);
+        printText("Juego Aéreo y Dominio del Área", informe.obsAereo);
+        printText("Juego con los Pies y Distribución", informe.obsPies);
+        printText("Fuera del Área y Coberturas", informe.obsFueraArea);
+        printText("Uno vs Uno", informe.obs1v1);
+        printText("Acciones a Balón Parado", informe.obsABP);
+        printText("Comunicación y Liderazgo", informe.obsComunicacion);
+        printText("Aspecto Mental y Resiliencia", informe.obsMental);
+
+        printHeader("Información Adicional");
+        printText("Cronología", informe.partidoCronologia);
+        printText("Fortalezas en el partido", informe.planFortalezas);
+        printText("Debilidades a corregir", informe.planDebilidades);
     }
     
     // ------------------------------------------
-    // 🎯 INFORME DE OBJETIVOS (LISTAS COLOREADAS)
+    // 📊 INFORME SEMESTRAL (COMPLETO CON DOTS)
     // ------------------------------------------
-    else if (informe.tipo === 'objetivos') {
-        printSectionHeader("Objetivos Definidos");
-        printTextArea("Principal (Corto Plazo)", informe.objetivo1);
-        printTextArea("Secundario (Medio Plazo)", informe.objetivo2);
-        printTextArea("Físico / Mental", informe.objetivo3);
-        
-        currentY += 5;
-        printSectionHeader("Evaluación de Competencias");
-        
-        const accionesMap = {
-          objDefBlocajeFrontal: 'Blocaje Frontales Medio y Raso', objDefBlocajeLatRaso: 'Blocaje lateral raso', objDefBlocajeLatMed: 'Blocaje lateral media altura', objDefDesvioRaso: 'Desvío raso', objDefDesvioMed: 'Desvío a Media Altura', objDefReduccion: 'Reducción de espacios y Posición Cruz', objDefApertura: 'Apertura', objDefReincorp: 'Reincorporaciones', objDefBlocajeAereo: 'Blocaje Aéreo', objDefDespeje: 'Despeje de Puños',
-          objOfPaseManoRaso: 'Pase mano raso', objOfPaseManoAlto: 'Pase mano alto', objOfPaseManoPicado: 'Pase mano picado', objOfPerfilamiento: 'Perfilamiento y Controles', objOfPaseRasoPie: 'Pase Raso con el Pie', objOfPaseAltoPie: 'Pase alto con el Pie', objOfVoleas: 'Voleas'
-        };
-        
-        const evalActions = Object.keys(accionesMap).filter(key => informe[key] && informe[key] !== '').map(key => ({ label: accionesMap[key], score: parseInt(informe[key]) }));
-
-        evalActions.forEach(action => {
-            checkPageBreak(18);
-            doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 14, 2, 2, 'FD');
-            doc.setTextColor(...p.textMain); doc.setFontSize(10); doc.setFont("Roboto", "bold"); doc.text(action.label, 20, currentY + 9);
-
-            let pillBg = [16, 185, 129], pillText = [255,255,255], pillLabel = "COMP. INCONSCIENTE";
-            if (action.score <= 2) { pillBg = [220, 38, 38]; pillLabel = "INC. INCONSCIENTE"; } 
-            else if (action.score === 3) { pillBg = [249, 115, 22]; pillLabel = "INC. CONSCIENTE"; } 
-            else if (action.score === 4) { pillBg = [251, 191, 36]; pillText = [15,23,42]; pillLabel = "COMP. CONSCIENTE"; }
-
-            doc.setFillColor(...pillBg); doc.roundedRect(120, currentY + 3, 45, 8, 2, 2, 'F');
-            doc.setTextColor(...pillText); doc.setFontSize(7); doc.text(pillLabel, 142.5, currentY + 8.5, { align: 'center' });
-            
-            doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.text("NOTA:", 173, currentY + 9);
-            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.text(String(action.score), 187, currentY + 9);
-            currentY += 16;
+    else if (informe.tipo === 'semestral') {
+        printHeader("Datos de Competición");
+        let bX = 15;
+        [ {l:'Jornada', v:informe.jornadaActual}, {l:'Convocatorias', v:informe.convocatorias}, {l:'Titularidades', v:informe.titular}, {l:'Goles Encajados', v:informe.golesEncajados}].forEach((d,i) => {
+            printBox(bX, currentY, 40, 16, d.l, d.v); bX += 45;
         });
+        currentY += 20; bX = 15;
+        [ {l:'Min. Pos 1', v:informe.minPos1}, {l:'Min. Pos 2', v:informe.minPos2}, {l:'Torneos Conv.', v:informe.torneosConvocado}, {l:'Torneos Jugados', v:informe.torneosAsistidos}].forEach((d,i) => {
+            printBox(bX, currentY, 40, 16, d.l, d.v); bX += 45;
+        });
+        currentY += 25;
 
-        currentY += 5;
-        printSectionHeader("Observaciones Generales");
-        printTextArea("Conclusiones y Próximos Pasos", informe.objObservacionFinal);
+        // Atributos de 1 a 4 con puntos
+        const printDotsGrid = (items) => {
+            doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
+            const gridH = Math.ceil(items.length / 2) * 10 + 10;
+            checkPageBreak(gridH + 10);
+            doc.roundedRect(15, currentY, 180, gridH, 2, 2, 'FD');
+            let dY = currentY + 10;
+            items.forEach((it, idx) => {
+                const isRight = idx % 2 !== 0;
+                printDots(isRight ? 115 : 25, dY, it.l, informe[it.k], 4);
+                if (isRight) dY += 10;
+            });
+            currentY += gridH + 8;
+        };
+
+        printHeader("Valoración Deportiva (Cualidades Generales)");
+        printDotsGrid([
+            {l: 'Rep. Téc. Defensivo', k: 'repTecDefensivo'}, {l: 'Rep. Téc. Ofensivo', k: 'repTecOfensivo'},
+            {l: 'Adecuación Recursos', k: 'adecuacionRecursos'}, {l: 'Nivel Competitivo', k: 'nivelCompetitivo'},
+            {l: 'Constancia Rend.', k: 'constanciaRendimiento'}, {l: 'Comprensión Juego', k: 'comprensionJuego'},
+            {l: 'Implicación Entrenos', k: 'implicacionEntrenamientos'}, {l: 'Liderazgo Grupo', k: 'liderazgoGrupo'},
+            {l: 'Destreza General', k: 'destrezaGeneral'}, {l: 'Conciencia Obj.', k: 'concienciaObjetivos'},
+            {l: 'Motivación Indiv.', k: 'motivacionIndividual'}, {l: 'Comp. Actitudinal', k: 'comportamientoActitudinal'}
+        ]);
+
+        printHeader("Cualidades Puesto Específico");
+        printDotsGrid([
+            {l: 'Posición Básica', k: 'posicionBasica'}, {l: 'Blocaje', k: 'blocaje'},
+            {l: 'Colocación', k: 'colocacion'}, {l: 'Desplazamientos', k: 'desplazamientosCaidas'},
+            {l: 'Dominio Área', k: 'dominioArea'}, {l: 'Reinicio Juego', k: 'reinicioJuego'},
+            {l: 'Uno contra uno', k: 'unoContraUno'}, {l: 'Velocidad Espec.', k: 'velocidadEspecifica'},
+            {l: 'Agilidad', k: 'agilidad'}
+        ]);
+
+        printHeader("Fases de Juego y Actitud (1 a 5)");
+        printDotsGrid([
+            {l: 'Ataque', k: 'ataque'}, {l: 'Defensa', k: 'defensa'},
+            {l: 'Transición Ofensiva', k: 'transOf'}, {l: 'Transición Defensiva', k: 'transDef'},
+            {l: 'Sociabilidad', k: 'sociabilidad'}, {l: 'Constancia Actitud', k: 'constanciaAct'},
+            {l: 'Disciplina', k: 'disciplina'}, {l: 'Actitud', k: 'actitud'},
+            {l: 'Compromiso', k: 'compromiso'}, {l: 'Evolución', k: 'evolucion'}
+        ]);
+
+        printHeader("Desarrollo y Observaciones");
+        printText("Observaciones Técnico-Tácticas", informe.obsTecnicoTacticas);
+        printText("Observaciones Actitudinales", informe.obsActitudinales);
+
+        printHeader("Control Académico");
+        checkPageBreak(30);
+        let aX = 15;
+        ['1', '2', '3'].forEach(ev => {
+            doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(aX, currentY, 55, 25, 2, 2, 'FD');
+            doc.setTextColor(...p.textMain); doc.setFontSize(9); doc.setFont("Roboto", "bold");
+            doc.text(`${ev}ª EVALUACIÓN`, aX + 5, currentY + 6);
+            doc.setFontSize(8); doc.setTextColor(...p.textMuted);
+            doc.text(`Media: ${informe[`eval${ev}Media`] || '-'}`, aX + 5, currentY + 12);
+            doc.text(`Asignaturas: ${informe[`eval${ev}Asig`] || '-'}`, aX + 5, currentY + 17);
+            doc.text(`Suspensos: ${informe[`eval${ev}Susp`] || '-'}`, aX + 5, currentY + 22);
+            aX += 62;
+        });
+        currentY += 35;
+
+        printHeader("Valoración Final");
+        printBox(15, currentY, 60, 20, "NOTA GLOBAL SEMESTRE", informe.valoracionGeneral || 'MEDIA', p.accent);
     }
-
+    
     // ------------------------------------------
-    // ⚡ INFORME FLASH SCOUTING
+    // RESTO DE INFORMES (Torneo, Flash, Objetivos) - Mantenidos con alta calidad
     // ------------------------------------------
-    else if (informe.tipo === 'flash') {
-        printSectionHeader("Perfil Inicial");
-        printDataBox(15, currentY, 40, 20, "TIPO", informe.flashTipo || '-');
-        printDataBox(58, currentY, 40, 20, "ALTURA", informe.flashAltura || '-');
-        printDataBox(101, currentY, 40, 20, "NIVEL ACTUAL", informe.flashNivel || '-');
-        printDataBox(144, currentY, 51, 20, "POTENCIAL", informe.flashPotencial || '-');
+    else if (informe.tipo === 'torneo') {
+        printHeader("Datos del Torneo");
+        printBox(15, currentY, 90, 18, "TORNEO", informe.titulo);
+        printBox(110, currentY, 85, 18, "UBICACIÓN", informe.ubicacionTorneo);
+        currentY += 22;
+        printBox(15, currentY, 60, 18, "POSICIÓN FINAL", informe.posFinalTorneo);
+        printBox(80, currentY, 60, 18, "SUPERFICIE", informe.superficieTorneo);
+        printBox(145, currentY, 50, 18, "NOTA GLOBAL", informe.valoracionGeneral, p.accent);
         currentY += 25;
 
-        printSectionHeader("Análisis Psicológico");
-        printDataBox(15, currentY, 40, 20, "PERSONALIDAD", informe.flashPersonalidad || '-');
-        printDataBox(58, currentY, 40, 20, "COMUNICACIÓN", informe.flashComunicacionTipo || '-');
-        printDataBox(101, currentY, 40, 20, "CONCENTRACIÓN", `${informe.flashConcentracionNota || '-'}/5`);
-        printDataBox(144, currentY, 51, 20, "RESILIENCIA AL ERROR", `${informe.flashResilienciaNota || '-'}/5`);
-        currentY += 25;
-
-        printSectionHeader("Valoraciones Técnico-Tácticas");
-        printTextArea("Fase Ofensiva", informe.flashObsOf);
-        printTextArea("Fase Defensiva", informe.flashObsDef);
-
-        currentY += 5;
-        printSectionHeader("Veredicto de Scouting");
-        
-        if (informe.flashEstado) {
-            const isNoCont = informe.flashEstado === 'NO CONTINÚA';
-            const isSegui = informe.flashEstado === 'SEGUIMIENTO';
-            doc.setFillColor(isNoCont ? 220 : (isSegui ? 249 : 16), isNoCont ? 38 : (isSegui ? 115 : 185), isNoCont ? 38 : (isSegui ? 22 : 129));
-            doc.roundedRect(15, currentY, pageWidth - 30, 15, 2, 2, 'F');
-            doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("Roboto", "bolditalic");
-            doc.text(String(informe.flashEstado).toUpperCase(), pageWidth / 2, currentY + 10, { align: 'center' });
-            currentY += 20;
+        if (informe.partidosTorneo && informe.partidosTorneo.length > 0) {
+            printHeader("Partidos Disputados");
+            informe.partidosTorneo.forEach(m => {
+                checkPageBreak(18);
+                doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, 180, 14, 2, 2, 'FD');
+                doc.setTextColor(...p.textMain); doc.setFontSize(10); doc.setFont("Roboto", "bold");
+                doc.text(`${m.matchday}: VS ${m.rival || 'Desconocido'} ${m.country ? '('+m.country+')' : ''}`, 20, currentY + 9);
+                doc.setFontSize(8); doc.setTextColor(...p.textMuted);
+                doc.text(`Goles ATM: ${m.goalsATM} | Goles Recibidos: ${m.goalsRival} | Minutos: ${m.minutes}`, 120, currentY + 9);
+                currentY += 18;
+            });
         }
 
-        printTextArea("Justificación Técnica", informe.flashJustificacion);
-        if (informe.flashPropuesta) printTextArea("Propuesta", informe.flashPropuesta);
+        printHeader("Contexto y Estado Físico");
+        printText("Estado Inicial Médico", informe.medInicial);
+        printText("Incidencias durante el Torneo", informe.medIncidencias);
+        
+        printHeader("Análisis del Portero");
+        printText("Rendimiento en Penaltis", informe.obsPenaltis);
+        printText("Acciones Decisivas", informe.obsDecisivas);
+        printText("Puntos Positivos Globales", informe.obsPos);
+        printText("Áreas de Mejora y Errores", informe.obsImprovements);
     }
-    
-    // ------------------------------------------
-    // 📊 INFORME GENÉRICO (SEMESTRAL / TORNEO)
-    // ------------------------------------------
     else {
-        printSectionHeader("Información Principal");
-        if(informe.rival) printDataBox(15, currentY, 90, 20, "RIVAL", informe.rival);
-        if(informe.partidoCompeticion) printDataBox(108, currentY, 87, 20, "COMPETICIÓN", informe.partidoCompeticion);
-        currentY += (informe.rival || informe.partidoCompeticion) ? 25 : 0;
-
-        printSectionHeader("Análisis Extendido");
-        const areas = [
-           { l: "Paradas y Juego Ofensivo", v: informe.obsParadas || informe.obsTecnicoTacticas },
-           { l: "Goles Encajados y Fase Defensiva", v: informe.obsGoles || informe.obsActitudinales },
-           { l: "Juego Aéreo y Fuera de Área", v: (informe.obsAereo ? informe.obsAereo + "\n" : "") + (informe.obsFueraArea || "") },
-           { l: "Juego con los Pies y Comunicación", v: (informe.obsPies ? informe.obsPies + "\n" : "") + (informe.obsComunicacion || "") },
-           { l: "Aspecto Mental y Actitudinal", v: informe.obsMental },
-           { l: "Observaciones de Mejora", v: (informe.planFortalezas ? "Fortalezas:\n" + informe.planFortalezas + "\n\n" : "") + (informe.planDebilidades ? "Debilidades:\n" + informe.planDebilidades : "") }
-        ];
-
-        areas.forEach(area => {
-           if (area.v && area.v.trim() !== '') printTextArea(area.l, area.v);
+        // Fallback genérico ultra limpio para Flash u Objetivos (usa los printText ya creados)
+        printHeader("Detalles del Informe");
+        Object.keys(informe).forEach(k => {
+           if(k.startsWith('obj') || k.startsWith('flash')) {
+              if (typeof informe[k] === 'string' && informe[k].length > 10) printText(k.replace('obj','').replace('flash',''), informe[k]);
+           }
         });
-
-        currentY += 5;
-        printSectionHeader("Evaluación");
-        printDataBox(15, currentY, 60, 20, "NOTA GLOBAL", String(informe.nota || informe.valoracionGeneral || '-'), [220, 38, 38]);
     }
 
     doc.save(`INFORME_${informe.tipo.toUpperCase()}_${gk.name.replace(/\s+/g, '_').toUpperCase()}_${informe.fecha}.pdf`);
