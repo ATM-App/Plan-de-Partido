@@ -3220,7 +3220,7 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Completado con todos los datos, secciones nuevas y sin saltos de scroll)
+// MÓDULO DE INFORMES (Actualizado con Objetivos Dinámicos)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
@@ -3231,6 +3231,11 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     'Grupos J6', 'Grupos J7', 'Grupos J8', '1/16 final', '1/8 final', 
     '1/4 final', 'Semifinal', 'Final', '3º-4º puesto'
   ];
+
+  const ACCIONES_EVALUACION = {
+    "DEFENSIVAS": ["Blocaje Frontales Medio y Raso", "Blocaje lateral raso", "Blocaje lateral media altura", "Desvío raso", "Desvío a Media Altura", "Reducción de espacios y Posición Cruz", "Apertura", "Reincorporaciones", "Blocaje Aéreo", "Despeje de Puños"],
+    "OFENSIVAS": ["Pase mano raso", "Pase mano alto", "Pase mano picado", "Perfilamiento y Controles", "Pase Raso con el Píe", "Pase alto con el Píe", "Voleas"]
+  };
 
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -3256,9 +3261,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     
     // --- PARTIDO ---
     partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '',
-    // Nivel 1: Registro Rápido (Contadores)
     statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0,
-    // Análisis Cualitativo
     obsParadas: '', obsGoles: '', obsAereo: '', obsPies: '', obsFueraArea: '', obs1v1: '', obsABP: '', obsComunicacion: '', obsMental: '',
     partidoCronologia: '', partidoVideos: '', partidoComparativa: '',
     valTecnicoPartido: '3', valTacticoPartido: '3', valFisicoPartido: '3', valMentalPartido: '3',
@@ -3279,30 +3282,50 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     flashPersonalidad: '', flashComunicacion: '', flashConcentracion: '', flashResiliencia: '',
     flashObsOf: '', flashObsDef: '', flashEstado: '', flashPropuesta: '', flashJustificacion: '',
     
-    // --- OBJETIVOS ---
-    objetivo1: '', objetivo2: '', objetivo3: ''
+    // --- OBJETIVOS (LISTA DINÁMICA) ---
+    objTempTipo: '', objTempAccion: '', objTempCompetencia: null, objTempNota: '3',
+    objetivosLista: [], objObservacionFinal: ''
   });
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleCounter = (field, delta) => setFormData(prev => ({ ...prev, [field]: Math.max(0, (parseInt(prev[field]) || 0) + delta) }));
 
-  // Helper para incrementar/decrementar contadores del informe de partido
-  const handleCounter = (field, delta) => {
-    setFormData(prev => ({ ...prev, [field]: Math.max(0, (parseInt(prev[field]) || 0) + delta) }));
+  // --- FUNCIONES OBJETIVOS DINÁMICOS ---
+  const handleAddObjetivo = () => {
+    if (!formData.objTempTipo || !formData.objTempAccion || !formData.objTempCompetencia) {
+      alert("Selecciona Tipo de Acción, Acción específica y Nivel de Competencia.");
+      return;
+    }
+    
+    const nuevoObj = {
+      id: Date.now(),
+      tipo: formData.objTempTipo,
+      accion: formData.objTempAccion,
+      competencia: formData.objTempCompetencia, // 1, 2, 3, 4
+      nota: formData.objTempNota
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      objetivosLista: [...prev.objetivosLista, nuevoObj],
+      objTempAccion: '', // Resetear para el siguiente
+      objTempCompetencia: null,
+      objTempNota: '3'
+    }));
   };
 
+  const removeObjetivo = (id) => {
+    setFormData(prev => ({ ...prev, objetivosLista: prev.objetivosLista.filter(o => o.id !== id) }));
+  };
+
+  // --- LÓGICA TORNEOS ---
   const handleCopyData = (reportId) => {
      const report = existingReports.find(r => r.id === reportId);
      if(report) {
         setFormData(prev => ({
-           ...prev,
-           titulo: report.titulo || '',
-           fecha: report.fecha || prev.fecha,
-           ubicacionTorneo: report.ubicacionTorneo || '',
-           hotelTorneo: report.hotelTorneo || '',
-           logoTorneo: report.logoTorneo || '',
-           partidosTorneo: (report.partidosTorneo || []).map(m => ({
-              ...m, id: Date.now() + Math.random(), goalsRival: '-', minutes: ''      
-           }))
+           ...prev, titulo: report.titulo || '', fecha: report.fecha || prev.fecha, ubicacionTorneo: report.ubicacionTorneo || '',
+           hotelTorneo: report.hotelTorneo || '', logoTorneo: report.logoTorneo || '',
+           partidosTorneo: (report.partidosTorneo || []).map(m => ({ ...m, id: Date.now() + Math.random(), goalsRival: '-', minutes: '' }))
         }));
      }
   };
@@ -3316,23 +3339,16 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
      }
   };
 
-  const addMatch = () => {
-     setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', minutes: '' }] }));
-  };
-
-  const removeMatch = (id) => {
-     setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.filter(m => m.id !== id) }));
-  };
-
-  const updateMatch = (id, field, value) => {
-     setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.map(m => m.id === id ? { ...m, [field]: value } : m) }));
-  };
+  const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', minutes: '' }] }));
+  const removeMatch = (id) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.filter(m => m.id !== id) }));
+  const updateMatch = (id, field, value) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.map(m => m.id === id ? { ...m, [field]: value } : m) }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!porteroSeleccionado) { alert("Debes seleccionar un portero"); return; }
-    if (tipoInforme === 'flash' && !formData.flashEstado) { alert("Debes seleccionar un estado (Semáforo) en el informe Flash"); return; }
-    if (tipoInforme === 'flash' && formData.flashEstado === 'CONTINÚA' && !formData.flashPropuesta) { alert("Debes seleccionar una propuesta si el portero CONTINÚA"); return; }
+    if (tipoInforme === 'flash' && !formData.flashEstado) { alert("Selecciona un estado (Semáforo) en el informe Flash"); return; }
+    if (tipoInforme === 'flash' && formData.flashEstado === 'CONTINÚA' && !formData.flashPropuesta) { alert("Selecciona una propuesta si el portero CONTINÚA"); return; }
+    if (tipoInforme === 'objetivos' && formData.objetivosLista.length === 0) { alert("Debes añadir al menos una acción a la lista de objetivos."); return; }
     
     const gkInfo = gks.find(g => g.id === porteroSeleccionado);
     const informeAguardar = {
@@ -3344,24 +3360,19 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     };
 
     onSave(informeAguardar);
-    setFormData(prev => ({ ...prev, titulo: '', contenido: '' })); 
+    setFormData(prev => ({ ...prev, titulo: '', contenido: '', objetivosLista: [], objObservacionFinal: '' })); 
   };
 
   const inputClass = "w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 outline-none transition-all text-sm";
   const sectionTitleClass = "text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8 flex items-center gap-2";
   const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 pl-1";
 
-  // Helper Radios numéricos (Sin saltos de scroll)
   const renderRadioGroup = (name, max, label) => (
     <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50 flex-wrap gap-2">
       <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
       <div className="flex gap-2 w-full sm:w-auto justify-end">
         {Array.from({ length: max }, (_, i) => i + 1).map(num => (
-          <div
-            key={num}
-            onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))}
-            className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all select-none ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}
-          >
+          <div key={num} onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))} className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all select-none ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
             {num}
           </div>
         ))}
@@ -3396,7 +3407,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                 <option value="semestral">📊 Informe Semestral</option>
                 <option value="torneo">🏆 Informe de Torneo</option>
                 <option value="flash">⚡ Informe Flash (Scouting)</option>
-                <option value="objetivos">🎯 Fijación de Objetivos</option>
+                <option value="objetivos">🎯 Seguimiento y Objetivos</option>
               </select>
             </div>
             <div>
@@ -3410,6 +3421,90 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
 
           <div className="space-y-8 pb-10">
             
+            {/* ============================================================== */}
+            {/* SEGUIMIENTO DE OBJETIVOS (NUEVO)                               */}
+            {/* ============================================================== */}
+            {tipoInforme === 'objetivos' && (
+              <div className="space-y-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div><label className={labelClass}>Fecha de Evaluación</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
+                </div>
+
+                <div className="bg-slate-100 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
+                   <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-white mb-6 flex items-center gap-2"><Target size={18} className="text-blue-500"/> Nueva Acción a Evaluar</h3>
+                   
+                   <div className="space-y-4">
+                     <select name="objTempTipo" value={formData.objTempTipo} onChange={(e) => { setFormData(prev => ({...prev, objTempTipo: e.target.value, objTempAccion: ''})) }} className={`${inputClass} cursor-pointer`}>
+                        <option value="">-- Tipo de Acción... --</option>
+                        <option value="DEFENSIVAS">🛡️ Acciones Defensivas</option>
+                        <option value="OFENSIVAS">⚔️ Acciones Ofensivas</option>
+                     </select>
+
+                     <select name="objTempAccion" value={formData.objTempAccion} onChange={handleChange} className={`${inputClass} cursor-pointer`} disabled={!formData.objTempTipo}>
+                        <option value="">-- Seleccionar Acción... --</option>
+                        {formData.objTempTipo && ACCIONES_EVALUACION[formData.objTempTipo].map(acc => (
+                           <option key={acc} value={acc}>{acc}</option>
+                        ))}
+                     </select>
+
+                     {/* Cuadrícula de Competencias (Estilo App Original) */}
+                     <div>
+                        <label className={labelClass}>Nivel de Competencia *</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                           <div onClick={() => setFormData(prev => ({...prev, objTempCompetencia: 1}))} className={`cursor-pointer py-4 px-3 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all border-2 select-none ${formData.objTempCompetencia === 1 ? 'bg-red-600 border-red-800 text-white shadow-md scale-[1.02]' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 hover:border-red-400'}`}>Incompetencia Inconsciente (1-2)</div>
+                           <div onClick={() => setFormData(prev => ({...prev, objTempCompetencia: 2}))} className={`cursor-pointer py-4 px-3 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all border-2 select-none ${formData.objTempCompetencia === 2 ? 'bg-orange-500 border-orange-700 text-white shadow-md scale-[1.02]' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/50 text-orange-700 dark:text-orange-400 hover:border-orange-400'}`}>Incompetencia Consciente (3)</div>
+                           <div onClick={() => setFormData(prev => ({...prev, objTempCompetencia: 3}))} className={`cursor-pointer py-4 px-3 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all border-2 select-none ${formData.objTempCompetencia === 3 ? 'bg-amber-400 border-amber-600 text-blue-950 shadow-md scale-[1.02]' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 hover:border-amber-400'}`}>Competencia Consciente (4)</div>
+                           <div onClick={() => setFormData(prev => ({...prev, objTempCompetencia: 4}))} className={`cursor-pointer py-4 px-3 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all border-2 select-none ${formData.objTempCompetencia === 4 ? 'bg-emerald-600 border-emerald-800 text-white shadow-md scale-[1.02]' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 hover:border-emerald-400'}`}>Competencia Inconsciente (5)</div>
+                        </div>
+                     </div>
+
+                     <div className="flex flex-col md:flex-row gap-4 items-end pt-2">
+                        <div className="w-full md:w-1/3">
+                           <label className={labelClass}>Nota (1-5)</label>
+                           <select name="objTempNota" value={formData.objTempNota} onChange={handleChange} className={`${inputClass} font-bold text-center`}>
+                              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                           </select>
+                        </div>
+                        <button type="button" onClick={handleAddObjetivo} className="w-full md:w-2/3 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                           <Plus size={20} strokeWidth={3}/> Añadir a la lista
+                        </button>
+                     </div>
+                   </div>
+                </div>
+
+                {/* LISTA TEMPORAL DE ACCIONES */}
+                {formData.objetivosLista.length > 0 && (
+                   <div className="space-y-3">
+                      <h3 className={sectionTitleClass}>Acciones Evaluadas ({formData.objetivosLista.length})</h3>
+                      {formData.objetivosLista.map(obj => {
+                         let bgClass = "bg-slate-100 dark:bg-slate-800"; let borderClass = "border-slate-300"; let label = ""; let textColor = "text-slate-700 dark:text-slate-300";
+                         if(obj.competencia === 1) { bgClass = "bg-red-50 dark:bg-red-900/10"; borderClass = "border-red-500"; label = "Inc. Inconsciente"; textColor = "text-red-700 dark:text-red-400"; }
+                         if(obj.competencia === 2) { bgClass = "bg-orange-50 dark:bg-orange-900/10"; borderClass = "border-orange-500"; label = "Inc. Consciente"; textColor = "text-orange-700 dark:text-orange-400"; }
+                         if(obj.competencia === 3) { bgClass = "bg-amber-50 dark:bg-amber-900/10"; borderClass = "border-amber-500"; label = "Comp. Consciente"; textColor = "text-amber-700 dark:text-amber-400"; }
+                         if(obj.competencia === 4) { bgClass = "bg-emerald-50 dark:bg-emerald-900/10"; borderClass = "border-emerald-500"; label = "Comp. Inconsciente"; textColor = "text-emerald-700 dark:text-emerald-400"; }
+
+                         return (
+                            <div key={obj.id} className={`flex items-center justify-between p-4 rounded-xl border-l-4 ${bgClass} border-r border-t border-b border-r-slate-200 border-t-slate-200 border-b-slate-200 dark:border-r-slate-700 dark:border-t-slate-700 dark:border-b-slate-700`} style={{ borderLeftColor: borderClass.replace('border-', '') }}>
+                               <div>
+                                  <div className="font-bold text-blue-950 dark:text-white text-sm">{obj.accion}</div>
+                                  <div className={`text-[10px] font-black uppercase tracking-widest mt-1 ${textColor}`}>{label} | NOTA: {obj.nota}</div>
+                               </div>
+                               <button type="button" onClick={() => removeObjetivo(obj.id)} className="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors"><X size={18} strokeWidth={3}/></button>
+                            </div>
+                         )
+                      })}
+                   </div>
+                )}
+
+                {/* OBSERVACIÓN FINAL OBJETIVOS */}
+                <div>
+                  <h3 className={sectionTitleClass}>Observación Final del Entrenador</h3>
+                  <textarea name="objObservacionFinal" value={formData.objObservacionFinal} onChange={handleChange} rows="4" className={`${inputClass} resize-y`} placeholder="Conclusiones, próximos pasos a trabajar en campo..."></textarea>
+                </div>
+
+              </div>
+            )}
+
             {/* ============================================================== */}
             {/* INFORME DE PARTIDO (NUEVA ESTRUCTURA PROFESIONAL)              */}
             {/* ============================================================== */}
@@ -3874,32 +3969,6 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
 
                    <div><label className={labelClass}>Justificación Técnica</label><textarea name="flashJustificacion" value={formData.flashJustificacion} onChange={handleChange} rows="3" className={`${inputClass} resize-none`} placeholder="Explica brevemente la decisión tomada..." /></div>
                 </div>
-              </div>
-            )}
-
-            {/* ============================================================== */}
-            {/* FIJACIÓN DE OBJETIVOS                                          */}
-            {/* ============================================================== */}
-            {tipoInforme === 'objetivos' && (
-              <div className="grid grid-cols-1 gap-6">
-                 <div>
-                    <label className={labelClass}>Título de la Planificación</label>
-                    <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Objetivos Mes de Octubre" className={inputClass} required/>
-                  </div>
-                 <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Objetivo Principal (Corto Plazo)</label>
-                    <input type="text" name="objetivo1" value={formData.objetivo1} onChange={handleChange} placeholder="Ej: Mejorar blocaje frontal" className={inputClass} required/>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Objetivo Secundario (Medio Plazo)</label>
-                    <input type="text" name="objetivo2" value={formData.objetivo2} onChange={handleChange} placeholder="Ej: Comunicación con la línea defensiva" className={inputClass}/>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Objetivo Físico/Mental</label>
-                    <input type="text" name="objetivo3" value={formData.objetivo3} onChange={handleChange} placeholder="Ej: Mantener concentración tras error" className={inputClass}/>
-                  </div>
-                 </div>
               </div>
             )}
 
