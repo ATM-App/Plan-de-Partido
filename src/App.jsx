@@ -818,6 +818,241 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
+// GENERADOR DE PDF PARA INFORMES DE OBJETIVOS
+// ==========================================
+const exportarInformeObjetivosPDF = async (gk, informe, darkMode, showNotification) => {
+  try {
+    showNotification("Generando PDF de Objetivos...", "success");
+    const jspdfModule = await loadJsPDF();
+    const JsPDFClass = jspdfModule.jsPDF;
+    
+    // FORMATO RETRATO (Portrait) A4
+    const doc = new JsPDFClass({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await loadCustomFonts(doc);
+
+    // Los datos del informe
+    const data = informe;
+
+    // Paleta de colores adaptativa
+    const p = darkMode ? {
+      bg: [15, 23, 42], textMain: [255, 255, 255], textMuted: [148, 163, 184], line: [51, 65, 85], card: [30, 41, 59]
+    } : {
+      bg: [248, 250, 252], textMain: [15, 23, 42], textMuted: [100, 116, 139], line: [226, 232, 240], card: [255, 255, 255]
+    };
+
+    // Cargar imágenes
+    const photoB64 = await loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode);
+    const atletiShieldB64 = await loadImgToB64(ESCUDO_ATM_URL);
+
+    const pageWidth = 210; const pageHeight = 297;
+
+    // --- PÁGINA 1: PORTADA PREMIUM ---
+    doc.setFillColor(11, 19, 43); // Azul Marino Profundo (Navy Blue)
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    // Marca de agua de fondo (Dorsal gigante)
+    doc.setTextColor(20, 30, 60);
+    doc.setFontSize(250);
+    doc.setFont("Roboto", "bolditalic");
+    doc.text(String(gk.number || ''), pageWidth / 2, 220, { align: 'center' });
+
+    // Foto del portero fundida
+    if (photoB64) {
+      doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
+    }
+    
+    // Textos de la Portada
+    doc.setTextColor(212, 175, 55); // Color Oro
+    doc.setFontSize(12);
+    doc.setFont("Roboto", "bold");
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2);
+    doc.text("PLANIFICACIÓN Y OBJETIVOS", pageWidth / 2, 230, { align: 'center' });
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(30);
+    doc.setFont("Roboto", "bolditalic");
+    doc.text(gk.name.toUpperCase(), pageWidth / 2, 245, { align: 'center' });
+
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "normal");
+    doc.text(`${gk.category || 'Categoría'} | ${gk.team || 'Equipo'} | ${data.fecha || ''}`, pageWidth / 2, 255, { align: 'center' });
+
+    // Escudo Atleti inferior
+    if (atletiShieldB64) {
+      doc.addImage(atletiShieldB64, 'PNG', pageWidth / 2 - 15, 265, 30, 30);
+    }
+
+    // --- PÁGINA 2: CONTENIDO DEL INFORME ---
+    doc.addPage();
+    doc.setFillColor(...p.bg);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    // Cabecera Página 2
+    doc.setTextColor(...p.textMain);
+    doc.setFontSize(22);
+    doc.setFont("Roboto", "bolditalic");
+    doc.text("SEGUIMIENTO DE OBJETIVOS", 15, 25);
+    
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(...p.textMuted);
+    doc.text(`${data.titulo || 'Informe Técnico'} • ${data.fecha || ''}`, 15, 32);
+
+    if (atletiShieldB64) {
+      doc.addImage(atletiShieldB64, 'PNG', pageWidth - 35, 12, 20, 20);
+    }
+
+    doc.setDrawColor(...p.line);
+    doc.setLineWidth(0.5);
+    doc.line(15, 38, pageWidth - 15, 38);
+
+    let currentY = 48;
+
+    // BLOQUE 1: OBJETIVOS MARCADOS
+    doc.setFillColor(...p.card);
+    doc.setDrawColor(...p.line);
+    doc.roundedRect(15, currentY, pageWidth - 30, 45, 3, 3, 'FD');
+    
+    doc.setTextColor(...p.textMain);
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "bold");
+    doc.text("1. OBJETIVOS DEFINIDOS", 20, currentY + 8);
+
+    doc.setFontSize(9);
+    doc.setTextColor(239, 68, 68); // Rojo para Principal
+    doc.text("Principal (Corto Plazo):", 20, currentY + 18);
+    doc.setTextColor(...p.textMuted);
+    doc.setFont("Roboto", "normal");
+    doc.text(data.objetivo1 || '-', 60, currentY + 18, { maxWidth: 130 });
+
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(59, 130, 246); // Azul para Medio Plazo
+    doc.text("Secundario (Medio Plazo):", 20, currentY + 28);
+    doc.setTextColor(...p.textMuted);
+    doc.setFont("Roboto", "normal");
+    doc.text(data.objetivo2 || '-', 65, currentY + 28, { maxWidth: 125 });
+
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(16, 185, 129); // Verde para Físico/Mental
+    doc.text("Físico / Mental:", 20, currentY + 38);
+    doc.setTextColor(...p.textMuted);
+    doc.setFont("Roboto", "normal");
+    doc.text(data.objetivo3 || '-', 50, currentY + 38, { maxWidth: 140 });
+
+    currentY += 55;
+
+    // BLOQUE 2: ACCIONES EVALUADAS CON COLORES
+    doc.setTextColor(...p.textMain);
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "bold");
+    doc.text("2. ACCIONES EVALUADAS (NIVEL DE COMPETENCIA)", 15, currentY);
+    currentY += 8;
+
+    // Mapa de los nombres internos a los nombres bonitos
+    const accionesMap = {
+      objDefBlocajeFrontal: 'Blocaje Frontales Medio y Raso', objDefBlocajeLatRaso: 'Blocaje lateral raso', objDefBlocajeLatMed: 'Blocaje lateral media altura', objDefDesvioRaso: 'Desvío raso', objDefDesvioMed: 'Desvío a Media Altura', objDefReduccion: 'Reducción de espacios y Posición Cruz', objDefApertura: 'Apertura', objDefReincorp: 'Reincorporaciones', objDefBlocajeAereo: 'Blocaje Aéreo', objDefDespeje: 'Despeje de Puños',
+      objOfPaseManoRaso: 'Pase mano raso', objOfPaseManoAlto: 'Pase mano alto', objOfPaseManoPicado: 'Pase mano picado', objOfPerfilamiento: 'Perfilamiento y Controles', objOfPaseRasoPie: 'Pase Raso con el Pie', objOfPaseAltoPie: 'Pase alto con el Pie', objOfVoleas: 'Voleas'
+    };
+
+    // Extraer solo las acciones que han sido evaluadas (nota diferente de vacío)
+    const evalActions = Object.keys(accionesMap)
+      .filter(key => data[key] && data[key] !== '')
+      .map(key => ({ label: accionesMap[key], score: parseInt(data[key]) }));
+
+    if (evalActions.length === 0) {
+       doc.setFont("Roboto", "normal");
+       doc.setTextColor(...p.textMuted);
+       doc.text("No se evaluaron acciones específicas en este informe.", 15, currentY);
+       currentY += 15;
+    } else {
+       evalActions.forEach(action => {
+          // Si nos quedamos sin espacio, creamos página nueva
+          if (currentY > pageHeight - 30) {
+             doc.addPage(); 
+             doc.setFillColor(...p.bg);
+             doc.rect(0, 0, pageWidth, pageHeight, 'F');
+             currentY = 20;
+          }
+          
+          // Fondo de la fila
+          doc.setFillColor(...p.card);
+          doc.setDrawColor(...p.line);
+          doc.roundedRect(15, currentY, pageWidth - 30, 12, 2, 2, 'FD');
+          
+          doc.setTextColor(...p.textMain);
+          doc.setFontSize(9);
+          doc.setFont("Roboto", "bold");
+          doc.text(action.label, 20, currentY + 7.5);
+
+          // Píldora de Color según nivel de competencia
+          let pillBg, pillText, pillLabel;
+          if (action.score <= 2) { 
+              pillBg = [220, 38, 38]; pillText = [255,255,255]; pillLabel = "INC. INCONSCIENTE"; 
+          } else if (action.score === 3) { 
+              pillBg = [249, 115, 22]; pillText = [255,255,255]; pillLabel = "INC. CONSCIENTE"; 
+          } else if (action.score === 4) { 
+              pillBg = [251, 191, 36]; pillText = [15,23,42]; pillLabel = "COMP. CONSCIENTE"; 
+          } else { 
+              pillBg = [16, 185, 129]; pillText = [255,255,255]; pillLabel = "COMP. INCONSCIENTE"; 
+          }
+
+          doc.setFillColor(...pillBg);
+          doc.roundedRect(120, currentY + 2.5, 45, 7, 2, 2, 'F');
+          doc.setTextColor(...pillText);
+          doc.setFontSize(7);
+          doc.text(pillLabel, 142.5, currentY + 7.5, { align: 'center' });
+
+          // La Nota numérica
+          doc.setTextColor(...p.textMuted);
+          doc.setFontSize(8);
+          doc.text("NOTA:", 175, currentY + 7.5);
+          doc.setTextColor(...p.textMain);
+          doc.setFontSize(11);
+          doc.text(String(action.score), 188, currentY + 7.5);
+
+          currentY += 14;
+       });
+    }
+
+    // BLOQUE 3: OBSERVACIONES
+    if (currentY > pageHeight - 50) {
+       doc.addPage();
+       doc.setFillColor(...p.bg);
+       doc.rect(0, 0, pageWidth, pageHeight, 'F');
+       currentY = 20;
+    }
+
+    currentY += 5;
+    doc.setTextColor(...p.textMain);
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "bold");
+    doc.text("3. OBSERVACIONES DEL ENTRENADOR", 15, currentY);
+    currentY += 6;
+
+    doc.setFillColor(...p.card);
+    doc.setDrawColor(...p.line);
+    doc.roundedRect(15, currentY, pageWidth - 30, 40, 3, 3, 'FD');
+    doc.setTextColor(...p.textMuted);
+    doc.setFontSize(9);
+    doc.setFont("Roboto", "normal");
+    
+    // Dividir texto largo en líneas
+    const splitObs = doc.splitTextToSize(data.objObservacionFinal || 'Sin observaciones adicionales registradas.', pageWidth - 40);
+    doc.text(splitObs, 20, currentY + 8);
+
+    // Finalizar y Guardar PDF
+    doc.save(`OBJETIVOS_${gk.name.replace(/\s+/g, '_').toUpperCase()}_${data.fecha}.pdf`);
+    showNotification("PDF Exportado con Éxito", "success");
+
+  } catch (error) {
+    console.error(error);
+    showNotification("Error generando PDF", "error");
+  }
+};
+
+// ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
 // ==========================================
 
