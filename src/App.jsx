@@ -823,15 +823,34 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
     showNotification(`Generando PDF de ${informe.tipo.toUpperCase()}...`, "success");
+    
+    // 1. Cargar librerías y fuentes con garantías
     const jspdfModule = await loadJsPDF();
     const doc = new jspdfModule.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await loadCustomFonts(doc);
 
+    // 2. Colores y Base64
     const p = darkMode ? { bg: [15, 23, 42], textMain: [255, 255, 255], textMuted: [148, 163, 184], line: [51, 65, 85], card: [30, 41, 59] } 
                        : { bg: [248, 250, 252], textMain: [15, 23, 42], textMuted: [100, 116, 139], line: [226, 232, 240], card: [255, 255, 255] };
 
     const photoB64 = await loadGkPhotoBase64(gk.photoUrl, gk.name, darkMode);
-    const atletiShieldB64 = await loadImgToB64(ESCUDO_ATM_URL);
+    
+    // Función auxiliar a prueba de fallos para cargar imágenes base
+    const safeImgLoad = (url) => new Promise(resolve => {
+        if(!url) return resolve(null);
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width; canvas.height = img.height;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+    });
+
+    const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
 
     const pageWidth = 210; const pageHeight = 297;
 
@@ -906,7 +925,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
        doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold");
        doc.text(label.toUpperCase(), 15, currentY);
        doc.setTextColor(...p.textMain); doc.setFontSize(10); doc.setFont("Roboto", "normal");
-       const lines = doc.splitTextToSize(String(value), width);
+       
+       // Proteger doc.splitTextToSize para que no falle si 'value' no es una cadena válida
+       const safeValue = String(value || '');
+       const lines = doc.splitTextToSize(safeValue, width);
+       
        doc.text(lines, 15, currentY + 5);
        currentY += 8 + (lines.length * 5);
     };
@@ -962,18 +985,20 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
         currentY += 5;
         printSectionTitle("DECISIÓN DE SCOUTING");
-        doc.setFillColor(informe.flashEstado === 'CONTINÚA' ? 16 : (informe.flashEstado === 'SEGUIMIENTO' ? 249 : 220), informe.flashEstado === 'CONTINÚA' ? 185 : (informe.flashEstado === 'SEGUIMIENTO' ? 115 : 38), informe.flashEstado === 'CONTINÚA' ? 129 : (informe.flashEstado === 'SEGUIMIENTO' ? 22 : 38));
-        doc.roundedRect(15, currentY, 60, 10, 2, 2, 'F');
-        doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont("Roboto", "bold");
-        doc.text(String(informe.flashEstado || 'SIN DECISIÓN'), 45, currentY + 6.5, { align: 'center' });
-        currentY += 15;
+        if (informe.flashEstado) {
+            doc.setFillColor(informe.flashEstado === 'CONTINÚA' ? 16 : (informe.flashEstado === 'SEGUIMIENTO' ? 249 : 220), informe.flashEstado === 'CONTINÚA' ? 185 : (informe.flashEstado === 'SEGUIMIENTO' ? 115 : 38), informe.flashEstado === 'CONTINÚA' ? 129 : (informe.flashEstado === 'SEGUIMIENTO' ? 22 : 38));
+            doc.roundedRect(15, currentY, 60, 10, 2, 2, 'F');
+            doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont("Roboto", "bold");
+            doc.text(String(informe.flashEstado), 45, currentY + 6.5, { align: 'center' });
+            currentY += 15;
+        }
         printField("Justificación Técnica", informe.flashJustificacion);
         if (informe.flashEstado === 'CONTINÚA') printField("Propuesta", informe.flashPropuesta);
     }
     else {
         printSectionTitle("DATOS PRINCIPALES");
         if(informe.rival) printField("Rival / Competición", `${informe.rival} - ${informe.partidoCompeticion || ''}`);
-        if(informe.titular) printField("Estado", informe.partidoTitular || informe.titular);
+        if(informe.partidoTitular || informe.titular) printField("Estado", informe.partidoTitular || informe.titular);
         
         currentY += 5;
         printSectionTitle("ANÁLISIS CUALITATIVO");
@@ -999,7 +1024,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     showNotification("PDF Exportado con Éxito", "success");
 
   } catch (error) {
-    console.error(error);
+    console.error("Error PDF Historial:", error);
     showNotification("Error generando PDF", "error");
   }
 };
