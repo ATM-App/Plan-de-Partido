@@ -317,10 +317,26 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     const cleanSheetsPercent = playedMatches > 0 ? Math.round(((gk.stats?.cleanSheets || 0) / playedMatches) * 100) : 0;
     const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
 
-    // Calcular Próximo Partido para la Portada
-    const gkMatchesForPdf = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
-    const nextMatchPdf = gkMatchesForPdf.length > 0 ? gkMatchesForPdf[0] : null;
+    // ==========================================
+    // LÓGICA CORREGIDA: PRÓXIMO PARTIDO (SOLO FUTUROS)
+    // ==========================================
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Ignorar la hora, solo fecha
+
+    const gkMatchesForPdf = matches.filter(m => m.goalkeeperIds?.includes(gk.id));
+    
+    // Ordenamos de más cercano a más lejano y filtramos solo los que son HOY o en el FUTURO
+    const futureMatches = gkMatchesForPdf
+      .map(m => ({ ...m, parsedDate: new Date(m.date) }))
+      .filter(m => {
+         m.parsedDate.setHours(0,0,0,0);
+         return m.parsedDate >= today;
+      })
+      .sort((a, b) => a.parsedDate - b.parsedDate);
+
+    const nextMatchPdf = futureMatches.length > 0 ? futureMatches[0] : null;
     const rivalPdf = nextMatchPdf ? rivals.find(r => r.id === nextMatchPdf.rivalId) : null;
+    // ==========================================
 
     // Generar URL para QR apuntando a la VISTA PÚBLICA de tu app
     const baseUrl = window.location.origin + window.location.pathname;
@@ -398,12 +414,12 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     if (nextMatchPdf) {
       // League Pill
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(leftCX - 60, 35, 120, 8, 4, 4, 'F'); // Tamaño original revertido
+      doc.roundedRect(leftCX - 60, 35, 120, 8, 4, 4, 'F'); 
       doc.setTextColor(11, 19, 43);
-      doc.setFontSize(8.5); // Letra más grande encajada dentro del tamaño original
+      doc.setFontSize(8.5); 
       doc.setFont("Roboto", "bold");
       const leagueText = `${nextMatchPdf.league || 'LIGA'} • ${nextMatchPdf.group || 'GRUPO'} • JORNADA ${nextMatchPdf.matchday || '-'}`;
-      doc.text(leagueText.toUpperCase(), leftCX, 40.5, { align: 'center' }); // Centrado vertical
+      doc.text(leagueText.toUpperCase(), leftCX, 40.5, { align: 'center' }); 
 
       // Venue & Date
       doc.setTextColor(239, 68, 68); // Corporate Red
@@ -428,16 +444,15 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
-      // El escudo local está centrado en: leftCX - 40 - 15 + (32/2) = leftCX - 39
-doc.text((nextMatchPdf.myTeam || 'ATLETI').toUpperCase(), leftCX - 39, shieldY + 42, { align: 'center', maxWidth: 45 });
+      doc.text((nextMatchPdf.myTeam || 'ATLETI').toUpperCase(), leftCX - 39, shieldY + 42, { align: 'center', maxWidth: 45 });
 
       // Time
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(leftCX - 20, shieldY + 6, 40, 16, 6, 6, 'F'); // Tamaño original de píldora de hora
+      doc.roundedRect(leftCX - 20, shieldY + 6, 40, 16, 6, 6, 'F'); 
       doc.setTextColor(11, 19, 43);
-      doc.setFontSize(22); // Número agrandado en estilo futbolero
+      doc.setFontSize(22); 
       doc.setFont("Roboto", "bolditalic");
-      doc.text(nextMatchPdf.time || '--:--', leftCX, shieldY + 18, { align: 'center' }); // Baseline ajustado
+      doc.text(nextMatchPdf.time || '--:--', leftCX, shieldY + 18, { align: 'center' }); 
       
       doc.setTextColor(148, 163, 184);
       doc.setFontSize(8);
@@ -455,8 +470,7 @@ doc.text((nextMatchPdf.myTeam || 'ATLETI').toUpperCase(), leftCX - 39, shieldY +
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
-      // El escudo visitante está centrado en: leftCX + 10 + 15 + (32/2) = leftCX + 41
-doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
+      doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
 
       // Match Stats Bottom Left
       const statsY = 168;
@@ -466,10 +480,9 @@ doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, {
       doc.setFont("Roboto", "bold");
       doc.text("GOLES RIVAL", leftCX - 35, statsY, {align: 'center'});
       
-      // Nueva Píldora para Goles Rival con alto contraste
-      doc.setFillColor(255, 255, 255); // Píldora blanca
+      doc.setFillColor(255, 255, 255); 
       doc.roundedRect(leftCX - 50, statsY + 4, 30, 14, 7, 7, 'F'); 
-      doc.setTextColor(239, 68, 68); // Letra en rojo corporativo
+      doc.setTextColor(239, 68, 68); 
       doc.setFontSize(24);
       doc.setFont("Roboto", "bolditalic");
       doc.text(String(nextMatchPdf.goalsScored || rivalPdf?.goalsScored || '0'), leftCX - 35, statsY + 15, {align: 'center'});
@@ -486,11 +499,11 @@ doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, {
               else if (res === 'E') doc.setFillColor(59, 130, 246); // Blue
               else doc.setFillColor(239, 68, 68); // Red
 
-              doc.circle(stX, statsY + 11, 5, 'F'); // Círculos ligeramente más amplios
+              doc.circle(stX, statsY + 11, 5, 'F'); 
               doc.setTextColor(255,255,255);
-              doc.setFontSize(9); // Letra más grande y legible
+              doc.setFontSize(9); 
               doc.setFont("Roboto", "bold");
-              doc.text(res, stX, statsY + 11, {align: 'center', baseline: 'middle'}); // Ajuste vertical exacto para centrado total
+              doc.text(res, stX, statsY + 11, {align: 'center', baseline: 'middle'}); 
               stX += 12;
           });
       } else {
@@ -611,10 +624,10 @@ doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, {
     addProfileRow("Edad", `${gk.age || '--'} años`);
     addProfileRow("Pie Domin.", gk.foot || '--');
 
-    // Caja Estado de Forma (Abajo en lugar de tapar la cara)
+    // Caja Estado de Forma
     doc.setFillColor(...p.cardAlt);
     doc.setDrawColor(...p.line);
-    doc.roundedRect(22, 175, 71, 15, 2, 2, 'FD'); // Desplazado abajo
+    doc.roundedRect(22, 175, 71, 15, 2, 2, 'FD'); 
     if (iActivity) doc.addImage(iActivity, 'PNG', 26, 178, 9, 9);
     doc.setTextColor(...p.textMuted);
     doc.setFontSize(7);
@@ -752,14 +765,14 @@ doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, {
     doc.text("GOLES", 265, tY + 7);
     tY += 14;
 
-    const gkMatches = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const gkMatchesAll = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(b.date) - new Date(a.date)); // Ordenados del más reciente al más antiguo para el historial
     
-    if (gkMatches.length === 0) {
+    if (gkMatchesAll.length === 0) {
       doc.setTextColor(...p.textMain);
       doc.setFont("Roboto", "normal");
-      doc.text("No hay partidos registrados en el calendario para este portero.", 20, tY + 5);
+      doc.text("No hay partidos registrados en el historial para este portero.", 20, tY + 5);
     } else {
-      gkMatches.forEach((m) => {
+      gkMatchesAll.forEach((m) => {
         if (tY > pageHeight - 20) {
           doc.addPage();
           drawBackground();
