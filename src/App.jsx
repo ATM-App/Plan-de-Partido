@@ -3516,7 +3516,15 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
 
     if (informeEditId) informeAguardar.id = informeEditId;
 
+    // Si NO es borrador, forzamos la descarga del PDF inmediatamente
+    if (!isDraft) {
+      exportarInformePDFVectorial(gkInfo, informeAguardar, darkMode, showNotification);
+    }
+
+    // Llamamos a la función onSave que nos pasa el componente padre (App.jsx)
+    // para que lo suba a Firebase
     onSave(informeAguardar);
+    
     resetForm();
     setActiveTab('historial');
   };
