@@ -818,7 +818,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
-// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM ESTRUCTURADA - CORRECCIÓN DE ALINEACIÓN)
+// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM FINAL CON ICONOS Y ALINEACIÓN)
 // ==========================================
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
@@ -850,8 +850,17 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         img.onerror = () => resolve(null); img.src = url;
     });
 
-    const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
-    const rivalShieldB64 = informe.rivalId ? await safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : null;
+    // Cargar Escudos e Iconos
+    const [atletiShieldB64, rivalShieldB64, iActivity, iTarget, iShield, iSwords, iGit, iGoal] = await Promise.all([
+        safeImgLoad(ESCUDO_ATM_URL),
+        informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
+        loadIconB64('activity', '#e11d48'), // Rojo para encabezados generales
+        loadIconB64('target', '#3b82f6'),   // Azul
+        loadIconB64('shield', '#ef4444'),   // Rojo para Defensa
+        loadIconB64('swords', '#10b981'),   // Verde para Ataque
+        loadIconB64('gitCompare', '#3b82f6'), // Azul para Táctica
+        loadIconB64('goal', '#eab308')      // Amarillo para Claves
+    ]);
 
     const pageWidth = 210; const pageHeight = 297;
 
@@ -861,7 +870,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     doc.setFillColor(...p.blueDark);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Dorsal de fondo
     doc.setTextColor(20, 30, 60);
     doc.setFontSize(250);
     doc.setFont("Roboto", "bolditalic");
@@ -869,7 +877,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    // Título Dorado (CORREGIDO: Sin charSpace para que el centrado de jsPDF no falle)
     doc.setTextColor(212, 175, 55);
     doc.setFontSize(12);
     doc.setFont("Roboto", "bold");
@@ -885,19 +892,16 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     doc.text(tituloPortada, pageWidth / 2, 230, { align: 'center' });
 
-    // Nombre (Alineación central)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(30);
     doc.setFont("Roboto", "bolditalic");
     doc.text(gk.name.toUpperCase(), pageWidth / 2, 242, { align: 'center' });
 
-    // Píldora Equipo / Fecha (Centrada matemáticamente)
     doc.setFillColor(220, 38, 38);
     const subtitleText = `${gk.team || 'ATLETI'} | ${informe.fecha || ''}`;
     doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
-    const textWidth = doc.getTextWidth(subtitleText) + 8; // Padding interno
-    // Se resta textWidth/2 para centrar el rectángulo respecto al pageWidth/2
+    const textWidth = doc.getTextWidth(subtitleText) + 8;
     doc.roundedRect((pageWidth / 2) - (textWidth / 2), 249, textWidth, 6, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
     doc.text(subtitleText, pageWidth / 2, 253.5, { align: 'center' });
@@ -943,25 +947,29 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         return false;
     };
 
-    const printHeader = (title) => {
+    // Header con Icono (si se proporciona)
+    const printHeader = (title, iconB64 = null) => {
         checkPageBreak(15);
-        doc.setFillColor(...p.accent);
-        doc.roundedRect(15, currentY, 4, 8, 1, 1, 'F');
-        doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.setFont("Roboto", "bold");
-        doc.text(title.toUpperCase(), 23, currentY + 6.5);
+        
+        if (iconB64) {
+            doc.addImage(iconB64, 'PNG', 15, currentY - 1, 6, 6);
+            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.setFont("Roboto", "bold");
+            doc.text(title.toUpperCase(), 23, currentY + 3.5);
+        } else {
+            doc.setFillColor(...p.accent);
+            doc.roundedRect(15, currentY, 4, 8, 1, 1, 'F');
+            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.setFont("Roboto", "bold");
+            doc.text(title.toUpperCase(), 23, currentY + 6.5);
+        }
         currentY += 12;
     };
 
     const printBox = (x, y, w, h, label, value, bg = p.card) => {
         doc.setFillColor(...bg); doc.setDrawColor(...p.line); doc.roundedRect(x, y, w, h, 2, 2, 'FD');
         doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); 
-        
         if (bg !== p.card) doc.setTextColor(203, 213, 225); 
         doc.text(label.toUpperCase(), x + 4, y + 5.5);
-        
-        if (bg === p.card) doc.setTextColor(...p.textMain);
-        else doc.setTextColor(255, 255, 255);
-        
+        if (bg === p.card) doc.setTextColor(...p.textMain); else doc.setTextColor(255, 255, 255);
         doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(String(value || '--'), x + 4, y + 12, { maxWidth: w - 8 });
     };
 
@@ -978,29 +986,41 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += h + 4;
     };
 
-    const printDots = (x, y, label, scoreStr, max = 4, isRightCol = false) => {
+    // Helper ajustado para alinear correctamente puntos y texto sin solapamientos
+    const printDots = (x, y, label, scoreStr, max = 4) => {
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
-        doc.text(label, x, y);
         
-        let dX = isRightCol ? x + 45 : x + 55; 
+        // Truncar label si es muy largo para evitar choque con los puntos
+        let safeLabel = label;
+        if(doc.getTextWidth(safeLabel) > 40) {
+            safeLabel = safeLabel.substring(0, 18) + '...';
+        }
+        doc.text(safeLabel, x, y);
+        
+        // Los puntos empiezan en una posición fija relativa a X (ancho reservado para el texto)
+        let dX = x + 45; 
         
         for(let i=1; i<=max; i++) {
            doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
            doc.circle(dX, y - 1.2, 1.8, 'F');
            dX += 6;
         }
-        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
+        
+        // Puntuación X/Y al final de los puntos
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); 
+        // Si max es 5 (ej. Fases de juego), dX ya ha avanzado más, sumamos un pequeño margen.
+        doc.text(`${score}/${max}`, dX + 2, y);
     };
 
     const getValColor = (valStr) => {
         if (!valStr) return p.card;
         const upper = valStr.toUpperCase();
-        if (upper === 'BAJA') return [220, 38, 38];   // Rojo
-        if (upper === 'MEDIA') return [249, 115, 22]; // Naranja
-        if (upper === 'ALTA') return [234, 179, 8];   // Amarillo/Dorado
-        if (upper === 'EXCEPCIONAL') return [16, 185, 129]; // Verde
-        return p.accent; // Default
+        if (upper === 'BAJA') return [220, 38, 38];   
+        if (upper === 'MEDIA') return [249, 115, 22]; 
+        if (upper === 'ALTA') return [234, 179, 8];   
+        if (upper === 'EXCEPCIONAL') return [16, 185, 129]; 
+        return p.accent; 
     };
 
     // ==========================================
@@ -1008,7 +1028,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     // ==========================================
     
     if (informe.tipo === 'partido') {
-        printHeader("Contexto del Encuentro");
+        printHeader("Contexto del Encuentro", iActivity);
         doc.setFillColor(...p.blueDark); doc.roundedRect(15, currentY, 180, 22, 3, 3, 'F');
         doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("Roboto", "bolditalic");
         doc.text(`VS ${informe.rival ? informe.rival.toUpperCase() : 'DESCONOCIDO'}`, 22, currentY + 14);
@@ -1042,7 +1062,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         });
         currentY += 25;
 
-        printHeader("Análisis Técnico y Táctico");
+        printHeader("Análisis Técnico y Táctico", iTarget);
         printText("Paradas Relevantes", informe.obsParadas);
         printText("Análisis de Goles Recibidos", informe.obsGoles);
         printText("Juego Aéreo y Dominio del Área", informe.obsAereo);
@@ -1053,20 +1073,20 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         printText("Comunicación y Liderazgo", informe.obsComunicacion);
         printText("Aspecto Mental y Resiliencia", informe.obsMental);
 
-        printHeader("Información Adicional");
+        printHeader("Información Adicional", iGit);
         printText("Cronología", informe.partidoCronologia);
         printText("Fortalezas en el partido", informe.planFortalezas);
         printText("Debilidades a corregir", informe.planDebilidades);
     }
     
     else if (informe.tipo === 'objetivos') {
-        printHeader("Objetivos Definidos");
+        printHeader("Objetivos Definidos", iTarget);
         printText("Principal (Corto Plazo)", informe.objetivo1);
         printText("Secundario (Medio Plazo)", informe.objetivo2);
         printText("Físico / Mental", informe.objetivo3);
         
         currentY += 5;
-        printHeader("Evaluación de Competencias");
+        printHeader("Evaluación de Competencias", iActivity);
         
         const accionesMap = {
           objDefBlocajeFrontal: 'Blocaje Frontales Medio y Raso', objDefBlocajeLatRaso: 'Blocaje lateral raso', objDefBlocajeLatMed: 'Blocaje lateral media altura', objDefDesvioRaso: 'Desvío raso', objDefDesvioMed: 'Desvío a Media Altura', objDefReduccion: 'Reducción de espacios y Posición Cruz', objDefApertura: 'Apertura', objDefReincorp: 'Reincorporaciones', objDefBlocajeAereo: 'Blocaje Aéreo', objDefDespeje: 'Despeje de Puños',
@@ -1085,7 +1105,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             else if (action.score === 3) { pillBg = [249, 115, 22]; pillLabel = "INC. CONSCIENTE"; } 
             else if (action.score === 4) { pillBg = [251, 191, 36]; pillText = [15,23,42]; pillLabel = "COMP. CONSCIENTE"; }
 
-            // Ajuste de las posiciones X para las píldoras de objetivos para que no se salgan
             doc.setFillColor(...pillBg); doc.roundedRect(115, currentY + 3, 48, 8, 2, 2, 'F');
             doc.setTextColor(...pillText); doc.setFontSize(7); doc.text(pillLabel, 139, currentY + 8.5, { align: 'center' });
             
@@ -1147,6 +1166,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         });
         currentY += 25;
 
+        // --- SOLUCIÓN DE COLUMNAS PARA DOTS ---
         const printDotsGrid = (items, maxP) => {
             doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
             const gridH = Math.ceil(items.length / 2) * 10 + 10;
@@ -1155,13 +1175,14 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             let dY = currentY + 10;
             items.forEach((it, idx) => {
                 const isRight = idx % 2 !== 0;
-                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], maxP, isRight);
+                // La columna izquierda empieza en X=20. La derecha en X=110.
+                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], maxP);
                 if (isRight) dY += 10;
             });
             currentY += gridH + 8;
         };
 
-        printHeader("Valoración Deportiva (Cualidades Generales)");
+        printHeader("Valoración Deportiva (Cualidades Generales)", iActivity);
         printDotsGrid([
             {l: 'Rep. Téc. Defensivo', k: 'repTecDefensivo'}, {l: 'Rep. Téc. Ofensivo', k: 'repTecOfensivo'},
             {l: 'Adecuación Recursos', k: 'adecuacionRecursos'}, {l: 'Nivel Competitivo', k: 'nivelCompetitivo'},
@@ -1171,7 +1192,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             {l: 'Motivación Indiv.', k: 'motivacionIndividual'}, {l: 'Comp. Actitudinal', k: 'comportamientoActitudinal'}
         ], 4);
 
-        printHeader("Cualidades Puesto Específico");
+        printHeader("Cualidades Puesto Específico", iTarget);
         printDotsGrid([
             {l: 'Posición Básica', k: 'posicionBasica'}, {l: 'Blocaje', k: 'blocaje'},
             {l: 'Colocación', k: 'colocacion'}, {l: 'Desplazamientos', k: 'desplazamientosCaidas'},
@@ -1180,7 +1201,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             {l: 'Agilidad', k: 'agilidad'}
         ], 4);
 
-        printHeader("Fases de Juego y Actitud (1 a 5)");
+        printHeader("Fases de Juego y Actitud (1 a 5)", iGit);
         printDotsGrid([
             {l: 'Ataque', k: 'ataque'}, {l: 'Defensa', k: 'defensa'},
             {l: 'Transición Ofensiva', k: 'transOf'}, {l: 'Transición Defensiva', k: 'transDef'},
