@@ -3220,7 +3220,7 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Actualizado: Objetivos en lista completa con colores dinámicos)
+// MÓDULO DE INFORMES (Actualizado: Informe Flash con Selectores)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) {
   const [tipoInforme, setTipoInforme] = useState('semestral');
@@ -3275,7 +3275,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
     
     // --- FLASH ---
     flashTipo: '', flashAltura: '', flashNivel: '', flashPotencial: '',
-    flashPersonalidad: '', flashComunicacion: '', flashConcentracion: '', flashResiliencia: '',
+    flashPersonalidad: '', flashComunicacionTipo: '', flashComunicacionNota: '3', flashConcentracionNota: '3', flashResilienciaNota: '3',
     flashObsOf: '', flashObsDef: '', flashEstado: '', flashPropuesta: '', flashJustificacion: '',
     
     // --- OBJETIVOS (Evaluación en lista completa) ---
@@ -3477,6 +3477,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
             {/* ============================================================== */}
             {tipoInforme === 'partido' && (
               <div className="space-y-10">
+                {/* 01 Y 02 - DATOS DEL PARTIDO */}
                 <div>
                   <h3 className={sectionTitleClass}>01 y 02 — Datos del Partido y Portero</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -3501,6 +3502,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                   </div>
                 </div>
 
+                {/* 03 - NIVEL 1 REGISTRO RÁPIDO */}
                 <div>
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8">
                      <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">⚡ Nivel 1 — Registro Rápido (En Partido)</h3>
@@ -3526,6 +3528,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                   </div>
                 </div>
 
+                {/* 04 AL 12 - ANÁLISIS CUALITATIVO */}
                 <div>
                   <h3 className={sectionTitleClass}>04 al 12 — Análisis Específico Post-Partido</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3541,6 +3544,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                   </div>
                 </div>
 
+                {/* 13 AL 15 - CRONOLOGÍA, VÍDEOS Y COMPARATIVA */}
                 <div>
                   <h3 className={sectionTitleClass}>13 al 15 — Datos Adicionales</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -3550,6 +3554,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                   </div>
                 </div>
 
+                {/* 16 - VALORACIÓN GLOBAL */}
                 <div>
                   <h3 className={sectionTitleClass}>16 — Valoración Global (1-5)</h3>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
@@ -3565,6 +3570,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                   </div>
                 </div>
 
+                {/* 17 - PLAN DE MEJORA */}
                 <div>
                   <h3 className={sectionTitleClass}>17 — Plan de Mejora (Post-Partido)</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -3887,20 +3893,72 @@ function ModuleInformes({ gks, theme, darkMode, onSave, existingReports = [] }) 
                    <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/50">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">⚽ Perfil General</h4>
                       <div className="space-y-4">
-                         <div><label className={labelClass}>Tipo Portero</label><input type="text" name="flashTipo" value={formData.flashTipo} onChange={handleChange} className={inputClass} placeholder="Ej: Atajador, Libero..." /></div>
-                         <div><label className={labelClass}>Altura/Envergadura</label><input type="text" name="flashAltura" value={formData.flashAltura} onChange={handleChange} className={inputClass} placeholder="Ej: 1.85m, Alto" /></div>
-                         <div><label className={labelClass}>Nivel Actual</label><input type="text" name="flashNivel" value={formData.flashNivel} onChange={handleChange} className={inputClass} placeholder="Ej: Titular indiscutible" /></div>
-                         <div><label className={labelClass}>Potencial</label><input type="text" name="flashPotencial" value={formData.flashPotencial} onChange={handleChange} className={inputClass} placeholder="Ej: Primer equipo" /></div>
+                         <div>
+                            <label className={labelClass}>Tipo Portero</label>
+                            <select name="flashTipo" value={formData.flashTipo} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Línea">Línea</option>
+                               <option value="Dominador de área">Dominador de área</option>
+                               <option value="Moderno">Moderno</option>
+                               <option value="Reactivo">Reactivo</option>
+                            </select>
+                         </div>
+                         <div>
+                            <label className={labelClass}>Altura/Envergadura</label>
+                            <select name="flashAltura" value={formData.flashAltura} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Bajo">Bajo</option>
+                               <option value="Medio">Medio</option>
+                               <option value="Alto">Alto</option>
+                            </select>
+                         </div>
+                         <div>
+                            <label className={labelClass}>Nivel Actual</label>
+                            <select name="flashNivel" value={formData.flashNivel} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Bajo">Bajo</option>
+                               <option value="Medio">Medio</option>
+                               <option value="Alto">Alto</option>
+                            </select>
+                         </div>
+                         <div>
+                            <label className={labelClass}>Potencial</label>
+                            <select name="flashPotencial" value={formData.flashPotencial} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Bajo">Bajo</option>
+                               <option value="Medio">Medio</option>
+                               <option value="Alto">Alto</option>
+                            </select>
+                         </div>
                       </div>
                    </div>
                    
                    <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/50">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">🧠 Aspectos Psicológicos</h4>
                       <div className="space-y-4">
-                         <div><label className={labelClass}>Personalidad</label><input type="text" name="flashPersonalidad" value={formData.flashPersonalidad} onChange={handleChange} className={inputClass} placeholder="Ej: Líder natural" /></div>
-                         <div><label className={labelClass}>Comunicación</label><input type="text" name="flashComunicacion" value={formData.flashComunicacion} onChange={handleChange} className={inputClass} placeholder="Ej: Habla constantemente" /></div>
-                         <div><label className={labelClass}>Concentración</label><input type="text" name="flashConcentracion" value={formData.flashConcentracion} onChange={handleChange} className={inputClass} placeholder="Ej: Mantiene el foco" /></div>
-                         <div><label className={labelClass}>Resiliencia (Error)</label><input type="text" name="flashResiliencia" value={formData.flashResiliencia} onChange={handleChange} className={inputClass} placeholder="Ej: Se recupera rápido" /></div>
+                         <div>
+                            <label className={labelClass}>Personalidad</label>
+                            <select name="flashPersonalidad" value={formData.flashPersonalidad} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Valiente">Valiente</option>
+                               <option value="Tímido">Tímido</option>
+                               <option value="Líder">Líder</option>
+                               <option value="Comunicativo">Comunicativo</option>
+                            </select>
+                         </div>
+                         <div>
+                            <label className={labelClass}>Tipo de Comunicación</label>
+                            <select name="flashComunicacionTipo" value={formData.flashComunicacionTipo} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                               <option value="">- Seleccionar -</option>
+                               <option value="Efectiva">Efectiva</option>
+                               <option value="Poco Efectiva">Poco Efectiva</option>
+                            </select>
+                         </div>
+                         <div className="pt-2">
+                            {renderRadioGroup('flashComunicacionNota', 5, 'Nota Comunicación')}
+                            {renderRadioGroup('flashConcentracionNota', 5, 'Nota Concentración')}
+                            {renderRadioGroup('flashResilienciaNota', 5, 'Nota Resiliencia (Error)')}
+                         </div>
                       </div>
                    </div>
                 </div>
