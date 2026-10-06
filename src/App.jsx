@@ -818,7 +818,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
-// GENERADOR DE PDF MAESTRO (NIVEL ÉLITE / PREMIUM)
+// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM ESTRUCTURADA)
 // ==========================================
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
@@ -828,7 +828,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     const doc = new jspdfModule.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await loadCustomFonts(doc);
 
-    // Colores forzados a modo claro/corporativo para garantizar la mejor impresión en PDF
     const p = { 
       bg: [248, 250, 252], 
       textMain: [15, 23, 42], 
@@ -852,6 +851,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     });
 
     const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
+    const rivalShieldB64 = informe.rivalId ? await safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : null;
+
     const pageWidth = 210; const pageHeight = 297;
 
     // ==========================================
@@ -860,7 +861,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     doc.setFillColor(...p.blueDark);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Dorsal de fondo
     doc.setTextColor(20, 30, 60);
     doc.setFontSize(250);
     doc.setFont("Roboto", "bolditalic");
@@ -868,6 +868,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
+    // Título Dorado
     doc.setTextColor(212, 175, 55);
     doc.setFontSize(14);
     doc.setFont("Roboto", "bold");
@@ -882,20 +883,25 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     };
     const tituloPortada = titulos[informe.tipo] || "INFORME TÉCNICO";
 
-    doc.text(tituloPortada, pageWidth / 2, 230, { align: 'center' });
+    doc.text(tituloPortada, pageWidth / 2, 228, { align: 'center' });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
+    // Nombre
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(32);
     doc.setFont("Roboto", "bolditalic");
-    doc.text(gk.name.toUpperCase(), pageWidth / 2, 245, { align: 'center' });
+    doc.text(gk.name.toUpperCase(), pageWidth / 2, 242, { align: 'center' });
 
+    // Píldora Equipo / Fecha
     doc.setFillColor(220, 38, 38);
-    doc.roundedRect(pageWidth / 2 - 25, 252, 50, 6, 2, 2, 'F');
-    doc.setTextColor(255, 255, 255);
+    const subtitleText = `${gk.team || 'ATLETI'} | ${informe.fecha || ''}`;
+    // Ajustar el ancho del rectángulo según la longitud del texto
     doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
-    doc.text(`${gk.team || 'ATLETI'} | ${informe.fecha || ''}`, pageWidth / 2, 256.5, { align: 'center' });
+    const textWidth = doc.getTextWidth(subtitleText) + 10;
+    doc.roundedRect(pageWidth / 2 - (textWidth / 2), 250, textWidth, 6, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text(subtitleText, pageWidth / 2, 254.5, { align: 'center' });
 
     if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth / 2 - 15, 265, 30, 30);
 
@@ -908,7 +914,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     let currentY = 45;
 
-    // Cabecera de páginas interiores
     const drawPageHeader = () => {
         doc.setFillColor(...p.card);
         doc.rect(0, 0, pageWidth, 30, 'F');
@@ -950,8 +955,16 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     const printBox = (x, y, w, h, label, value, bg = p.card) => {
         doc.setFillColor(...bg); doc.setDrawColor(...p.line); doc.roundedRect(x, y, w, h, 2, 2, 'FD');
-        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); doc.text(label.toUpperCase(), x + 4, y + 5.5);
-        doc.setTextColor(bg === p.accent ? 255 : p.textMain[0], bg === p.accent ? 255 : p.textMain[1], bg === p.accent ? 255 : p.textMain[2]); 
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); 
+        
+        // Si el fondo NO es blanco, el label es un gris más claro
+        if (bg !== p.card) doc.setTextColor(203, 213, 225);
+        doc.text(label.toUpperCase(), x + 4, y + 5.5);
+        
+        // Si el fondo es blanco, el texto principal es negro, sino, es blanco
+        if (bg === p.card) doc.setTextColor(...p.textMain);
+        else doc.setTextColor(255, 255, 255);
+        
         doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(String(value || '--'), x + 4, y + 12, { maxWidth: w - 8 });
     };
 
@@ -972,6 +985,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
         doc.text(label, x, y);
+        // Desplazamiento fijo para los puntos (x + 55)
         let dX = x + 55;
         for(let i=1; i<=max; i++) {
            doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
@@ -981,16 +995,23 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
     };
 
+    // Helper para el color de la Valoración Global
+    const getValColor = (valStr) => {
+        if (!valStr) return p.card;
+        const upper = valStr.toUpperCase();
+        if (upper === 'BAJA') return [100, 116, 139]; // Gris
+        if (upper === 'MEDIA') return [249, 115, 22]; // Naranja
+        if (upper === 'ALTA') return [234, 179, 8];   // Amarillo/Dorado
+        if (upper === 'EXCEPCIONAL') return [16, 185, 129]; // Verde
+        return p.accent; // Default
+    };
+
     // ==========================================
     // LÓGICA DE DIBUJO POR TIPO DE INFORME
     // ==========================================
     
-    // ------------------------------------------
-    // 📝 INFORME DE PARTIDO
-    // ------------------------------------------
     if (informe.tipo === 'partido') {
         printHeader("Contexto del Encuentro");
-        // Rival Gigante
         doc.setFillColor(...p.blueDark); doc.roundedRect(15, currentY, 180, 22, 3, 3, 'F');
         doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("Roboto", "bolditalic");
         doc.text(`VS ${informe.rival ? informe.rival.toUpperCase() : 'DESCONOCIDO'}`, 22, currentY + 14);
@@ -1041,9 +1062,81 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         printText("Debilidades a corregir", informe.planDebilidades);
     }
     
-    // ------------------------------------------
-    // 📊 INFORME SEMESTRAL (COMPLETO CON DOTS)
-    // ------------------------------------------
+    else if (informe.tipo === 'objetivos') {
+        printHeader("Objetivos Definidos");
+        printText("Principal (Corto Plazo)", informe.objetivo1);
+        printText("Secundario (Medio Plazo)", informe.objetivo2);
+        printText("Físico / Mental", informe.objetivo3);
+        
+        currentY += 5;
+        printHeader("Evaluación de Competencias");
+        
+        const accionesMap = {
+          objDefBlocajeFrontal: 'Blocaje Frontales Medio y Raso', objDefBlocajeLatRaso: 'Blocaje lateral raso', objDefBlocajeLatMed: 'Blocaje lateral media altura', objDefDesvioRaso: 'Desvío raso', objDefDesvioMed: 'Desvío a Media Altura', objDefReduccion: 'Reducción de espacios y Posición Cruz', objDefApertura: 'Apertura', objDefReincorp: 'Reincorporaciones', objDefBlocajeAereo: 'Blocaje Aéreo', objDefDespeje: 'Despeje de Puños',
+          objOfPaseManoRaso: 'Pase mano raso', objOfPaseManoAlto: 'Pase mano alto', objOfPaseManoPicado: 'Pase mano picado', objOfPerfilamiento: 'Perfilamiento y Controles', objOfPaseRasoPie: 'Pase Raso con el Pie', objOfPaseAltoPie: 'Pase alto con el Pie', objOfVoleas: 'Voleas'
+        };
+        
+        const evalActions = Object.keys(accionesMap).filter(key => informe[key] && informe[key] !== '').map(key => ({ label: accionesMap[key], score: parseInt(informe[key]) }));
+
+        evalActions.forEach(action => {
+            checkPageBreak(18);
+            doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 14, 2, 2, 'FD');
+            doc.setTextColor(...p.textMain); doc.setFontSize(10); doc.setFont("Roboto", "bold"); doc.text(action.label, 20, currentY + 9);
+
+            let pillBg = [16, 185, 129], pillText = [255,255,255], pillLabel = "COMP. INCONSCIENTE";
+            if (action.score <= 2) { pillBg = [220, 38, 38]; pillLabel = "INC. INCONSCIENTE"; } 
+            else if (action.score === 3) { pillBg = [249, 115, 22]; pillLabel = "INC. CONSCIENTE"; } 
+            else if (action.score === 4) { pillBg = [251, 191, 36]; pillText = [15,23,42]; pillLabel = "COMP. CONSCIENTE"; }
+
+            doc.setFillColor(...pillBg); doc.roundedRect(120, currentY + 3, 45, 8, 2, 2, 'F');
+            doc.setTextColor(...pillText); doc.setFontSize(7); doc.text(pillLabel, 142.5, currentY + 8.5, { align: 'center' });
+            
+            doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.text("NOTA:", 173, currentY + 9);
+            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.text(String(action.score), 187, currentY + 9);
+            currentY += 16;
+        });
+
+        currentY += 5;
+        printHeader("Observaciones Generales");
+        printText("Conclusiones y Próximos Pasos", informe.objObservacionFinal);
+    }
+
+    else if (informe.tipo === 'flash') {
+        printHeader("Perfil Inicial");
+        printBox(15, currentY, 40, 20, "TIPO", informe.flashTipo || '-');
+        printBox(58, currentY, 40, 20, "ALTURA", informe.flashAltura || '-');
+        printBox(101, currentY, 40, 20, "NIVEL ACTUAL", informe.flashNivel || '-');
+        printBox(144, currentY, 51, 20, "POTENCIAL", informe.flashPotencial || '-');
+        currentY += 25;
+
+        printHeader("Análisis Psicológico");
+        printBox(15, currentY, 40, 20, "PERSONALIDAD", informe.flashPersonalidad || '-');
+        printBox(58, currentY, 40, 20, "COMUNICACIÓN", informe.flashComunicacionTipo || '-');
+        printBox(101, currentY, 40, 20, "CONCENTRACIÓN", `${informe.flashConcentracionNota || '-'}/5`);
+        printBox(144, currentY, 51, 20, "RESILIENCIA AL ERROR", `${informe.flashResilienciaNota || '-'}/5`);
+        currentY += 25;
+
+        printHeader("Valoraciones Técnico-Tácticas");
+        printText("Fase Ofensiva", informe.flashObsOf);
+        printText("Fase Defensiva", informe.flashObsDef);
+
+        currentY += 5;
+        printHeader("Veredicto de Scouting");
+        
+        if (informe.flashEstado) {
+            const isNoCont = informe.flashEstado === 'NO CONTINÚA';
+            const isSegui = informe.flashEstado === 'SEGUIMIENTO';
+            doc.setFillColor(isNoCont ? 220 : (isSegui ? 249 : 16), isNoCont ? 38 : (isSegui ? 115 : 185), isNoCont ? 38 : (isSegui ? 22 : 129));
+            doc.roundedRect(15, currentY, pageWidth - 30, 15, 2, 2, 'F');
+            doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("Roboto", "bolditalic");
+            doc.text(String(informe.flashEstado).toUpperCase(), pageWidth / 2, currentY + 10, { align: 'center' });
+            currentY += 20;
+        }
+
+        printText("Justificación Técnica", informe.flashJustificacion);
+        if (informe.flashPropuesta) printText("Propuesta", informe.flashPropuesta);
+    }
+    
     else if (informe.tipo === 'semestral') {
         printHeader("Datos de Competición");
         let bX = 15;
@@ -1065,7 +1158,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             let dY = currentY + 10;
             items.forEach((it, idx) => {
                 const isRight = idx % 2 !== 0;
-                printDots(isRight ? 115 : 25, dY, it.l, informe[it.k], 4);
+                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], 4);
                 if (isRight) dY += 10;
             });
             currentY += gridH + 8;
@@ -1091,7 +1184,22 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         ]);
 
         printHeader("Fases de Juego y Actitud (1 a 5)");
-        printDotsGrid([
+        // Para Fases de Juego usamos max = 5
+        const printDotsGrid5 = (items) => {
+            doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
+            const gridH = Math.ceil(items.length / 2) * 10 + 10;
+            checkPageBreak(gridH + 10);
+            doc.roundedRect(15, currentY, 180, gridH, 2, 2, 'FD');
+            let dY = currentY + 10;
+            items.forEach((it, idx) => {
+                const isRight = idx % 2 !== 0;
+                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], 5);
+                if (isRight) dY += 10;
+            });
+            currentY += gridH + 8;
+        };
+
+        printDotsGrid5([
             {l: 'Ataque', k: 'ataque'}, {l: 'Defensa', k: 'defensa'},
             {l: 'Transición Ofensiva', k: 'transOf'}, {l: 'Transición Defensiva', k: 'transDef'},
             {l: 'Sociabilidad', k: 'sociabilidad'}, {l: 'Constancia Actitud', k: 'constanciaAct'},
@@ -1100,8 +1208,9 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         ]);
 
         printHeader("Desarrollo y Observaciones");
-        printText("Observaciones Técnico-Tácticas", informe.obsTecnicoTacticas);
-        printText("Observaciones Actitudinales", informe.obsActitudinales);
+        printText("Paradas y Juego Ofensivo", informe.obsTecnicoTacticas || informe.obsParadas);
+        printText("Goles Encajados y Fase Defensiva", informe.obsActitudinales || informe.obsGoles);
+        printText("Análisis Extendido", informe.obsMental || informe.extendedAnalysis);
 
         printHeader("Control Académico");
         checkPageBreak(30);
@@ -1119,12 +1228,9 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += 35;
 
         printHeader("Valoración Final");
-        printBox(15, currentY, 60, 20, "NOTA GLOBAL SEMESTRE", informe.valoracionGeneral || 'MEDIA', p.accent);
+        printBox(15, currentY, 60, 20, "NOTA GLOBAL SEMESTRE", informe.valoracionGeneral || 'MEDIA', getValColor(informe.valoracionGeneral));
     }
     
-    // ------------------------------------------
-    // RESTO DE INFORMES (Torneo, Flash, Objetivos) - Mantenidos con alta calidad
-    // ------------------------------------------
     else if (informe.tipo === 'torneo') {
         printHeader("Datos del Torneo");
         printBox(15, currentY, 90, 18, "TORNEO", informe.titulo);
@@ -1132,7 +1238,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += 22;
         printBox(15, currentY, 60, 18, "POSICIÓN FINAL", informe.posFinalTorneo);
         printBox(80, currentY, 60, 18, "SUPERFICIE", informe.superficieTorneo);
-        printBox(145, currentY, 50, 18, "NOTA GLOBAL", informe.valoracionGeneral, p.accent);
+        printBox(145, currentY, 50, 18, "NOTA GLOBAL", informe.valoracionGeneral, getValColor(informe.valoracionGeneral));
         currentY += 25;
 
         if (informe.partidosTorneo && informe.partidosTorneo.length > 0) {
@@ -1159,7 +1265,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         printText("Áreas de Mejora y Errores", informe.obsImprovements);
     }
     else {
-        // Fallback genérico ultra limpio para Flash u Objetivos (usa los printText ya creados)
         printHeader("Detalles del Informe");
         Object.keys(informe).forEach(k => {
            if(k.startsWith('obj') || k.startsWith('flash')) {
@@ -1176,6 +1281,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     showNotification("Error generando PDF", "error");
   }
 };
+// ==========================================
 
 // ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
