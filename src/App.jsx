@@ -861,6 +861,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     doc.setFillColor(...p.blueDark);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
+    // Dorsal de fondo
     doc.setTextColor(20, 30, 60);
     doc.setFontSize(250);
     doc.setFont("Roboto", "bolditalic");
@@ -868,11 +869,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    // Título Dorado
+    // Título Dorado (Ajustado)
     doc.setTextColor(212, 175, 55);
-    doc.setFontSize(14);
+    doc.setFontSize(12); // Reducido un poco para que quepa bien
     doc.setFont("Roboto", "bold");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(3);
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2); // Menos espacio para no desbordar
     
     const titulos = {
       'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
@@ -895,7 +896,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     // Píldora Equipo / Fecha
     doc.setFillColor(220, 38, 38);
     const subtitleText = `${gk.team || 'ATLETI'} | ${informe.fecha || ''}`;
-    // Ajustar el ancho del rectángulo según la longitud del texto
     doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
     const textWidth = doc.getTextWidth(subtitleText) + 10;
@@ -957,11 +957,9 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.setFillColor(...bg); doc.setDrawColor(...p.line); doc.roundedRect(x, y, w, h, 2, 2, 'FD');
         doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); 
         
-        // Si el fondo NO es blanco, el label es un gris más claro
-        if (bg !== p.card) doc.setTextColor(203, 213, 225);
+        if (bg !== p.card) doc.setTextColor(203, 213, 225); // Gris claro si el fondo tiene color
         doc.text(label.toUpperCase(), x + 4, y + 5.5);
         
-        // Si el fondo es blanco, el texto principal es negro, sino, es blanco
         if (bg === p.card) doc.setTextColor(...p.textMain);
         else doc.setTextColor(255, 255, 255);
         
@@ -981,12 +979,15 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += h + 4;
     };
 
-    const printDots = (x, y, label, scoreStr, max = 4) => {
+    // Helper ajustado para alinear correctamente puntos y nota
+    const printDots = (x, y, label, scoreStr, max = 4, isRightCol = false) => {
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
         doc.text(label, x, y);
-        // Desplazamiento fijo para los puntos (x + 55)
-        let dX = x + 55;
+        
+        // El desplazamiento base para los puntos. Si es la columna derecha, empujamos más a la derecha.
+        let dX = isRightCol ? x + 45 : x + 55; 
+        
         for(let i=1; i<=max; i++) {
            doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
            doc.circle(dX, y - 1.2, 1.8, 'F');
@@ -995,11 +996,10 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
     };
 
-    // Helper para el color de la Valoración Global
     const getValColor = (valStr) => {
         if (!valStr) return p.card;
         const upper = valStr.toUpperCase();
-        if (upper === 'BAJA') return [100, 116, 139]; // Gris
+        if (upper === 'BAJA') return [220, 38, 38];   // Rojo
         if (upper === 'MEDIA') return [249, 115, 22]; // Naranja
         if (upper === 'ALTA') return [234, 179, 8];   // Amarillo/Dorado
         if (upper === 'EXCEPCIONAL') return [16, 185, 129]; // Verde
@@ -1149,8 +1149,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         });
         currentY += 25;
 
-        // Atributos de 1 a 4 con puntos
-        const printDotsGrid = (items) => {
+        // Atributos con puntos alineados a la derecha
+        const printDotsGrid = (items, maxP) => {
             doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
             const gridH = Math.ceil(items.length / 2) * 10 + 10;
             checkPageBreak(gridH + 10);
@@ -1158,7 +1158,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             let dY = currentY + 10;
             items.forEach((it, idx) => {
                 const isRight = idx % 2 !== 0;
-                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], 4);
+                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], maxP, isRight);
                 if (isRight) dY += 10;
             });
             currentY += gridH + 8;
@@ -1172,7 +1172,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             {l: 'Implicación Entrenos', k: 'implicacionEntrenamientos'}, {l: 'Liderazgo Grupo', k: 'liderazgoGrupo'},
             {l: 'Destreza General', k: 'destrezaGeneral'}, {l: 'Conciencia Obj.', k: 'concienciaObjetivos'},
             {l: 'Motivación Indiv.', k: 'motivacionIndividual'}, {l: 'Comp. Actitudinal', k: 'comportamientoActitudinal'}
-        ]);
+        ], 4);
 
         printHeader("Cualidades Puesto Específico");
         printDotsGrid([
@@ -1181,31 +1181,16 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             {l: 'Dominio Área', k: 'dominioArea'}, {l: 'Reinicio Juego', k: 'reinicioJuego'},
             {l: 'Uno contra uno', k: 'unoContraUno'}, {l: 'Velocidad Espec.', k: 'velocidadEspecifica'},
             {l: 'Agilidad', k: 'agilidad'}
-        ]);
+        ], 4);
 
         printHeader("Fases de Juego y Actitud (1 a 5)");
-        // Para Fases de Juego usamos max = 5
-        const printDotsGrid5 = (items) => {
-            doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
-            const gridH = Math.ceil(items.length / 2) * 10 + 10;
-            checkPageBreak(gridH + 10);
-            doc.roundedRect(15, currentY, 180, gridH, 2, 2, 'FD');
-            let dY = currentY + 10;
-            items.forEach((it, idx) => {
-                const isRight = idx % 2 !== 0;
-                printDots(isRight ? 110 : 20, dY, it.l, informe[it.k], 5);
-                if (isRight) dY += 10;
-            });
-            currentY += gridH + 8;
-        };
-
-        printDotsGrid5([
+        printDotsGrid([
             {l: 'Ataque', k: 'ataque'}, {l: 'Defensa', k: 'defensa'},
             {l: 'Transición Ofensiva', k: 'transOf'}, {l: 'Transición Defensiva', k: 'transDef'},
             {l: 'Sociabilidad', k: 'sociabilidad'}, {l: 'Constancia Actitud', k: 'constanciaAct'},
             {l: 'Disciplina', k: 'disciplina'}, {l: 'Actitud', k: 'actitud'},
             {l: 'Compromiso', k: 'compromiso'}, {l: 'Evolución', k: 'evolucion'}
-        ]);
+        ], 5);
 
         printHeader("Desarrollo y Observaciones");
         printText("Paradas y Juego Ofensivo", informe.obsTecnicoTacticas || informe.obsParadas);
@@ -1228,7 +1213,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += 35;
 
         printHeader("Valoración Final");
-        printBox(15, currentY, 60, 20, "NOTA GLOBAL SEMESTRE", informe.valoracionGeneral || 'MEDIA', getValColor(informe.valoracionGeneral));
+        const valColor = getValColor(informe.valoracionGeneral);
+        printBox(15, currentY, 60, 20, "NOTA GLOBAL SEMESTRE", informe.valoracionGeneral || 'MEDIA', valColor);
     }
     
     else if (informe.tipo === 'torneo') {
@@ -1238,7 +1224,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += 22;
         printBox(15, currentY, 60, 18, "POSICIÓN FINAL", informe.posFinalTorneo);
         printBox(80, currentY, 60, 18, "SUPERFICIE", informe.superficieTorneo);
-        printBox(145, currentY, 50, 18, "NOTA GLOBAL", informe.valoracionGeneral, getValColor(informe.valoracionGeneral));
+        const valColor = getValColor(informe.valoracionGeneral);
+        printBox(145, currentY, 50, 18, "NOTA GLOBAL", informe.valoracionGeneral, valColor);
         currentY += 25;
 
         if (informe.partidosTorneo && informe.partidosTorneo.length > 0) {
@@ -1264,14 +1251,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         printText("Puntos Positivos Globales", informe.obsPos);
         printText("Áreas de Mejora y Errores", informe.obsImprovements);
     }
-    else {
-        printHeader("Detalles del Informe");
-        Object.keys(informe).forEach(k => {
-           if(k.startsWith('obj') || k.startsWith('flash')) {
-              if (typeof informe[k] === 'string' && informe[k].length > 10) printText(k.replace('obj','').replace('flash',''), informe[k]);
-           }
-        });
-    }
 
     doc.save(`INFORME_${informe.tipo.toUpperCase()}_${gk.name.replace(/\s+/g, '_').toUpperCase()}_${informe.fecha}.pdf`);
     showNotification("PDF Exportado con Éxito", "success");
@@ -1281,7 +1260,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     showNotification("Error generando PDF", "error");
   }
 };
-// ==========================================
 
 // ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
