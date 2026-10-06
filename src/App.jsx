@@ -818,7 +818,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
-// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM ESTRUCTURADA)
+// GENERADOR DE PDF MAESTRO (VERSIÓN PREMIUM ESTRUCTURADA - CORRECCIÓN DE ALINEACIÓN)
 // ==========================================
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
@@ -869,11 +869,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    // Título Dorado (Ajustado)
+    // Título Dorado (Ajuste de alineación central)
     doc.setTextColor(212, 175, 55);
-    doc.setFontSize(12); // Reducido un poco para que quepa bien
+    doc.setFontSize(11); // Reducido levemente para evitar desbordes con tracking
     doc.setFont("Roboto", "bold");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2); // Menos espacio para no desbordar
+    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2.5); // Tracking uniforme
     
     const titulos = {
       'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
@@ -884,24 +884,25 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     };
     const tituloPortada = titulos[informe.tipo] || "INFORME TÉCNICO";
 
-    doc.text(tituloPortada, pageWidth / 2, 228, { align: 'center' });
+    doc.text(tituloPortada, pageWidth / 2, 230, { align: 'center' });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
-    // Nombre
+    // Nombre (Alineación central)
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(32);
+    doc.setFontSize(30);
     doc.setFont("Roboto", "bolditalic");
     doc.text(gk.name.toUpperCase(), pageWidth / 2, 242, { align: 'center' });
 
-    // Píldora Equipo / Fecha
+    // Píldora Equipo / Fecha (Centrada matemáticamente)
     doc.setFillColor(220, 38, 38);
     const subtitleText = `${gk.team || 'ATLETI'} | ${informe.fecha || ''}`;
     doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
-    const textWidth = doc.getTextWidth(subtitleText) + 10;
-    doc.roundedRect(pageWidth / 2 - (textWidth / 2), 250, textWidth, 6, 2, 2, 'F');
+    const textWidth = doc.getTextWidth(subtitleText) + 8; // Padding interno
+    // Se resta textWidth/2 para centrar el rectángulo respecto al pageWidth/2
+    doc.roundedRect((pageWidth / 2) - (textWidth / 2), 249, textWidth, 6, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.text(subtitleText, pageWidth / 2, 254.5, { align: 'center' });
+    doc.text(subtitleText, pageWidth / 2, 253.5, { align: 'center' });
 
     if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth / 2 - 15, 265, 30, 30);
 
@@ -957,7 +958,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.setFillColor(...bg); doc.setDrawColor(...p.line); doc.roundedRect(x, y, w, h, 2, 2, 'FD');
         doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.setFont("Roboto", "bold"); 
         
-        if (bg !== p.card) doc.setTextColor(203, 213, 225); // Gris claro si el fondo tiene color
+        if (bg !== p.card) doc.setTextColor(203, 213, 225); 
         doc.text(label.toUpperCase(), x + 4, y + 5.5);
         
         if (bg === p.card) doc.setTextColor(...p.textMain);
@@ -979,13 +980,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += h + 4;
     };
 
-    // Helper ajustado para alinear correctamente puntos y nota
     const printDots = (x, y, label, scoreStr, max = 4, isRightCol = false) => {
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
         doc.text(label, x, y);
         
-        // El desplazamiento base para los puntos. Si es la columna derecha, empujamos más a la derecha.
         let dX = isRightCol ? x + 45 : x + 55; 
         
         for(let i=1; i<=max; i++) {
@@ -1088,11 +1087,12 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
             else if (action.score === 3) { pillBg = [249, 115, 22]; pillLabel = "INC. CONSCIENTE"; } 
             else if (action.score === 4) { pillBg = [251, 191, 36]; pillText = [15,23,42]; pillLabel = "COMP. CONSCIENTE"; }
 
-            doc.setFillColor(...pillBg); doc.roundedRect(120, currentY + 3, 45, 8, 2, 2, 'F');
-            doc.setTextColor(...pillText); doc.setFontSize(7); doc.text(pillLabel, 142.5, currentY + 8.5, { align: 'center' });
+            // Ajuste de las posiciones X para las píldoras de objetivos para que no se salgan
+            doc.setFillColor(...pillBg); doc.roundedRect(115, currentY + 3, 48, 8, 2, 2, 'F');
+            doc.setTextColor(...pillText); doc.setFontSize(7); doc.text(pillLabel, 139, currentY + 8.5, { align: 'center' });
             
-            doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.text("NOTA:", 173, currentY + 9);
-            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.text(String(action.score), 187, currentY + 9);
+            doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.text("NOTA:", 170, currentY + 9);
+            doc.setTextColor(...p.textMain); doc.setFontSize(12); doc.text(String(action.score), 184, currentY + 9.5);
             currentY += 16;
         });
 
@@ -1149,7 +1149,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         });
         currentY += 25;
 
-        // Atributos con puntos alineados a la derecha
         const printDotsGrid = (items, maxP) => {
             doc.setFillColor(...p.card); doc.setDrawColor(...p.line);
             const gridH = Math.ceil(items.length / 2) * 10 + 10;
