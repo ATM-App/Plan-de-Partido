@@ -1433,7 +1433,7 @@ export default function App() {
       case 'rivales': return <ModuleRivales rivals={rivals} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
       case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} />;
       case 'ajustes': return <ModuleAjustes users={usersList} currentUserData={currentUserData} role={role} onNewUser={() => {setEditingUser(null); setIsUserFormOpen(true);}} onEditUser={(u) => {setEditingUser(u); setIsUserFormOpen(true);}} onSaveProfile={handleSaveProfile} onBackup={downloadBackup} theme={theme} darkMode={darkMode} />;
-      case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} onSave={(data) => handleSaveDoc('informes', data, true, "Informe guardado")} />;
+      case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} existingReports={informesList} onSave={async (data) => { const id = await handleSaveDoc('informes', data, !data.id, data.isDraft ? "Borrador guardado" : "Informe finalizado"); if (id && !data.id) data.id = id; return id; }} onDelete={(id) => handleDeleteDoc('informes', id)} showNotification={showNotification} />;
       default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={rivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} />;
     }
   };
@@ -3500,7 +3500,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
     setFormData(initialFormState);
   };
 
-  const handleSaveSubmit = (e, isDraft = false) => {
+  const handleSaveSubmit = async (e, isDraft = false) => {
     e.preventDefault();
     if (!porteroSeleccionado) { showNotification("Debes seleccionar un portero", "error"); return; }
     
@@ -3516,15 +3516,16 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
 
     if (informeEditId) informeAguardar.id = informeEditId;
 
-    // Si NO es borrador, forzamos la descarga del PDF inmediatamente
-    if (!isDraft) {
-      exportarInformePDFVectorial(gkInfo, informeAguardar, darkMode, showNotification);
+    // 1. Guardar en Firebase y esperar a que termine
+    const savedId = await onSave(informeAguardar);
+    
+    // 2. Si NO es borrador y se ha guardado bien, descargar el PDF automáticamente
+    if (!isDraft && savedId !== null) {
+       // Asegurarnos de usar el ID que nos dio Firebase si era nuevo
+       if (!informeAguardar.id) informeAguardar.id = savedId;
+       exportarInformePDFVectorial(gkInfo, informeAguardar, darkMode, showNotification);
     }
 
-    // Llamamos a la función onSave que nos pasa el componente padre (App.jsx)
-    // para que lo suba a Firebase
-    onSave(informeAguardar);
-    
     resetForm();
     setActiveTab('historial');
   };
