@@ -869,11 +869,10 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    // Título Dorado (Ajuste de alineación central)
+    // Título Dorado (CORREGIDO: Sin charSpace para que el centrado de jsPDF no falle)
     doc.setTextColor(212, 175, 55);
-    doc.setFontSize(11); // Reducido levemente para evitar desbordes con tracking
+    doc.setFontSize(12);
     doc.setFont("Roboto", "bold");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2.5); // Tracking uniforme
     
     const titulos = {
       'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
@@ -885,7 +884,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     const tituloPortada = titulos[informe.tipo] || "INFORME TÉCNICO";
 
     doc.text(tituloPortada, pageWidth / 2, 230, { align: 'center' });
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
     // Nombre (Alineación central)
     doc.setTextColor(255, 255, 255);
