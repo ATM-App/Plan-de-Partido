@@ -1281,25 +1281,30 @@ function PublicReportView({ reportId, informesList, goalkeepers }) {
     </div>
   );
 
-  // Helper para medallas/emojis
+  // Helper para medallas/emojis (SEGURO)
   const getPosicionEmoji = (pos) => {
-    if (!pos) return pos;
-    const p = pos.toLowerCase();
+    if (!pos) return '-';
+    const p = String(pos).toLowerCase();
     if (p.includes('campe')) return `🏆 ${pos}`;
     if (p.includes('subcampe') || p.includes('segundo')) return `🥈 ${pos}`;
     if (p.includes('tercer')) return `🥉 ${pos}`;
     return pos;
   };
 
-  // Calcular Resumen Estadístico para Torneos
-  let minsTotales = 0; let golesTotales = 0; let parTotales = report.partidosTorneo?.length || 0;
-  if (report.partidosTorneo) {
+  // Calcular Resumen Estadístico SEGURO (Siempre definidos)
+  let minsTotales = 0; 
+  let golesTotales = 0; 
+  let parTotales = 0;
+  let mediaGoles = '0.00';
+
+  if (report.tipo === 'torneo' && report.partidosTorneo && Array.isArray(report.partidosTorneo)) {
+      parTotales = report.partidosTorneo.length;
       report.partidosTorneo.forEach(m => {
           minsTotales += parseInt(m.minutes) || 0; 
           golesTotales += parseInt(m.goalsConcededByGk !== '-' && m.goalsConcededByGk ? m.goalsConcededByGk : m.goalsRival) || 0;
       });
+      mediaGoles = parTotales > 0 ? (golesTotales / parTotales).toFixed(2) : '0.00';
   }
-  const mediaGoles = parTotales > 0 ? (golesTotales / parTotales).toFixed(2) : '0.00';
 
   // VISTA DEL INFORME PÚBLICO (Optimizada para Móvil / Tablet)
   return (
@@ -1328,7 +1333,7 @@ function PublicReportView({ reportId, informesList, goalkeepers }) {
           <h1 className="text-3xl font-black italic uppercase tracking-tight leading-none mb-1 text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
             {gk?.name || report.gkName}
           </h1>
-          <p className="text-red-400 font-bold tracking-widest text-xs mb-4">{report.category || gk?.team}</p>
+          <p className="text-red-400 font-bold tracking-widest text-xs mb-4">{report.category || gk?.team || 'Atlético de Madrid'}</p>
           
           {report.tipo === 'torneo' && report.titulo && (
             <div className="w-full bg-slate-900/80 backdrop-blur-sm rounded-xl p-3 border border-slate-800 shadow-inner">
@@ -1430,11 +1435,11 @@ function PublicReportView({ reportId, informesList, goalkeepers }) {
             { label: "Áreas de Mejora", val: report.obsImprovements },
             { label: "Análisis Extendido / Mental", val: report.obsMental || report.extendedAnalysis },
           ].map((item, idx) => (
-             item.val ? (
+             item.val && String(item.val).trim() !== '' ? (
                <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-red-500 to-red-600"></div>
                   <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{item.label}</span>
-                  <p className="text-sm text-slate-700 leading-relaxed font-medium">{item.val}</p>
+                  <p className="text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{item.val}</p>
                </div>
              ) : null
           ))}
