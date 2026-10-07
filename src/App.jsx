@@ -850,10 +850,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         img.onerror = () => resolve(null); img.src = url;
     });
 
-    const [atletiShieldB64, rivalShieldB64, torneoLogoB64, iActivity, iTarget, iGit] = await Promise.all([
+    const [atletiShieldB64, rivalShieldB64, torneoLogoB64, qrCodeB64, iActivity, iTarget, iGit] = await Promise.all([
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
         informe.logoTorneo ? safeImgLoad(informe.logoTorneo) : Promise.resolve(null),
+        informe.tipo === 'torneo' ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://atm-app.github.io/Informes-y-Objetivos-GuardianLab/?view=torneo&id=${informe.id || 'NUEVO'}`)}&margin=1`) : Promise.resolve(null),
         loadIconB64('activity', '#e11d48'), 
         loadIconB64('target', '#3b82f6'), 
         loadIconB64('gitCompare', '#10b981')
@@ -911,6 +912,17 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     if (informe.tipo === 'torneo' && torneoLogoB64) {
         // Logo de torneo equilibrado en la izquierda, misma altura
         doc.addImage(torneoLogoB64, 'PNG', 15, 255, 30, 30); 
+    }
+
+    // Dibujar Código QR Centrado (Solo Torneo)
+    if (informe.tipo === 'torneo' && qrCodeB64) {
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(pageWidth / 2 - 12.5, 257, 25, 25, 2, 2, 'F');
+        doc.addImage(qrCodeB64, 'PNG', pageWidth / 2 - 11.5, 258, 23, 23);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(6);
+        doc.setFont("Roboto", "bold");
+        doc.text("ESCANEAR INFORME", pageWidth / 2, 285, { align: 'center' });
     }
 
     // ==========================================
