@@ -1058,7 +1058,9 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         let minsTotales = 0; let golesTotales = 0; let parTotales = informe.partidosTorneo?.length || 0;
         if (informe.partidosTorneo) {
             informe.partidosTorneo.forEach(m => {
-                minsTotales += parseInt(m.minutes) || 0; golesTotales += parseInt(m.goalsRival) || 0;
+                minsTotales += parseInt(m.minutes) || 0; 
+                // Usar los goles marcados ESPECÍFICAMENTE al portero, si no está el dato, usa los del equipo.
+                golesTotales += parseInt(m.goalsConcededByGk !== '-' && m.goalsConcededByGk ? m.goalsConcededByGk : m.goalsRival) || 0;
             });
         }
         const mediaGoles = parTotales > 0 ? (golesTotales / parTotales).toFixed(2) : '0.00';
@@ -3671,7 +3673,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
      }
   };
 
-  const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', minutes: '' }] }));
+  const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', goalsConcededByGk: '-', minutes: '' }] }));
   const removeMatch = (id) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.filter(m => m.id !== id) }));
   const updateMatch = (id, field, value) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.map(m => m.id === id ? { ...m, [field]: value } : m) }));
 
@@ -4204,7 +4206,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
                                   <input type="text" placeholder="Nombre Rival" value={match.rival} onChange={(e) => updateMatch(match.id, 'rival', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
                                   <input type="text" placeholder="País (Opcional)" value={match.country} onChange={(e) => updateMatch(match.id, 'country', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                   <div>
                                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Goles ATM</label>
                                      <select value={match.goalsATM} onChange={(e) => updateMatch(match.id, 'goalsATM', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors">
@@ -4212,11 +4214,30 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
                                      </select>
                                   </div>
                                   <div>
-                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Goles Rival (Recibidos por GK)</label>
-                                     <select value={match.goalsRival} onChange={(e) => updateMatch(match.id, 'goalsRival', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors">
+                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Goles Rival</label>
+                                     <select value={match.goalsRival} onChange={(e) => {
+                                         updateMatch(match.id, 'goalsRival', e.target.value);
+                                         // Si ponen '-', resetear goles encajados también
+                                         if(e.target.value === '-') updateMatch(match.id, 'goalsConcededByGk', '-');
+                                     }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-red-500 transition-colors">
                                         <option value="-">-</option>{[0,1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}</option>)}
                                      </select>
                                   </div>
+                                  
+                                  {/* CAMPO CONDICIONAL SI HAY GOLES DEL RIVAL */}
+                                  <div>
+                                     {match.goalsRival !== '-' && parseInt(match.goalsRival) > 0 ? (
+                                        <div className="animate-in fade-in zoom-in duration-300">
+                                            <label className="block text-[10px] font-black uppercase tracking-widest text-amber-500 mb-2 pl-2" title="Goles que encajó específicamente este portero">Recibidos GK</label>
+                                            <select value={match.goalsConcededByGk} onChange={(e) => updateMatch(match.id, 'goalsConcededByGk', e.target.value)} className="w-full bg-amber-500/10 border border-amber-500/50 rounded-xl px-4 py-3 text-amber-500 font-bold outline-none focus:border-amber-400 focus:bg-amber-500/20 transition-all shadow-inner">
+                                                <option value="-">-</option>
+                                                {/* Crear array dinámico basado en los goles del rival */}
+                                                {Array.from({length: parseInt(match.goalsRival) + 1}, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
+                                            </select>
+                                        </div>
+                                     ) : <div className="h-full"></div>}
+                                  </div>
+
                                   <div className="flex gap-3 items-center">
                                      <div className="flex-1">
                                          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 pl-2">Min. Jugados</label>
