@@ -1368,9 +1368,8 @@ export default function App() {
   const [role, setRole] = useState(null); 
   const [loadingAuth, setLoadingAuth] = useState(true);
   
-  // Hemos añadido 'informes' al control de carga
-  const [dataLoaded, setDataLoaded] = useState({ users: false, gks: false, rivals: false, matches: false, informes: false });
-  const isDataLoading = !dataLoaded.users || !dataLoaded.gks || !dataLoaded.rivals || !dataLoaded.matches || !dataLoaded.informes;
+  const [dataLoaded, setDataLoaded] = useState({ users: false, gks: false, rivals: false, matches: false });
+  const isDataLoading = !dataLoaded.users || !dataLoaded.gks || !dataLoaded.rivals || !dataLoaded.matches;
 
   const [goalkeepers, setGoalkeepers] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -1416,7 +1415,15 @@ export default function App() {
   const [viewLockerRoom, setViewLockerRoom] = useState(true);
   const [lockerSelectedGk, setLockerSelectedGk] = useState(null);
 
-  // EFECTO DE AUTENTICACIÓN
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gkParam = params.get('gk');
+    if (gkParam) {
+      setSelectedGkId(gkParam);
+      setCurrentModule('reporte_detalle');
+    }
+  }, []);
+
   useEffect(() => {
     if (!auth) { setLoadingAuth(false); return; }
     const initAuth = async () => {
@@ -1426,9 +1433,7 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (error) { 
-        showNotification("Error de autenticación", "error"); 
-      }
+      } catch (error) { showNotification("Error de autenticación", "error"); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -1438,7 +1443,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // EFECTO DE CARGA DE DATOS DE FIREBASE
   useEffect(() => {
     if (!user || !db) return;
 
@@ -1450,9 +1454,15 @@ export default function App() {
 
     const unsubUsers = onSnapshot(usersRef, (snapshot) => {
       const uList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
       if (uList.length === 0 && user.uid) {
         const defaultAdmin = {
-          role: 'admin', username: 'admin', email: 'admin@atleti.com', password: '123', name: 'Administrador', photoUrl: ''
+          role: 'admin',
+          username: 'admin',
+          email: 'admin@atleti.com',
+          password: '123',
+          name: 'Administrador',
+          photoUrl: ''
         };
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'admin-user'), defaultAdmin).catch(console.error);
         setUsersList([{ id: 'admin-user', ...defaultAdmin }]);
@@ -1460,14 +1470,18 @@ export default function App() {
         setUsersList(uList);
         if (appUser) {
            const updatedMe = uList.find(u => u.id === appUser.id);
-           if (updatedMe) { setAppUser(updatedMe); setRole(updatedMe.role); }
+           if (updatedMe) {
+               setAppUser(updatedMe);
+               setRole(updatedMe.role);
+           }
         }
       }
       setDataLoaded(prev => ({...prev, users: true}));
     });
 
     const unsubGk = onSnapshot(gkRef, (snapshot) => {
-      setGoalkeepers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const gks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setGoalkeepers(gks);
       setDataLoaded(prev => ({...prev, gks: true}));
     });
 
@@ -1480,57 +1494,23 @@ export default function App() {
       const mList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMatches(mList);
       const dbSeasons = Array.from(new Set(mList.map(m => m.season).filter(Boolean)));
-      if (dbSeasons.length > 0) setAvailableSeasons(prev => Array.from(new Set([...prev, ...dbSeasons])).sort().reverse());
+      if (dbSeasons.length > 0) {
+        setAvailableSeasons(prev => Array.from(new Set([...prev, ...dbSeasons])).sort().reverse());
+      }
       setDataLoaded(prev => ({...prev, matches: true}));
     });
 
     const unsubInformes = onSnapshot(informesRef, (snapshot) => {
       setInformesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setDataLoaded(prev => ({...prev, informes: true})); // AVISAMOS DE QUE YA HAY INFORMES
     });
 
     return () => { unsubUsers(); unsubGk(); unsubRivals(); unsubMatches(); unsubInformes(); };
   }, [user, appUser]);
 
-  // ===============================================
-  // CONDICIONALES DE RENDERIZADO PRINCIPALES
-  // ===============================================
-
-  // 1. Si está cargando la autenticación inicial, mostramos spinner
-  if (loadingAuth) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-blue-950 text-white font-sans">
-        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  // 2. VISTA PÚBLICA (QR) - Prioridad absoluta
-  // Si nos piden una vista pública, esperamos a que carguen SOLO los informes y los porteros.
+  // Si publicReportViewId tiene un valor, renderizamos SOLO la vista pública.
+  // IMPORTANTE: Lo hacemos DESPUÉS de los useEffects para que Firebase haya cargado los informesList.
   if (publicReportViewId) {
-    if (!dataLoaded.informes || !dataLoaded.gks) {
-       return (
-         <div className="flex h-screen items-center justify-center bg-slate-950">
-           <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-         </div>
-       );
-    }
-    // Si ya cargaron, mostramos la vista pública directamente y cortamos la ejecución aquí
     return <PublicReportView reportId={publicReportViewId} informesList={informesList} goalkeepers={goalkeepers} />;
-  }
-
-  // 3. Si no es vista pública, pedimos Login (si no está logueado)
-  if (!appUser) {
-    return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
-  }
-
-  // 4. Si está logueado pero cargando los datos de la app privada, mostramos spinner
-  if (user && isDataLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-blue-950 text-white font-sans">
-        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
   }
 
   const visibleGoalkeepers = useMemo(() => {
