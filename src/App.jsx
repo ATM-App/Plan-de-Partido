@@ -818,7 +818,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
 };
 
 // ==========================================
-// GENERADOR DE PDF MAESTRO (VERSIÓN ÉLITE ESTRUCTURADA)
+// GENERADOR DE PDF MAESTRO (VERSIÓN ÉLITE ESTRUCTURADA - CORRECCIÓN LOGO Y MEDALLA VECTORIAL)
 // ==========================================
 const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotification) => {
   try {
@@ -850,7 +850,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         img.onerror = () => resolve(null); img.src = url;
     });
 
-    // Cargar Escudos e Iconos
     const [atletiShieldB64, rivalShieldB64, torneoLogoB64, iActivity, iTarget, iGit] = await Promise.all([
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
@@ -868,18 +867,13 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     doc.setFillColor(...p.blueDark);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Dorsal de fondo
     doc.setTextColor(20, 30, 60);
     doc.setFontSize(250);
     doc.setFont("Roboto", "bolditalic");
     doc.text(String(gk.number || ''), pageWidth / 2, 220, { align: 'center' });
 
-    // Foto Jugador
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
-    // =====================================
-    // CENTRADO PERFECTO DEL TÍTULO DORADO
-    // =====================================
     const titulos = {
       'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
       'partido': "ANÁLISIS DE RENDIMIENTO EN PARTIDO",
@@ -891,20 +885,16 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     
     doc.setFontSize(11);
     doc.setFont("Roboto", "bold");
-    doc.setTextColor(212, 175, 55); // Dorado
-    // Se elimina setCharSpace para que el calculo del centro sea exacto por parte de jsPDF
+    doc.setTextColor(212, 175, 55); 
     const tituloWidth = doc.getTextWidth(tituloString);
     const centerX = (pageWidth - tituloWidth) / 2;
     doc.text(tituloString, centerX, 230);
-    // =====================================
 
-    // Nombre del Jugador
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(30);
     doc.setFont("Roboto", "bolditalic");
     doc.text(gk.name.toUpperCase(), pageWidth / 2, 242, { align: 'center' });
 
-    // Píldora Inferior
     doc.setFillColor(220, 38, 38);
     let subtitleText = `${gk.team || 'ATLETI'} | ${informe.fecha || ''}`;
     if (informe.tipo === 'torneo' && informe.titulo) subtitleText = `${informe.titulo.toUpperCase()} | ${gk.team} | ${informe.fecha}`;
@@ -916,11 +906,11 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     doc.setTextColor(255, 255, 255);
     doc.text(subtitleText, pageWidth / 2, 253.5, { align: 'center' });
 
-    // Logos Superiores
-    if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 25, 10, 15, 15);
+    // Logos Inferiores Alineados
+    if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 45, 255, 30, 30);
     if (informe.tipo === 'torneo' && torneoLogoB64) {
-        // Añade el logo del torneo a la izquierda si existe
-        doc.addImage(torneoLogoB64, 'PNG', 10, 10, 15, 15); 
+        // Logo de torneo equilibrado en la izquierda, misma altura
+        doc.addImage(torneoLogoB64, 'PNG', 15, 255, 30, 30); 
     }
 
     // ==========================================
@@ -993,24 +983,17 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += h + 4;
     };
 
-    // Helper ajustado matemáticamente para alinear la columna derecha
     const printDots = (x, y, label, scoreStr, max = 4, isRightCol = false) => {
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
-        
         let safeLabel = label; if(doc.getTextWidth(safeLabel) > 40) safeLabel = safeLabel.substring(0, 18) + '...';
         doc.text(safeLabel, x, y);
-        
-        // Coordenada exacta para los puntos: Si es columna derecha, los acerca al texto. Si es izq, los aleja un poco.
         let dX = isRightCol ? x + 40 : x + 50; 
-        
         for(let i=1; i<=max; i++) {
            doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
            doc.circle(dX, y - 1.2, 1.8, 'F'); dX += 6;
         }
-        
-        doc.setTextColor(...p.textMuted); doc.setFontSize(7); 
-        doc.text(`${score}/${max}`, dX + 2, y);
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
     };
 
     const getValColor = (valStr) => {
@@ -1022,36 +1005,52 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         return p.accent; 
     };
 
+    // Helper Dibujo Vectorial Medalla/Copa
+    const drawMedalIcon = (x, y, rank) => {
+        if (rank === 1) { // Copa Dorada
+            doc.setFillColor(250, 204, 21); // yellow-400
+            doc.triangle(x-3, y-4, x+3, y-4, x, y+2, 'F');
+            doc.rect(x-1.5, y+2, 3, 2, 'F');
+            doc.rect(x-2.5, y+4, 5, 1.5, 'F');
+            doc.setFillColor(253, 224, 71); // Detalles
+            doc.circle(x-3.5, y-2, 1.5, 'F'); doc.circle(x+3.5, y-2, 1.5, 'F');
+        } else { // Medalla (Plata o Bronce)
+            doc.setFillColor(220, 38, 38); doc.triangle(x-2, y-4, x, y-1, x, y-4, 'F'); // Cinta roja
+            doc.setFillColor(255, 255, 255); doc.triangle(x+2, y-4, x, y-1, x, y-4, 'F'); // Cinta blanca
+            doc.setFillColor(rank === 2 ? 148 : 180, rank === 2 ? 163 : 83, rank === 2 ? 184 : 9); // Color Metal
+            doc.circle(x, y+1, 3, 'F');
+            doc.setFillColor(255,255,255); doc.setFontSize(5); doc.text(String(rank), x, y+2, {align:'center'});
+        }
+    };
+
     // ==========================================
     // LÓGICA DE DIBUJO POR TIPO DE INFORME
     // ==========================================
     
-    // ------------------------------------------
-    // 🏆 INFORME DE TORNEO (REDSIEÑO TOP ESTRUCTURA)
-    // ------------------------------------------
     if (informe.tipo === 'torneo') {
         printHeader("Resumen del Torneo", iActivity);
         
         doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 30, 2, 2, 'FD');
         
-        // Cabecera Interna Torneo
         doc.setTextColor(...p.blueDark); doc.setFontSize(16); doc.setFont("Roboto", "bolditalic");
         doc.text(String(informe.titulo).toUpperCase() || 'TORNEO NO DEFINIDO', 20, currentY + 10);
         doc.setTextColor(...p.textMuted); doc.setFontSize(9); doc.setFont("Roboto", "bold");
         doc.text(`${informe.ubicacionTorneo || '-'} | Superficie: ${informe.superficieTorneo || '-'}`, 20, currentY + 16);
         doc.setTextColor(...p.textMain); doc.text(`Categoría: ${gk.team}`, 20, currentY + 24);
         
-        // MEDALLA DE POSICIÓN FINAL
-        let medalla = ''; let mColor = p.blueDark;
+        // MEDALLA DE POSICIÓN FINAL (Renderizada Vectorialmente)
+        let medalla = informe.posFinalTorneo?.toUpperCase() || '-'; let mColor = p.blueDark; let mRank = 0;
         const posLower = (informe.posFinalTorneo || '').toLowerCase();
-        if (posLower.includes('campe')) { medalla = '🏆 CAMPEÓN'; mColor = [234, 179, 8]; } // Dorado
-        else if (posLower.includes('subcampe') || posLower.includes('segundo')) { medalla = '🥈 SUBCAMPEÓN'; mColor = [148, 163, 184]; } // Plata
-        else if (posLower.includes('tercer')) { medalla = '🥉 3º PUESTO'; mColor = [180, 83, 9]; } // Bronce
-        else medalla = informe.posFinalTorneo?.toUpperCase() || '-';
+        if (posLower.includes('campe')) { mColor = [234, 179, 8]; mRank = 1; medalla = 'CAMPEÓN'; } 
+        else if (posLower.includes('subcampe') || posLower.includes('segundo')) { mColor = [148, 163, 184]; mRank = 2; medalla = 'SUBCAMPEÓN'; } 
+        else if (posLower.includes('tercer')) { mColor = [180, 83, 9]; mRank = 3; medalla = '3º PUESTO'; } 
 
-        doc.setFillColor(...mColor); doc.roundedRect(130, currentY + 6, 50, 18, 2, 2, 'F');
-        doc.setTextColor(255,255,255); doc.setFontSize(7); doc.text("POSICIÓN FINAL", 155, currentY + 12, {align: 'center'});
-        doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(medalla, 155, currentY + 19, {align: 'center'});
+        doc.setFillColor(...mColor); doc.roundedRect(125, currentY + 6, 55, 18, 2, 2, 'F');
+        doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont("Roboto", "bold"); 
+        doc.text("POSICIÓN FINAL", 152.5, currentY + 12, {align: 'center'});
+        if(mRank > 0) drawMedalIcon(132, currentY + 17.5, mRank); // Dibujar Medalla
+        doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); 
+        doc.text(medalla, 152.5 + (mRank > 0 ? 3 : 0), currentY + 19, {align: 'center'});
         currentY += 35;
 
         // SCOREBOARD ESTADÍSTICO GIGANTE
@@ -1125,14 +1124,12 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         };
         doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 45, 2, 2, 'FD');
         printDotsCol(20, currentY + 10, [{l:'Personalidad', k:'valPersonalidad'}, {l:'Capacidad Mando', k:'valMando'}, {l:'Concentración', k:'valConc'}, {l:'Confianza', k:'valConfianza'}], false);
-        // Columna derecha alineada
         printDotsCol(115, currentY + 10, [{l:'Gestión Error', k:'valError'}, {l:'Mentalidad Comp.', k:'valMentalidad'}, {l:'Actitud tras Gol', k:'valActitudGol'}], true);
         currentY += 55;
 
         printHeader("Evolución y Táctica (1 a 5)", iTarget);
         doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 35, 2, 2, 'FD');
         printDotsCol(20, currentY + 10, [{l:'1º vs Último Part.', k:'valPrimerUltimo'}, {l:'Adapt. Ritmo', k:'valRitmo'}, {l:'Adapt. Entorno', k:'valEntorno'}], false);
-        // Columna derecha alineada
         printDotsCol(115, currentY + 10, [{l:'Rend. 1vs1', k:'val1v1'}, {l:'Organización', k:'valOrg'}, {l:'Comunicación', k:'valCom'}], true);
         currentY += 45;
 
@@ -1146,9 +1143,6 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         printBox(15, currentY, 60, 20, "EVALUACIÓN DEL CUERPO TÉCNICO", informe.valoracionGeneral, getValColor(informe.valoracionGeneral));
     }
 
-    // ------------------------------------------
-    // 📝 PARTIDO, OBJETIVOS, FLASH Y SEMESTRAL (MANTENIDOS)
-    // ------------------------------------------
     else if (informe.tipo === 'partido') {
         printHeader("Contexto del Encuentro", iActivity);
         doc.setFillColor(...p.blueDark); doc.roundedRect(15, currentY, 180, 22, 3, 3, 'F');
