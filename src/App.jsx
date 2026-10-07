@@ -1257,11 +1257,10 @@ const FormTextarea = ({ label, className = "", ...props }) => (
   </div>
 );
 
-/// ==========================================
+// ==========================================
 // COMPONENTE: VISTA PÚBLICA DE INFORME (PARA QR)
 // ==========================================
 function PublicReportView({ reportId, informesList, goalkeepers }) {
-  // Encontramos el informe en la lista que ya cargó la App
   const report = informesList.find(inf => inf.id === reportId);
   const gk = report ? goalkeepers.find(g => g.id === report.gkId) : null;
 
@@ -1282,78 +1281,165 @@ function PublicReportView({ reportId, informesList, goalkeepers }) {
     </div>
   );
 
+  // Helper para medallas/emojis
+  const getPosicionEmoji = (pos) => {
+    if (!pos) return pos;
+    const p = pos.toLowerCase();
+    if (p.includes('campe')) return `🏆 ${pos}`;
+    if (p.includes('subcampe') || p.includes('segundo')) return `🥈 ${pos}`;
+    if (p.includes('tercer')) return `🥉 ${pos}`;
+    return pos;
+  };
+
+  // Calcular Resumen Estadístico para Torneos
+  let minsTotales = 0; let golesTotales = 0; let parTotales = report.partidosTorneo?.length || 0;
+  if (report.partidosTorneo) {
+      report.partidosTorneo.forEach(m => {
+          minsTotales += parseInt(m.minutes) || 0; 
+          golesTotales += parseInt(m.goalsConcededByGk !== '-' && m.goalsConcededByGk ? m.goalsConcededByGk : m.goalsRival) || 0;
+      });
+  }
+  const mediaGoles = parTotales > 0 ? (golesTotales / parTotales).toFixed(2) : '0.00';
+
   // VISTA DEL INFORME PÚBLICO (Optimizada para Móvil / Tablet)
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
-      <div className="bg-slate-950 text-white p-6 pt-10 shadow-xl rounded-b-3xl relative overflow-hidden">
+      
+      {/* 1. CABECERA PREMIUM (Foto y Título) */}
+      <div className="bg-slate-950 text-white p-6 pt-10 shadow-xl rounded-b-[2rem] relative overflow-hidden">
+        {/* Fondo Imagen Jugador si existe */}
+        {gk?.photoUrl && (
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <img src={gk.photoUrl} alt="" className="w-full h-full object-cover object-top filter blur-sm" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent"></div>
+          </div>
+        )}
         <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
           <Shield size={120} />
         </div>
-        <div className="relative z-10">
-          <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block">
-            Informe Oficial • GuardianLab
+        
+        <div className="relative z-10 flex flex-col items-center text-center">
+          {gk?.photoUrl && (
+            <img src={gk.photoUrl} alt={gk.name} className="w-24 h-24 rounded-full object-cover object-top border-4 border-red-600 shadow-lg mb-4 bg-slate-800" />
+          )}
+          <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3 inline-block shadow-md">
+            Informe Oficial • {report.tipo === 'torneo' ? 'Torneo' : 'Partido'}
           </span>
-          <h1 className="text-3xl font-black italic uppercase tracking-tight leading-tight mb-2">
-            {report.titulo || "Informe de Rendimiento"}
+          <h1 className="text-3xl font-black italic uppercase tracking-tight leading-none mb-1 text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
+            {gk?.name || report.gkName}
           </h1>
-          <p className="text-slate-400 font-bold tracking-wide flex flex-col gap-1">
-            <span>👤 Jugador: <span className="text-white">{report.gkName || gk?.name}</span></span>
-            <span>📅 Fecha: <span className="text-white">{report.fecha}</span></span>
-          </p>
+          <p className="text-red-400 font-bold tracking-widest text-xs mb-4">{report.category || gk?.team}</p>
+          
+          {report.tipo === 'torneo' && report.titulo && (
+            <div className="w-full bg-slate-900/80 backdrop-blur-sm rounded-xl p-3 border border-slate-800 shadow-inner">
+               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Torneo Disputado</span>
+               <h2 className="text-lg font-bold text-amber-500">{report.titulo}</h2>
+               <p className="text-xs text-slate-400">{report.fecha}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="p-4 space-y-6 -mt-4 relative z-20">
+      <div className="p-4 space-y-6 -mt-6 relative z-20">
+        
+        {/* 2. NOTA GLOBAL Y POSICIÓN (Tarjetas Destacadas) */}
         {(report.posFinalTorneo || report.valoracionGeneral) && (
           <div className="grid grid-cols-2 gap-4">
              {report.posFinalTorneo && (
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+               <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center text-center transform hover:scale-105 transition-transform">
                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Posición Final</span>
-                 <span className="text-lg font-black text-slate-800 uppercase">{report.posFinalTorneo}</span>
+                 <span className="text-lg font-black text-slate-800 uppercase">{getPosicionEmoji(report.posFinalTorneo)}</span>
                </div>
              )}
              {report.valoracionGeneral && (
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+               <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center text-center transform hover:scale-105 transition-transform">
                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Nota Global</span>
-                 <span className="text-lg font-black text-red-600 uppercase">{report.valoracionGeneral}</span>
+                 <span className="text-2xl font-black text-red-600 uppercase">{report.valoracionGeneral}</span>
                </div>
              )}
           </div>
         )}
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
-              <Activity size={16} className="text-red-500"/> Información General
-           </h3>
-           <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
-              {report.ubicacionTorneo && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Ubicación</span><span className="font-semibold text-slate-700">{report.ubicacionTorneo}</span></div>}
-              {report.superficieTorneo && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Superficie</span><span className="font-semibold text-slate-700">{report.superficieTorneo}</span></div>}
-              {report.partidoCompeticion && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Competición</span><span className="font-semibold text-slate-700">{report.partidoCompeticion}</span></div>}
-              {report.rival && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Rival</span><span className="font-semibold text-slate-700">{report.rival}</span></div>}
-              {report.partidoResultado && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Resultado</span><span className="font-semibold text-slate-700">{report.partidoResultado}</span></div>}
-           </div>
-        </div>
+        {/* 3. RESUMEN ESTADÍSTICO (SCOREBOARD SI ES TORNEO) */}
+        {report.tipo === 'torneo' && (
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+             <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2 mb-4">
+                <Activity size={16} className="text-blue-500"/> Resumen Estadístico
+             </h3>
+             <div className="grid grid-cols-4 gap-2 text-center divide-x divide-slate-100">
+                <div>
+                   <span className="block text-2xl font-black italic text-slate-800">{parTotales}</span>
+                   <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">PJ</span>
+                </div>
+                <div>
+                   <span className="block text-2xl font-black italic text-slate-800">{minsTotales}</span>
+                   <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Min.</span>
+                </div>
+                <div>
+                   <span className="block text-2xl font-black italic text-slate-800 text-red-500">{golesTotales}</span>
+                   <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Goles Rec.</span>
+                </div>
+                <div>
+                   <span className="block text-2xl font-black italic text-slate-800 text-blue-500">{mediaGoles}</span>
+                   <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Media</span>
+                </div>
+             </div>
+          </div>
+        )}
 
-        <div className="space-y-4">
-          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest ml-2 flex items-center gap-2">
+        {/* 4. LISTADO DE PARTIDOS DISPUTADOS */}
+        {report.tipo === 'torneo' && report.partidosTorneo && report.partidosTorneo.length > 0 && (
+           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+             <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2 mb-2">
+                <Shield size={16} className="text-emerald-500"/> Detalle de Partidos
+             </h3>
+             <div className="space-y-3">
+                {report.partidosTorneo.map((match, idx) => (
+                  <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex flex-col gap-2">
+                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                       <span>{match.matchday || `Partido ${idx+1}`}</span>
+                       <span>{match.minutes || '0'} Min. Jugados</span>
+                     </div>
+                     <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                       <span className="font-bold text-sm text-slate-700 truncate pr-2">VS {match.rival || 'Desconocido'}</span>
+                       <div className="flex gap-2 text-xs font-black shrink-0">
+                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{match.goalsATM || 0}</span>
+                         <span className="text-slate-300">-</span>
+                         <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100" title="Goles recibidos por este portero">
+                           {match.goalsConcededByGk !== '-' && match.goalsConcededByGk ? match.goalsConcededByGk : (match.goalsRival || 0)}
+                         </span>
+                       </div>
+                     </div>
+                  </div>
+                ))}
+             </div>
+           </div>
+        )}
+
+        {/* 5. NOTAS DEL CUERPO TÉCNICO */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest ml-2 flex items-center gap-2 mb-2">
               <Target size={16} className="text-red-500"/> Notas del Cuerpo Técnico
           </h3>
           {[
             { label: "Paradas y Juego Ofensivo", val: report.obsParadas || report.obsTecnicoTacticas },
-            { label: "Fase Defensiva", val: report.obsGoles || report.obsActitudinales },
-            { label: "Análisis Extendido / Mental", val: report.obsMental || report.extendedAnalysis },
+            { label: "Fase Defensiva y Goles", val: report.obsGoles || report.obsActitudinales },
+            { label: "Rendimiento en Penaltis", val: report.obsPenaltis },
+            { label: "Acciones Decisivas", val: report.obsDecisivas },
             { label: "Puntos Positivos", val: report.obsPos },
             { label: "Áreas de Mejora", val: report.obsImprovements },
-            { label: "Propuesta de Scouting", val: report.flashPropuesta },
+            { label: "Análisis Extendido / Mental", val: report.obsMental || report.extendedAnalysis },
           ].map((item, idx) => (
              item.val ? (
-               <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                  <span className="block text-[10px] font-black uppercase tracking-widest text-red-500 mb-2">{item.label}</span>
-                  <p className="text-sm text-slate-600 leading-relaxed">{item.val}</p>
+               <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-red-500 to-red-600"></div>
+                  <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{item.label}</span>
+                  <p className="text-sm text-slate-700 leading-relaxed font-medium">{item.val}</p>
                </div>
              ) : null
           ))}
         </div>
+
       </div>
     </div>
   );
