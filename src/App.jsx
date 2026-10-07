@@ -1257,44 +1257,21 @@ const FormTextarea = ({ label, className = "", ...props }) => (
   </div>
 );
 
-// ==========================================
+/// ==========================================
 // COMPONENTE: VISTA PÚBLICA DE INFORME (PARA QR)
 // ==========================================
-function PublicReportView({ reportId, theme }) {
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+function PublicReportView({ reportId, informesList, goalkeepers }) {
+  // Encontramos el informe en la lista que ya cargó la App
+  const report = informesList.find(inf => inf.id === reportId);
+  const gk = report ? goalkeepers.find(g => g.id === report.gkId) : null;
 
-  useEffect(() => {
-    const fetchReport = async () => {
-      try {
-        const { collection, getDocs, getFirestore } = await import('firebase/firestore');
-        const db = getFirestore();
-        const informesRef = collection(db, 'artifacts', typeof __app_id !== 'undefined' ? __app_id : 'default-app-id', 'public', 'data', 'informes');
-        const querySnapshot = await getDocs(informesRef);
-        
-        let foundReport = null;
-        querySnapshot.forEach((doc) => {
-          if (doc.id === reportId) {
-            foundReport = { id: doc.id, ...doc.data() };
-          }
-        });
-        
-        setReport(foundReport);
-      } catch (error) {
-        console.error("Error cargando informe público:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (reportId) fetchReport();
-  }, [reportId]);
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-    </div>
-  );
+  if (!informesList.length || !goalkeepers.length) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
 
   if (!report) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-bold p-6 text-center">
@@ -1320,7 +1297,7 @@ function PublicReportView({ reportId, theme }) {
             {report.titulo || "Informe de Rendimiento"}
           </h1>
           <p className="text-slate-400 font-bold tracking-wide flex flex-col gap-1">
-            <span>👤 Jugador: <span className="text-white">{report.gkName}</span></span>
+            <span>👤 Jugador: <span className="text-white">{report.gkName || gk?.name}</span></span>
             <span>📅 Fecha: <span className="text-white">{report.fecha}</span></span>
           </p>
         </div>
@@ -1386,24 +1363,6 @@ function PublicReportView({ reportId, theme }) {
 // COMPONENTE PRINCIPAL
 // ==========================================
 export default function App() {
-  // LÓGICA VISTA PÚBLICA POR QR (Esto frena todo lo demás si detecta el ID)
-  const [publicReportViewId, setPublicReportViewId] = useState(null);
-
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const viewParam = searchParams.get('view');
-    const idParam = searchParams.get('id');
-
-    if ((viewParam === 'torneo' || viewParam === 'informe') && idParam) {
-      setPublicReportViewId(idParam);
-    }
-  }, []);
-
-  if (publicReportViewId) {
-    return <PublicReportView reportId={publicReportViewId} />;
-  }
-  // --- FIN LÓGICA VISTA PÚBLICA ---
-
   const [user, setUser] = useState(null); 
   const [appUser, setAppUser] = useState(null); 
   const [role, setRole] = useState(null); 
@@ -1417,6 +1376,19 @@ export default function App() {
   const [rivals, setRivals] = useState([]);
   const [matches, setMatches] = useState([]);
   const [informesList, setInformesList] = useState([]);
+
+  // LÓGICA VISTA PÚBLICA POR QR
+  const [publicReportViewId, setPublicReportViewId] = useState(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const viewParam = searchParams.get('view');
+    const idParam = searchParams.get('id');
+
+    if ((viewParam === 'torneo' || viewParam === 'informe') && idParam) {
+      setPublicReportViewId(idParam);
+    }
+  }, []);
 
   const [darkMode, setDarkMode] = useState(false);
   const [currentModule, setCurrentModule] = useState('inicio');
@@ -1534,6 +1506,12 @@ export default function App() {
 
     return () => { unsubUsers(); unsubGk(); unsubRivals(); unsubMatches(); unsubInformes(); };
   }, [user, appUser]);
+
+  // Si publicReportViewId tiene un valor, renderizamos SOLO la vista pública.
+  // IMPORTANTE: Lo hacemos DESPUÉS de los useEffects para que Firebase haya cargado los informesList.
+  if (publicReportViewId) {
+    return <PublicReportView reportId={publicReportViewId} informesList={informesList} goalkeepers={goalkeepers} />;
+  }
 
   const visibleGoalkeepers = useMemo(() => {
     if (role === 'admin' || role === 'staff') return goalkeepers;
