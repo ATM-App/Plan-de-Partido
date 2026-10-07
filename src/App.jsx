@@ -878,7 +878,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     if (photoB64) doc.addImage(photoB64, 'PNG', 35, 40, 140, 168);
     
     // =====================================
-    // SOLUCIÓN DEFINITIVA: CENTRADO MATEMÁTICO DEL TÍTULO DORADO
+    // CENTRADO PERFECTO DEL TÍTULO DORADO
     // =====================================
     const titulos = {
       'objetivos': "PLANIFICACIÓN Y OBJETIVOS",
@@ -889,17 +889,13 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     };
     const tituloString = titulos[informe.tipo] || "INFORME TÉCNICO";
     
-    // Pre-medir el texto para forzar el centro
     doc.setFontSize(11);
     doc.setFont("Roboto", "bold");
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(2.5);
+    doc.setTextColor(212, 175, 55); // Dorado
+    // Se elimina setCharSpace para que el calculo del centro sea exacto por parte de jsPDF
     const tituloWidth = doc.getTextWidth(tituloString);
     const centerX = (pageWidth - tituloWidth) / 2;
-    
-    doc.setTextColor(212, 175, 55); // Dorado
-    // Usamos el 'X' calculado en lugar de 'align: center' que fallaba con el CharSpace
     doc.text(tituloString, centerX, 230);
-    if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
     // =====================================
 
     // Nombre del Jugador
@@ -923,7 +919,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
     // Logos Superiores
     if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 25, 10, 15, 15);
     if (informe.tipo === 'torneo' && torneoLogoB64) {
-        doc.addImage(torneoLogoB64, 'PNG', 10, 10, 20, 20); // Logo Torneo izq
+        // Añade el logo del torneo a la izquierda si existe
+        doc.addImage(torneoLogoB64, 'PNG', 10, 10, 15, 15); 
     }
 
     // ==========================================
@@ -996,17 +993,24 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         currentY += h + 4;
     };
 
+    // Helper ajustado matemáticamente para alinear la columna derecha
     const printDots = (x, y, label, scoreStr, max = 4, isRightCol = false) => {
         const score = parseInt(scoreStr) || 0;
         doc.setTextColor(...p.textMain); doc.setFontSize(8); doc.setFont("Roboto", "bold");
+        
         let safeLabel = label; if(doc.getTextWidth(safeLabel) > 40) safeLabel = safeLabel.substring(0, 18) + '...';
         doc.text(safeLabel, x, y);
-        let dX = isRightCol ? x + 45 : x + 55; 
+        
+        // Coordenada exacta para los puntos: Si es columna derecha, los acerca al texto. Si es izq, los aleja un poco.
+        let dX = isRightCol ? x + 40 : x + 50; 
+        
         for(let i=1; i<=max; i++) {
            doc.setFillColor(i <= score ? p.accent[0] : 226, i <= score ? p.accent[1] : 232, i <= score ? p.accent[2] : 240);
            doc.circle(dX, y - 1.2, 1.8, 'F'); dX += 6;
         }
-        doc.setTextColor(...p.textMuted); doc.setFontSize(7); doc.text(`${score}/${max}`, dX + 2, y);
+        
+        doc.setTextColor(...p.textMuted); doc.setFontSize(7); 
+        doc.text(`${score}/${max}`, dX + 2, y);
     };
 
     const getValColor = (valStr) => {
@@ -1047,7 +1051,7 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 
         doc.setFillColor(...mColor); doc.roundedRect(130, currentY + 6, 50, 18, 2, 2, 'F');
         doc.setTextColor(255,255,255); doc.setFontSize(7); doc.text("POSICIÓN FINAL", 155, currentY + 12, {align: 'center'});
-        doc.setFontSize(12); doc.setFont("Roboto", "bolditalic"); doc.text(medalla, 155, currentY + 19, {align: 'center'});
+        doc.setFontSize(11); doc.setFont("Roboto", "bolditalic"); doc.text(medalla, 155, currentY + 19, {align: 'center'});
         currentY += 35;
 
         // SCOREBOARD ESTADÍSTICO GIGANTE
@@ -1116,18 +1120,20 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.addPage(); doc.setFillColor(...p.bg); doc.rect(0, 0, pageWidth, pageHeight, 'F'); drawPageHeader(); currentY = 45;
 
         printHeader("Perfil Psicológico y Actitudinal (1 a 5)", iGit);
-        const printDotsCol = (x, y, items) => {
-            let tempY = y; items.forEach(it => { printDots(x, tempY, it.l, informe[it.k], 5); tempY += 10; }); return tempY;
+        const printDotsCol = (x, y, items, isRight) => {
+            let tempY = y; items.forEach(it => { printDots(x, tempY, it.l, informe[it.k], 5, isRight); tempY += 10; }); return tempY;
         };
         doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 45, 2, 2, 'FD');
-        printDotsCol(20, currentY + 10, [{l:'Personalidad', k:'valPersonalidad'}, {l:'Capacidad Mando', k:'valMando'}, {l:'Concentración', k:'valConc'}, {l:'Confianza', k:'valConfianza'}]);
-        printDotsCol(115, currentY + 10, [{l:'Gestión Error', k:'valError'}, {l:'Mentalidad Comp.', k:'valMentalidad'}, {l:'Actitud tras Gol', k:'valActitudGol'}]);
+        printDotsCol(20, currentY + 10, [{l:'Personalidad', k:'valPersonalidad'}, {l:'Capacidad Mando', k:'valMando'}, {l:'Concentración', k:'valConc'}, {l:'Confianza', k:'valConfianza'}], false);
+        // Columna derecha alineada
+        printDotsCol(115, currentY + 10, [{l:'Gestión Error', k:'valError'}, {l:'Mentalidad Comp.', k:'valMentalidad'}, {l:'Actitud tras Gol', k:'valActitudGol'}], true);
         currentY += 55;
 
         printHeader("Evolución y Táctica (1 a 5)", iTarget);
         doc.setFillColor(...p.card); doc.setDrawColor(...p.line); doc.roundedRect(15, currentY, pageWidth - 30, 35, 2, 2, 'FD');
-        printDotsCol(20, currentY + 10, [{l:'1º vs Último Part.', k:'valPrimerUltimo'}, {l:'Adapt. Ritmo', k:'valRitmo'}, {l:'Adapt. Entorno', k:'valEntorno'}]);
-        printDotsCol(115, currentY + 10, [{l:'Rend. 1vs1', k:'val1v1'}, {l:'Organización', k:'valOrg'}, {l:'Comunicación', k:'valCom'}]);
+        printDotsCol(20, currentY + 10, [{l:'1º vs Último Part.', k:'valPrimerUltimo'}, {l:'Adapt. Ritmo', k:'valRitmo'}, {l:'Adapt. Entorno', k:'valEntorno'}], false);
+        // Columna derecha alineada
+        printDotsCol(115, currentY + 10, [{l:'Rend. 1vs1', k:'val1v1'}, {l:'Organización', k:'valOrg'}, {l:'Comunicación', k:'valCom'}], true);
         currentY += 45;
 
         printHeader("Situaciones Específicas y Conclusión");
