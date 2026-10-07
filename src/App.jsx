@@ -1368,6 +1368,7 @@ export default function App() {
   const [role, setRole] = useState(null); 
   const [loadingAuth, setLoadingAuth] = useState(true);
   
+  // Hemos vuelto a la versión original de dataLoaded para no romper la app principal
   const [dataLoaded, setDataLoaded] = useState({ users: false, gks: false, rivals: false, matches: false });
   const isDataLoading = !dataLoaded.users || !dataLoaded.gks || !dataLoaded.rivals || !dataLoaded.matches;
 
@@ -1377,18 +1378,16 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [informesList, setInformesList] = useState([]);
 
-  // LÓGICA VISTA PÚBLICA POR QR
-  const [publicReportViewId, setPublicReportViewId] = useState(null);
-
-  useEffect(() => {
+  // LÓGICA VISTA PÚBLICA POR QR (Controlado con un simple useState de la URL)
+  const [publicReportViewId, setPublicReportViewId] = useState(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const viewParam = searchParams.get('view');
     const idParam = searchParams.get('id');
-
     if ((viewParam === 'torneo' || viewParam === 'informe') && idParam) {
-      setPublicReportViewId(idParam);
+      return idParam;
     }
-  }, []);
+    return null;
+  });
 
   const [darkMode, setDarkMode] = useState(false);
   const [currentModule, setCurrentModule] = useState('inicio');
@@ -1418,11 +1417,11 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gkParam = params.get('gk');
-    if (gkParam) {
+    if (gkParam && !publicReportViewId) {
       setSelectedGkId(gkParam);
       setCurrentModule('reporte_detalle');
     }
-  }, []);
+  }, [publicReportViewId]);
 
   useEffect(() => {
     if (!auth) { setLoadingAuth(false); return; }
@@ -1433,7 +1432,10 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (error) { showNotification("Error de autenticación", "error"); }
+      } catch (error) { 
+        // Silenciamos este error si estamos en vista pública
+        if(!publicReportViewId) showNotification("Error de autenticación", "error"); 
+      }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -1441,7 +1443,7 @@ export default function App() {
       setLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [publicReportViewId]);
 
   useEffect(() => {
     if (!user || !db) return;
@@ -1457,12 +1459,7 @@ export default function App() {
       
       if (uList.length === 0 && user.uid) {
         const defaultAdmin = {
-          role: 'admin',
-          username: 'admin',
-          email: 'admin@atleti.com',
-          password: '123',
-          name: 'Administrador',
-          photoUrl: ''
+          role: 'admin', username: 'admin', email: 'admin@atleti.com', password: '123', name: 'Administrador', photoUrl: ''
         };
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'admin-user'), defaultAdmin).catch(console.error);
         setUsersList([{ id: 'admin-user', ...defaultAdmin }]);
@@ -1480,8 +1477,7 @@ export default function App() {
     });
 
     const unsubGk = onSnapshot(gkRef, (snapshot) => {
-      const gks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setGoalkeepers(gks);
+      setGoalkeepers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setDataLoaded(prev => ({...prev, gks: true}));
     });
 
@@ -1507,10 +1503,35 @@ export default function App() {
     return () => { unsubUsers(); unsubGk(); unsubRivals(); unsubMatches(); unsubInformes(); };
   }, [user, appUser]);
 
-  // Si publicReportViewId tiene un valor, renderizamos SOLO la vista pública.
-  // IMPORTANTE: Lo hacemos DESPUÉS de los useEffects para que Firebase haya cargado los informesList.
+  // ===============================================
+  // CONDICIONAL DE RENDERIZADO: VISTA PÚBLICA (MANDA SOBRE TODO)
+  // ===============================================
   if (publicReportViewId) {
+    // Si la app está cargando Firebase en segundo plano, esperamos un momento
+    if (informesList.length === 0 && loadingAuth === false) {
+        // Puede que tarde un segundito en descargar la collection de Firebase
+        return (
+          <div className="flex h-screen items-center justify-center bg-slate-950 text-white font-sans">
+             <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        );
+    }
     return <PublicReportView reportId={publicReportViewId} informesList={informesList} goalkeepers={goalkeepers} />;
+  }
+
+  // ===============================================
+  // CONDICIONALES DE RENDERIZADO APP PRIVADA (INTACTOS)
+  // ===============================================
+  if (loadingAuth || (user && isDataLoading)) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-blue-950 text-white font-sans">
+        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!appUser) {
+    return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
   }
 
   const visibleGoalkeepers = useMemo(() => {
