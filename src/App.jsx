@@ -1258,9 +1258,152 @@ const FormTextarea = ({ label, className = "", ...props }) => (
 );
 
 // ==========================================
+// COMPONENTE: VISTA PÚBLICA DE INFORME (PARA QR)
+// ==========================================
+function PublicReportView({ reportId, theme }) {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReport = async () => {
+      try {
+        const { collection, getDocs, getFirestore } = await import('firebase/firestore');
+        const db = getFirestore();
+        const informesRef = collection(db, 'artifacts', typeof __app_id !== 'undefined' ? __app_id : 'default-app-id', 'public', 'data', 'informes');
+        const querySnapshot = await getDocs(informesRef);
+        
+        let foundReport = null;
+        querySnapshot.forEach((doc) => {
+          if (doc.id === reportId) {
+            foundReport = { id: doc.id, ...doc.data() };
+          }
+        });
+        
+        setReport(foundReport);
+      } catch (error) {
+        console.error("Error cargando informe público:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (reportId) fetchReport();
+  }, [reportId]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+    </div>
+  );
+
+  if (!report) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-bold p-6 text-center">
+      <div>
+        <h1 className="text-2xl mb-2 text-red-500">❌ Informe no encontrado</h1>
+        <p className="text-slate-400">El informe que intentas buscar ya no existe o el enlace es incorrecto.</p>
+      </div>
+    </div>
+  );
+
+  // VISTA DEL INFORME PÚBLICO (Optimizada para Móvil / Tablet)
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
+      <div className="bg-slate-950 text-white p-6 pt-10 shadow-xl rounded-b-3xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+          <Shield size={120} />
+        </div>
+        <div className="relative z-10">
+          <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block">
+            Informe Oficial • GuardianLab
+          </span>
+          <h1 className="text-3xl font-black italic uppercase tracking-tight leading-tight mb-2">
+            {report.titulo || "Informe de Rendimiento"}
+          </h1>
+          <p className="text-slate-400 font-bold tracking-wide flex flex-col gap-1">
+            <span>👤 Jugador: <span className="text-white">{report.gkName}</span></span>
+            <span>📅 Fecha: <span className="text-white">{report.fecha}</span></span>
+          </p>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-6 -mt-4 relative z-20">
+        {(report.posFinalTorneo || report.valoracionGeneral) && (
+          <div className="grid grid-cols-2 gap-4">
+             {report.posFinalTorneo && (
+               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Posición Final</span>
+                 <span className="text-lg font-black text-slate-800 uppercase">{report.posFinalTorneo}</span>
+               </div>
+             )}
+             {report.valoracionGeneral && (
+               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Nota Global</span>
+                 <span className="text-lg font-black text-red-600 uppercase">{report.valoracionGeneral}</span>
+               </div>
+             )}
+          </div>
+        )}
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+              <Activity size={16} className="text-red-500"/> Información General
+           </h3>
+           <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
+              {report.ubicacionTorneo && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Ubicación</span><span className="font-semibold text-slate-700">{report.ubicacionTorneo}</span></div>}
+              {report.superficieTorneo && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Superficie</span><span className="font-semibold text-slate-700">{report.superficieTorneo}</span></div>}
+              {report.partidoCompeticion && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Competición</span><span className="font-semibold text-slate-700">{report.partidoCompeticion}</span></div>}
+              {report.rival && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Rival</span><span className="font-semibold text-slate-700">{report.rival}</span></div>}
+              {report.partidoResultado && <div><span className="block text-[10px] text-slate-400 uppercase font-bold">Resultado</span><span className="font-semibold text-slate-700">{report.partidoResultado}</span></div>}
+           </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest ml-2 flex items-center gap-2">
+              <Target size={16} className="text-red-500"/> Notas del Cuerpo Técnico
+          </h3>
+          {[
+            { label: "Paradas y Juego Ofensivo", val: report.obsParadas || report.obsTecnicoTacticas },
+            { label: "Fase Defensiva", val: report.obsGoles || report.obsActitudinales },
+            { label: "Análisis Extendido / Mental", val: report.obsMental || report.extendedAnalysis },
+            { label: "Puntos Positivos", val: report.obsPos },
+            { label: "Áreas de Mejora", val: report.obsImprovements },
+            { label: "Propuesta de Scouting", val: report.flashPropuesta },
+          ].map((item, idx) => (
+             item.val ? (
+               <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                  <span className="block text-[10px] font-black uppercase tracking-widest text-red-500 mb-2">{item.label}</span>
+                  <p className="text-sm text-slate-600 leading-relaxed">{item.val}</p>
+               </div>
+             ) : null
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
 export default function App() {
+  // LÓGICA VISTA PÚBLICA POR QR (Esto frena todo lo demás si detecta el ID)
+  const [publicReportViewId, setPublicReportViewId] = useState(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const viewParam = searchParams.get('view');
+    const idParam = searchParams.get('id');
+
+    if ((viewParam === 'torneo' || viewParam === 'informe') && idParam) {
+      setPublicReportViewId(idParam);
+    }
+  }, []);
+
+  if (publicReportViewId) {
+    return <PublicReportView reportId={publicReportViewId} />;
+  }
+  // --- FIN LÓGICA VISTA PÚBLICA ---
+
   const [user, setUser] = useState(null); 
   const [appUser, setAppUser] = useState(null); 
   const [role, setRole] = useState(null); 
@@ -1273,7 +1416,7 @@ export default function App() {
   const [usersList, setUsersList] = useState([]);
   const [rivals, setRivals] = useState([]);
   const [matches, setMatches] = useState([]);
-  const [informesList, setInformesList] = useState([]); // NUEVO ESTADO PARA INFORMES
+  const [informesList, setInformesList] = useState([]);
 
   const [darkMode, setDarkMode] = useState(false);
   const [currentModule, setCurrentModule] = useState('inicio');
@@ -1297,11 +1440,9 @@ export default function App() {
   const [isAddSeasonModalOpen, setIsAddSeasonModalOpen] = useState(false);
   const [exportTrigger, setExportTrigger] = useState(0);
 
-  // Estados del Vestuario e Plan táctico inmersivo
   const [viewLockerRoom, setViewLockerRoom] = useState(true);
   const [lockerSelectedGk, setLockerSelectedGk] = useState(null);
 
-  // NUEVO: Leer el QR para abrir directamente el perfil del portero
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gkParam = params.get('gk');
@@ -1337,7 +1478,7 @@ export default function App() {
     const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
     const rivalsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rivals');
     const matchesRef = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
-    const informesRef = collection(db, 'artifacts', appId, 'public', 'data', 'informes'); // NUEVA REFERENCIA
+    const informesRef = collection(db, 'artifacts', appId, 'public', 'data', 'informes');
 
     const unsubUsers = onSnapshot(usersRef, (snapshot) => {
       const uList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1387,7 +1528,6 @@ export default function App() {
       setDataLoaded(prev => ({...prev, matches: true}));
     });
 
-    // NUEVO LISENER PARA INFORMES
     const unsubInformes = onSnapshot(informesRef, (snapshot) => {
       setInformesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -1413,7 +1553,6 @@ export default function App() {
     const seasonMatches = matches.filter(m => m.season === activeSeason || (!m.season && activeSeason === '2026/27'));
     if (role === 'admin') return seasonMatches;
     
-    // Filtrar los partidos para que los entrenadores/staff SOLO vean los partidos de sus porteros asignados
     const visibleGkIds = visibleGoalkeepers.map(g => g.id);
     return seasonMatches.filter(m => m.goalkeeperIds?.some(id => visibleGkIds.includes(id)) || !m.goalkeeperIds || m.goalkeeperIds.length === 0);
   }, [matches, activeSeason, visibleGoalkeepers, role]);
@@ -1538,7 +1677,6 @@ export default function App() {
     border: darkMode ? 'border-slate-700' : 'border-slate-200'
   };
 
-  // --- NUEVA VISTA PÚBLICA PARA COMPARTIR POR QR ---
   const urlParams = new URLSearchParams(window.location.search);
   const publicGkId = urlParams.get('public_gk');
 
@@ -1563,7 +1701,6 @@ export default function App() {
              </button>
            </div>
            
-           {/* Vista de reporte engañando a la app con role="staff" para que sea Solo Lectura */}
            <DashboardView 
               gk={publicGk} 
               allGks={[publicGk]} 
@@ -1580,7 +1717,7 @@ export default function App() {
     );
   }
 
-  // Si no hay QR público, pedimos login normal
+  // Si no hay QR público y no hay sesión iniciada, pedimos login normal
   if (!appUser) {
     return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
   }
@@ -1755,7 +1892,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* MODALES GLOBALES (Ahora refactorizados usando BaseModal y componentes de formulario) */}
+        {/* MODALES GLOBALES */}
         {isGkFormOpen && <GkFormModal initialData={editingGk} users={usersList} onClose={() => setIsGkFormOpen(false)} onSave={(data) => handleSaveDoc('goalkeepers', data, !editingGk, "Portero guardado").then(id => {if(id){setIsGkFormOpen(false); if(!editingGk){setSelectedGkId(id); setCurrentModule('reporte_detalle');}}})} theme={theme} darkMode={darkMode} />}
         {isRivalFormOpen && <RivalFormModal initialData={editingRival} onClose={() => setIsRivalFormOpen(false)} onSave={(data) => handleSaveDoc('rivals', data, !editingRival, "Rival guardado").then(()=>setIsRivalFormOpen(false))} theme={theme} />}
         {isUserFormOpen && <UserFormModal initialData={editingUser} onClose={() => setIsUserFormOpen(false)} onSave={(data) => handleSaveDoc('users', data, !editingUser, "Usuario guardado").then(()=>setIsUserFormOpen(false))} theme={theme} />}
