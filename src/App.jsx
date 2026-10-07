@@ -854,7 +854,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
         informe.logoTorneo ? safeImgLoad(informe.logoTorneo) : Promise.resolve(null),
-        informe.tipo === 'torneo' ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://atm-app.github.io/Informes-y-Objetivos-GuardianLab/?view=torneo&id=${informe.id || 'NUEVO'}`)}&margin=1`) : Promise.resolve(null),
+        // AHORA TOMA TU URL AUTOMÁTICAMENTE:
+        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
         loadIconB64('activity', '#e11d48'), 
         loadIconB64('target', '#3b82f6'), 
         loadIconB64('gitCompare', '#10b981')
