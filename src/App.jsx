@@ -1105,18 +1105,41 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         if (informe.partidosTorneo && informe.partidosTorneo.length > 0) {
             doc.setFillColor(...p.blueDark); doc.roundedRect(15, currentY, pageWidth-30, 10, 1, 1, 'F');
             doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont("Roboto", "bold");
-            doc.text("JORNADA/FASE", 18, currentY + 6.5); doc.text("RIVAL Y PAÍS", 55, currentY + 6.5);
-            doc.text("GOLES R.", 155, currentY + 6.5); doc.text("MIN", 185, currentY + 6.5);
+            doc.text("FASE", 18, currentY + 6.5); 
+            doc.text("PAÍS", 45, currentY + 6.5);
+            doc.text("RIVAL", 60, currentY + 6.5);
+            doc.text("RES.", 140, currentY + 6.5);
+            doc.text("G. REC", 160, currentY + 6.5);
+            doc.text("MIN", 185, currentY + 6.5);
             currentY += 10;
 
             informe.partidosTorneo.forEach((m, idx) => {
                 checkPageBreak(12);
                 doc.setFillColor(idx % 2 === 0 ? p.card[0] : p.bg[0], idx % 2 === 0 ? p.card[1] : p.bg[1], idx % 2 === 0 ? p.card[2] : p.bg[2]);
                 doc.rect(15, currentY, pageWidth-30, 10, 'F'); doc.setDrawColor(...p.line); doc.line(15, currentY+10, pageWidth-15, currentY+10);
-                doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); doc.text(m.matchday || '-', 18, currentY + 6.5);
-                doc.setTextColor(...p.textMain); doc.text(`${m.rival || '-'} ${m.country ? '('+m.country+')' : ''}`, 55, currentY + 6.5, {maxWidth: 90});
-                doc.setTextColor(220,38,38); doc.text(String(m.goalsRival || '-'), 155, currentY + 6.5);
-                doc.setTextColor(...p.textMuted); doc.text(String(m.minutes || '-'), 185, currentY + 6.5);
+                doc.setTextColor(...p.textMuted); doc.setFontSize(8); doc.setFont("Roboto", "bold"); 
+                
+                doc.text(m.matchday || '-', 18, currentY + 6.5);
+                
+                // Extraemos siglas del país sin el emoji para que jsPDF no de error de codificación
+                const countryCode = (m.country || '').replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim().substring(0,3).toUpperCase() || '-';
+                doc.text(countryCode, 45, currentY + 6.5);
+                
+                doc.setTextColor(...p.textMain); 
+                doc.text(`${m.rival || '-'}`.toUpperCase(), 60, currentY + 6.5, {maxWidth: 70});
+                
+                // Resultado global del partido
+                const resText = `${m.goalsATM !== '-' ? m.goalsATM : 0} - ${m.goalsRival !== '-' ? m.goalsRival : 0}`;
+                doc.setTextColor(...p.textMuted);
+                doc.text(resText, 140, currentY + 6.5);
+                
+                // Goles encajados por este portero
+                const gRec = m.goalsConcededByGk !== '-' && m.goalsConcededByGk ? m.goalsConcededByGk : (m.goalsRival !== '-' ? m.goalsRival : 0);
+                doc.setTextColor(220,38,38); 
+                doc.text(String(gRec), 165, currentY + 6.5);
+                
+                doc.setTextColor(...p.textMuted); 
+                doc.text(String(m.minutes || '0'), 185, currentY + 6.5);
                 currentY += 10;
             });
             currentY += 5;
@@ -1399,14 +1422,19 @@ function PublicReportView({ reportId, informesList, goalkeepers }) {
                 {report.partidosTorneo.map((match, idx) => (
                   <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex flex-col gap-2">
                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                       <span>{match.matchday || `Partido ${idx+1}`}</span>
+                       <span>{match.matchday || `Partido ${idx+1}`} {match.country ? `• ${match.country}` : ''}</span>
                        <span>{match.minutes || '0'} Min. Jugados</span>
                      </div>
-                     <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                     <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 shadow-sm mt-1">
                        <span className="font-bold text-sm text-slate-700 truncate pr-2">VS {match.rival || 'Desconocido'}</span>
-                       <div className="flex gap-2 text-xs font-black shrink-0">
-                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{match.goalsATM || 0}</span>
-                         <span className="text-slate-300">-</span>
+                       <div className="flex gap-2 text-xs font-black shrink-0 items-center">
+                         {/* Resultado global */}
+                         <div className="flex gap-1 text-[10px] items-center mr-2 px-2 border-r border-slate-200" title="Resultado Global">
+                            <span className="text-emerald-600">{match.goalsATM !== '-' ? match.goalsATM : 0}</span>
+                            <span className="text-slate-400">-</span>
+                            <span className="text-red-500">{match.goalsRival !== '-' ? match.goalsRival : 0}</span>
+                         </div>
+                         <span className="text-slate-400 text-[9px] uppercase hidden sm:inline">Rec:</span>
                          <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100" title="Goles recibidos por este portero">
                            {match.goalsConcededByGk !== '-' && match.goalsConcededByGk ? match.goalsConcededByGk : (match.goalsRival || 0)}
                          </span>
@@ -3859,7 +3887,8 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
      }
   };
 
-  const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '', goalsATM: '-', goalsRival: '-', goalsConcededByGk: '-', minutes: '' }] }));
+  // CAMBIO AQUÍ: '🇪🇸 España' por defecto
+  const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '🇪🇸 España', goalsATM: '-', goalsRival: '-', goalsConcededByGk: '-', minutes: '' }] }));
   const removeMatch = (id) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.filter(m => m.id !== id) }));
   const updateMatch = (id, field, value) => setFormData(prev => ({ ...prev, partidosTorneo: prev.partidosTorneo.map(m => m.id === id ? { ...m, [field]: value } : m) }));
 
@@ -4390,7 +4419,24 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
                                      {MATCHDAY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                   </select>
                                   <input type="text" placeholder="Nombre Rival" value={match.rival} onChange={(e) => updateMatch(match.id, 'rival', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
-                                  <input type="text" placeholder="País (Opcional)" value={match.country} onChange={(e) => updateMatch(match.id, 'country', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium placeholder-slate-500 outline-none focus:border-blue-500 transition-colors" />
+                                  
+                                  {/* CAMBIO AQUÍ: SELECTOR DE PAÍSES EN VEZ DE INPUT TEXT */}
+                                  <select value={match.country} onChange={(e) => updateMatch(match.id, 'country', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-medium outline-none focus:border-blue-500 transition-colors cursor-pointer">
+                                     <option value="">-- País (Opcional) --</option>
+                                     <option value="🇪🇸 España">🇪🇸 España</option>
+                                     <option value="🇵🇹 Portugal">🇵🇹 Portugal</option>
+                                     <option value="🇫🇷 Francia">🇫🇷 Francia</option>
+                                     <option value="🇮🇹 Italia">🇮🇹 Italia</option>
+                                     <option value="🇬🇧 Inglaterra">🇬🇧 Inglaterra</option>
+                                     <option value="🇩🇪 Alemania">🇩🇪 Alemania</option>
+                                     <option value="🇳🇱 Países Bajos">🇳🇱 Países Bajos</option>
+                                     <option value="🇧🇪 Bélgica">🇧🇪 Bélgica</option>
+                                     <option value="🇦🇷 Argentina">🇦🇷 Argentina</option>
+                                     <option value="🇧🇷 Brasil">🇧🇷 Brasil</option>
+                                     <option value="🇺🇸 Estados Unidos">🇺🇸 Estados Unidos</option>
+                                     <option value="🇯🇵 Japón">🇯🇵 Japón</option>
+                                     <option value="🌍 Otro">🌍 Otro</option>
+                                  </select>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                   <div>
