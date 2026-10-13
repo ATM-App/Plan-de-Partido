@@ -339,7 +339,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     // ==========================================
 
     // Generar URL para QR apuntando a la VISTA PÚBLICA de tu app
-    const baseUrl = window.location.origin + window.location.pathname;
+    const baseUrl = "https://atm-app.github.io/Plan-de-Partido/";
     const statsUrl = `${baseUrl}?public_gk=${gk.id}`;
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(statsUrl)}&color=0b132b&margin=10`;
 
@@ -854,8 +854,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
         informe.logoTorneo ? safeImgLoad(informe.logoTorneo) : Promise.resolve(null),
-        // AHORA TOMA TU URL AUTOMÁTICAMENTE:
-        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
+        // URL OFICIAL FIJADA PARA EL QR:
+        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://atm-app.github.io/Plan-de-Partido/?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
         loadIconB64('activity', '#e11d48'), 
         loadIconB64('target', '#3b82f6'), 
         loadIconB64('gitCompare', '#10b981')
