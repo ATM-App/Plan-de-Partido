@@ -339,7 +339,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     // ==========================================
 
     // Generar URL para QR apuntando a la VISTA PÚBLICA de tu app
-    const baseUrl = "https://atm-app.github.io/Plan-de-Partido/";
+    const baseUrl = window.location.origin + window.location.pathname;
     const statsUrl = `${baseUrl}?public_gk=${gk.id}`;
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(statsUrl)}&color=0b132b&margin=10`;
 
@@ -854,8 +854,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
         informe.logoTorneo ? safeImgLoad(informe.logoTorneo) : Promise.resolve(null),
-        // URL OFICIAL FIJADA PARA EL QR:
-        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://atm-app.github.io/Plan-de-Partido/?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
+        // AHORA TOMA TU URL AUTOMÁTICAMENTE:
+        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
         loadIconB64('activity', '#e11d48'), 
         loadIconB64('target', '#3b82f6'), 
         loadIconB64('gitCompare', '#10b981')
@@ -1639,6 +1639,14 @@ export default function App() {
     return seasonMatches.filter(m => m.goalkeeperIds?.some(id => visibleGkIds.includes(id)) || !m.goalkeeperIds || m.goalkeeperIds.length === 0);
   }, [matches, activeSeason, visibleGoalkeepers, role]);
 
+  // --- NUEVO: FILTRADO PRIVADO DE RIVALES PARA ENTRENADORES ---
+  const visibleRivals = useMemo(() => {
+    if (role === 'admin') return rivals;
+    // Entrenadores ven los rivales que ellos mismos han creado 
+    // (o los antiguos/globales que no tienen creador para no perder datos previos)
+    return rivals.filter(r => r.createdBy === appUser?.id || !r.createdBy);
+  }, [rivals, role, appUser]);
+
   // 4. FUNCIONES HELPER GLOBALES
   const selectedGk = visibleGoalkeepers.find(gk => gk.id === selectedGkId) || visibleGoalkeepers[0] || DUMMY_GOALKEEPER;
   const currentUserData = usersList.find(u => u.id === appUser?.id) || {};
@@ -1786,6 +1794,7 @@ export default function App() {
   }
 
   // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
+  // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
   const renderModule = () => {
     if (selectedGkId && currentModule === 'reporte_detalle') {
       return (
@@ -1797,7 +1806,7 @@ export default function App() {
              gk={selectedGk} 
              allGks={visibleGoalkeepers} 
              matches={currentSeasonMatches} 
-             rivals={rivals} 
+             rivals={visibleRivals} 
              theme={theme} 
              darkMode={darkMode} 
              activeSeason={activeSeason} 
@@ -1819,7 +1828,7 @@ export default function App() {
         <ModuleInicio 
           gks={visibleGoalkeepers} 
           matches={currentSeasonMatches} 
-          rivals={rivals} 
+          rivals={visibleRivals} 
           theme={theme} 
           setModule={setCurrentModule} 
           darkMode={darkMode} 
@@ -1834,12 +1843,12 @@ export default function App() {
         />
       );
       case 'porteros': return <ModulePorteros gks={visibleGoalkeepers} role={role} onSelect={(id) => { setSelectedGkId(id); setCurrentModule('reporte_detalle'); }} onNew={() => { setEditingGk(null); setIsGkFormOpen(true); }} onEdit={(gk) => { setEditingGk(gk); setIsGkFormOpen(true); }} onDelete={(id) => handleDeleteDoc('goalkeepers', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
-      case 'partidos': return <ModulePartidos matches={currentSeasonMatches} rivals={rivals} gks={visibleGoalkeepers} role={role} onNew={() => { setEditingMatch(null); setIsMatchFormOpen(true); }} onEdit={(match) => { setEditingMatch(match); setIsMatchFormOpen(true); }} onDelete={(id) => handleDeleteDoc('matches', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
-      case 'rivales': return <ModuleRivales rivals={rivals} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
+      case 'partidos': return <ModulePartidos matches={currentSeasonMatches} rivals={visibleRivals} gks={visibleGoalkeepers} role={role} onNew={() => { setEditingMatch(null); setIsMatchFormOpen(true); }} onEdit={(match) => { setEditingMatch(match); setIsMatchFormOpen(true); }} onDelete={(id) => handleDeleteDoc('matches', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
+      case 'rivales': return <ModuleRivales rivals={visibleRivals} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
       case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} />;
       case 'ajustes': return <ModuleAjustes users={usersList} currentUserData={currentUserData} role={role} onNewUser={() => {setEditingUser(null); setIsUserFormOpen(true);}} onEditUser={(u) => {setEditingUser(u); setIsUserFormOpen(true);}} onSaveProfile={handleSaveProfile} onBackup={downloadBackup} theme={theme} darkMode={darkMode} />;
       case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} existingReports={informesList} onSave={async (data) => { const id = await handleSaveDoc('informes', data, !data.id, data.isDraft ? "Borrador guardado" : "Informe finalizado"); if (id && !data.id) data.id = id; return id; }} onDelete={(id) => handleDeleteDoc('informes', id)} showNotification={showNotification} />;
-      default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={rivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} />;
+      default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={visibleRivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} />;
     }
   };
 
@@ -1958,9 +1967,18 @@ export default function App() {
 
         {/* MODALES GLOBALES */}
         {isGkFormOpen && <GkFormModal initialData={editingGk} users={usersList} onClose={() => setIsGkFormOpen(false)} onSave={(data) => handleSaveDoc('goalkeepers', data, !editingGk, "Portero guardado").then(id => {if(id){setIsGkFormOpen(false); if(!editingGk){setSelectedGkId(id); setCurrentModule('reporte_detalle');}}})} theme={theme} darkMode={darkMode} />}
-        {isRivalFormOpen && <RivalFormModal initialData={editingRival} onClose={() => setIsRivalFormOpen(false)} onSave={(data) => handleSaveDoc('rivals', data, !editingRival, "Rival guardado").then(()=>setIsRivalFormOpen(false))} theme={theme} />}
+        
+        {/* --- MODAL DE RIVAL CON ETIQUETA DE CREADOR --- */}
+        {isRivalFormOpen && <RivalFormModal initialData={editingRival} onClose={() => setIsRivalFormOpen(false)} onSave={(data) => {
+            if (!editingRival && appUser) data.createdBy = appUser.id; // Marca quién lo creó
+            handleSaveDoc('rivals', data, !editingRival, "Rival guardado").then(()=>setIsRivalFormOpen(false));
+        }} theme={theme} />}
+
+        {/* Modal de Usuario INTACTO */}
         {isUserFormOpen && <UserFormModal initialData={editingUser} onClose={() => setIsUserFormOpen(false)} onSave={(data) => handleSaveDoc('users', data, !editingUser, "Usuario guardado").then(()=>setIsUserFormOpen(false))} theme={theme} />}
-        {isMatchFormOpen && <MatchFormModal initialData={editingMatch} rivals={rivals} gks={visibleGoalkeepers} activeSeason={activeSeason} onClose={() => setIsMatchFormOpen(false)} onSave={(data) => handleSaveDoc('matches', data, !editingMatch, "Partido guardado").then(()=>setIsMatchFormOpen(false))} theme={theme} darkMode={darkMode} />}
+        
+        {/* --- MODAL DE PARTIDO CON LOS RIVALES FILTRADOS --- */}
+        {isMatchFormOpen && <MatchFormModal initialData={editingMatch} rivals={visibleRivals} gks={visibleGoalkeepers} activeSeason={activeSeason} onClose={() => setIsMatchFormOpen(false)} onSave={(data) => handleSaveDoc('matches', data, !editingMatch, "Partido guardado").then(()=>setIsMatchFormOpen(false))} theme={theme} darkMode={darkMode} />}
         
         {/* MODALES DE EDICIÓN DEL REPORTE */}
         {isTechDecModalOpen && <TechDecisionModal initialData={selectedGk} onClose={() => setIsTechDecModalOpen(false)} onSave={handleSaveTechDecision} theme={theme} />}
@@ -2828,7 +2846,8 @@ function ModuleRivales({ rivals, role, onNew, onEdit, onDelete, theme, darkMode,
 
   return (
     <div className="space-y-6">
-      {role === 'admin' && (
+      {/* Permitimos a todos (excepto staff de solo lectura) crear rivales */}
+      {role !== 'staff' && (
         <div className="flex justify-end mb-6">
           <button onClick={onNew} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 dark:hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg">
             <Plus size={16} /> Añadir Rival
@@ -2839,12 +2858,15 @@ function ModuleRivales({ rivals, role, onNew, onEdit, onDelete, theme, darkMode,
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {rivals.map(rival => (
           <div key={rival.id} className={`p-6 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col items-center text-center relative group shadow-sm hover:shadow-xl transition-shadow`}>
-            {role === 'admin' && (
+            
+            {/* Permitimos a todos (excepto staff) editar sus rivales */}
+            {role !== 'staff' && (
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => onEdit(rival)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-blue-600 rounded-full shadow-md transition-colors"><Edit2 size={14} strokeWidth={3}/></button>
                 <button onClick={() => onDelete(rival.id)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-600 rounded-full shadow-md transition-colors"><X size={14} strokeWidth={3}/></button>
               </div>
             )}
+            
             <div className="w-20 h-20 md:w-24 md:h-24 flex items-center justify-center mb-4 mt-2">
               {rival.shieldUrl ? <img src={rival.shieldUrl} alt={rival.name} className="max-w-full max-h-full object-contain drop-shadow-md" /> : <Swords className="w-12 h-12 text-slate-300 dark:text-slate-600"/>}
             </div>
