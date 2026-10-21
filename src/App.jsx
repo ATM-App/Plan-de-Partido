@@ -574,9 +574,17 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(26);
     doc.setFont("Roboto", "bolditalic");
-    doc.text(`${gk.number} - ${gk.name.toUpperCase()}`, rightCX, polY + polH + 32, { align: 'center' });
+    
+    // Reducir la fuente dinámicamente si el nombre es muy largo para que no se salga
+    const fullNameCover = `${gk.number} - ${gk.name.toUpperCase()}`;
+    let fontSizeCover = 26;
+    doc.setFontSize(fontSizeCover);
+    while (doc.getTextWidth(fullNameCover) > 130 && fontSizeCover > 10) {
+        fontSizeCover -= 1;
+        doc.setFontSize(fontSizeCover);
+    }
+    doc.text(fullNameCover, rightCX, polY + polH + 32, { align: 'center' });
 
     // Footer Text
     doc.setTextColor(148, 163, 184);
@@ -825,12 +833,12 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3);
         doc.text(m.field || '--', 200, tY + 6, { maxWidth: 60 });
         
-        // AHORA IMPRIME LOS MINUTOS JUGADOS EN LUGAR DE LOS GOLES
-        doc.setTextColor(...p.textMain); // Texto color principal
+        // AHORA IMPRIME LOS MINUTOS JUGADOS
+        doc.setTextColor(...p.textMain); 
         doc.setFont("Roboto", "bold");
         
-        // Minutos jugados en ese partido. Si no hay dato, guion.
-        const minsJugados = m.minutes || '-';
+        // Obtenemos los minutos específicos de este portero guardados en gkMinutes
+        const minsJugados = (m.gkMinutes && m.gkMinutes[gk.id]) ? m.gkMinutes[gk.id] : '-';
         doc.text(String(minsJugados), 265, tY + 6);
         
         tY += 12;
@@ -3452,7 +3460,8 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] });
+  // Añadimos gkMinutes al estado inicial para guardar los minutos de cada portero
+  const [formData, setFormData] = useState(initialData || { date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], gkMinutes: {}, streak: [], goalsScored: '', season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] });
   
   const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
   
@@ -3504,15 +3513,9 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
 
           {step === 2 && (
             <div className="grid grid-cols-1 gap-5 animate-in fade-in slide-in-from-right-4">
-              {/* Selector de Mi Equipo AÑADIDO AQUI */}
               <div className="mb-5">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Mi Equipo</label>
-                <select 
-                  name="myTeam" 
-                  value={formData.myTeam} 
-                  onChange={handleChange} 
-                  className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}
-                >
+                <select name="myTeam" value={formData.myTeam} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
                   {TEAMS_LIST.map(team => <option key={team} value={team}>{team}</option>)}
                 </select>
               </div>
@@ -3576,17 +3579,33 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
               </div>
 
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">Porteros Convocados</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">Porteros Convocados y Minutos Jugados</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {gks.map(gk => {
                     const isSelected = formData.goalkeeperIds.includes(gk.id);
                     return (
-                      <div key={gk.id} onClick={() => toggleGk(gk.id)} className={`cursor-pointer p-4 rounded-[2rem] border-2 flex flex-col items-center gap-3 transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-200 hover:shadow-sm'}`}>
-                         <div className="relative">
-                           <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm" style={{ objectPosition: 'center 15%' }} alt=""/>
-                           {isSelected && <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1 border-2 border-white dark:border-slate-800 shadow-sm"><CheckCircle2 size={12} className="text-white" strokeWidth={3}/></div>}
+                      <div key={gk.id} className={`p-4 rounded-[2rem] border-2 flex flex-col items-center gap-2 transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-200 hover:shadow-sm'}`}>
+                         <div onClick={() => toggleGk(gk.id)} className="cursor-pointer relative flex flex-col items-center w-full gap-2">
+                           <div className="relative">
+                             <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm" style={{ objectPosition: 'center 15%' }} alt=""/>
+                             {isSelected && <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1 border-2 border-white dark:border-slate-800 shadow-sm"><CheckCircle2 size={12} className="text-white" strokeWidth={3}/></div>}
+                           </div>
+                           <span className={`text-xs text-center font-black uppercase truncate w-full ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>{gk.name}</span>
                          </div>
-                         <span className={`text-xs text-center font-black uppercase truncate w-full ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>{gk.name}</span>
+                         
+                         {/* Casilla de minutos que aparece al seleccionarlo */}
+                         {isSelected && (
+                           <div className="w-full mt-1">
+                             <input 
+                               type="number" 
+                               placeholder="Minutos" 
+                               value={formData.gkMinutes?.[gk.id] || ''} 
+                               onChange={(e) => setFormData(prev => ({...prev, gkMinutes: {...(prev.gkMinutes || {}), [gk.id]: e.target.value}}))} 
+                               className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-bold text-blue-950 dark:text-white outline-none focus:border-blue-500" 
+                               onClick={(e) => e.stopPropagation()} 
+                             />
+                           </div>
+                         )}
                       </div>
                     )
                   })}
