@@ -425,12 +425,29 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setTextColor(239, 68, 68); // Corporate Red
       doc.setFontSize(12);
       doc.setFont("Roboto", "bold");
-      if (iPin) doc.addImage(iPin, 'PNG', leftCX - doc.getTextWidth(nextMatchPdf.field || 'CAMPO POR DEFINIR')/2 - 10, 48.5, 6, 6);
-      doc.text((nextMatchPdf.field || 'CAMPO POR DEFINIR').toUpperCase(), leftCX, 53, { align: 'center' });
       
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(13);
-      doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' });
+      const fieldText = (nextMatchPdf.field || 'CAMPO POR DEFINIR').toUpperCase();
+      const fieldWidth = doc.getTextWidth(fieldText);
+      
+      // Si el texto es muy largo, lo dividimos en dos líneas y centramos el icono con la primera línea
+      if (fieldWidth > 80) {
+          const splitField = doc.splitTextToSize(fieldText, 80);
+          const firstLineWidth = doc.getTextWidth(splitField[0]);
+          if (iPin) doc.addImage(iPin, 'PNG', leftCX - (firstLineWidth / 2) - 8, 45, 6, 6); // Icono más arriba
+          doc.text(splitField, leftCX, 49.5, { align: 'center' }); // Texto en dos líneas
+          
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(13);
+          doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' }); // Fecha más abajo si hay dos líneas
+      } else {
+          // Si el texto cabe en una línea, lo centramos normal
+          if (iPin) doc.addImage(iPin, 'PNG', leftCX - (fieldWidth / 2) - 8, 48.5, 6, 6);
+          doc.text(fieldText, leftCX, 53, { align: 'center' });
+          
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(13);
+          doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' });
+      }
 
       // Matchup Area
       const shieldY = 90;
@@ -595,16 +612,24 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.setFontSize(26);
     doc.setFont("Roboto", "bolditalic");
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(-0.5);
-    doc.text(gk.name.toUpperCase(), 57, 137, { align: 'center', maxWidth: 80 });
+    
+    // Calcular altura para evitar que se monte si el nombre es muy largo
+    const nameLines = doc.splitTextToSize(gk.name.toUpperCase(), 80);
+    doc.text(nameLines, 57, 134, { align: 'center' });
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
     
-    doc.setTextColor(239, 68, 68); // red-500
-    doc.setFontSize(10);
+    // Bajamos el subtítulo dinámicamente dependiendo de si el nombre ocupa 1 o 2 líneas
+    const extraSpace = nameLines.length > 1 ? 8 : 0;
+    
+    doc.setFillColor(239, 68, 68); // Fondo rojo corporativo
+    doc.roundedRect(57 - 25, 138 + extraSpace, 50, 7, 2, 2, 'F'); // Badge rojo para resaltar el dorsal
+    doc.setTextColor(255, 255, 255); // Texto blanco
+    doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
-    doc.text(`#${gk.number || '-'} | ${gk.team.toUpperCase()}`, 57, 144, { align: 'center' });
+    doc.text(`DORSAL ${gk.number || '-'} | ${gk.team.toUpperCase()}`, 57, 143 + extraSpace, { align: 'center' });
 
     // Información Perfil
-    let py = 158;
+    let py = 158 + (extraSpace > 0 ? 5 : 0); // Ajustamos el inicio de la info si el nombre es largo
     const addProfileRow = (label, val) => {
       doc.setTextColor(...p.textMuted);
       doc.setFont("Roboto", "bold");
@@ -762,7 +787,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.text("COMPETICIÓN", 60, tY + 7);
     doc.text("RIVAL", 140, tY + 7);
     doc.text("CAMPO", 200, tY + 7);
-    doc.text("GOLES", 265, tY + 7);
+    doc.text("MINUTOS", 265, tY + 7); // CAMBIADO DE "GOLES" A "MINUTOS"
     tY += 14;
 
     const gkMatchesAll = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(b.date) - new Date(a.date)); // Ordenados del más reciente al más antiguo para el historial
@@ -800,9 +825,13 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3);
         doc.text(m.field || '--', 200, tY + 6, { maxWidth: 60 });
         
-        doc.setTextColor(239, 68, 68); // Goles siempre rojos para destacar
+        // AHORA IMPRIME LOS MINUTOS JUGADOS EN LUGAR DE LOS GOLES
+        doc.setTextColor(...p.textMain); // Texto color principal
         doc.setFont("Roboto", "bold");
-        doc.text(String(m.goalsScored || rival?.goalsScored || '-'), 265, tY + 6);
+        
+        // Minutos jugados en ese partido. Si no hay dato, guion.
+        const minsJugados = m.minutes || '-';
+        doc.text(String(minsJugados), 265, tY + 6);
         
         tY += 12;
       });
