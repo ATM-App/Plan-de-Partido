@@ -891,8 +891,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         safeImgLoad(ESCUDO_ATM_URL),
         informe.rivalId ? safeImgLoad(rivals?.find(r => r.id === informe.rivalId)?.shieldUrl) : Promise.resolve(null),
         informe.logoTorneo ? safeImgLoad(informe.logoTorneo) : Promise.resolve(null),
-        // AHORA TOMA TU URL AUTOMÁTICAMENTE:
-        (informe.tipo === 'torneo' && informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=torneo&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
+        // GENERAR QR PARA CUALQUIER TIPO DE INFORME:
+        (informe.id) ? safeImgLoad(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://atm-app.github.io/Plan-de-Partido/?view=informe&id=${informe.id}`)}&margin=1`) : Promise.resolve(null),
         loadIconB64('activity', '#e11d48'), 
         loadIconB64('target', '#3b82f6'), 
         loadIconB64('gitCompare', '#10b981')
@@ -952,8 +952,8 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.addImage(torneoLogoB64, 'PNG', 15, 255, 30, 30); 
     }
 
-    // Dibujar Código QR Centrado (Solo Torneo)
-    if (informe.tipo === 'torneo' && qrCodeB64) {
+    // Dibujar Código QR Centrado en todos los informes
+    if (qrCodeB64) {
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(pageWidth / 2 - 12.5, 257, 25, 25, 2, 2, 'F');
         doc.addImage(qrCodeB64, 'PNG', pageWidth / 2 - 11.5, 258, 23, 23);
@@ -1531,7 +1531,7 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [informesList, setInformesList] = useState([]);
 
-  // LÓGICA VISTA PÚBLICA POR QR
+  // LÓGICA VISTA PÚBLICA POR QR (INFORMES SECUNDARIOS)
   const [publicReportViewId, setPublicReportViewId] = useState(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const viewParam = searchParams.get('view');
@@ -1541,6 +1541,14 @@ export default function App() {
     }
     return null;
   });
+
+  // LÓGICA VISTA PÚBLICA POR QR (PERFIL PRINCIPAL PLAN DE PARTIDO)
+  const [publicGkViewId, setPublicGkViewId] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('public_gk');
+  });
+
+  const [darkMode, setDarkMode] = useState(false);
 
   const [darkMode, setDarkMode] = useState(false);
   const [currentModule, setCurrentModule] = useState('inicio');
@@ -1804,7 +1812,7 @@ export default function App() {
   // 5. CONDICIONALES DE RENDERIZADO (Regla: Nunca antes de un Hook)
   // ===============================================
 
-  // VISTA PÚBLICA (QR)
+  // VISTA PÚBLICA DE INFORME (QR)
   if (publicReportViewId) {
     if (informesList.length === 0 && loadingAuth === false) {
         return (
@@ -1814,6 +1822,51 @@ export default function App() {
         );
     }
     return <PublicReportView reportId={publicReportViewId} informesList={informesList} goalkeepers={goalkeepers} />;
+  }
+
+  // VISTA PÚBLICA DEL PERFIL DEL PORTERO (QR PRINCIPAL)
+  if (publicGkViewId) {
+    if (isDataLoading) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-slate-950 text-white font-sans">
+          <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      );
+    }
+    const gk = goalkeepers.find(g => g.id === publicGkViewId);
+    if (!gk) {
+      return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white font-bold p-6 text-center"><X size={48} className="text-red-500 mb-4"/><h1 className="text-2xl">Portero no encontrado</h1></div>;
+    }
+    return (
+      <div className={`flex flex-col min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+        <header className="bg-blue-950 text-white p-5 flex items-center justify-center gap-3 shadow-xl relative z-20">
+           <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-10 h-10 object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
+           <div className="flex flex-col">
+             <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-white leading-none">
+               ATLETI <span className="text-red-600">PLAN PARTIDO</span>
+             </h1>
+             <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Informe Confidencial</span>
+           </div>
+        </header>
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div className="max-w-6xl mx-auto pb-10">
+            <DashboardView 
+               gk={gk} 
+               allGks={goalkeepers} 
+               matches={matches} 
+               rivals={rivals} 
+               theme={theme} 
+               darkMode={darkMode} 
+               activeSeason={activeSeason} 
+               role="public" // Esta etiqueta "public" oculta los botones de edición automáticamente
+               onEditTechDec={()=>{}} onEditStats={()=>{}} onEditMatchPlan={()=>{}} 
+               showNotification={showNotification} 
+               isDataLoading={isDataLoading} 
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // APP PRIVADA: CARGANDO
@@ -1830,7 +1883,6 @@ export default function App() {
     return <LoginScreen users={usersList} onLogin={(u) => { setAppUser(u); setRole(u.role); }} />;
   }
 
-  // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
   // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
   const renderModule = () => {
     if (selectedGkId && currentModule === 'reporte_detalle') {
@@ -3146,7 +3198,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       <div>
         <div className="flex justify-between items-center mb-6 ml-2 group">
           <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
-          {role !== 'staff' && (
+          {role !== 'staff' && role !== 'public' && (
             <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estadísticas">
               <Edit2 size={16} strokeWidth={3} />
             </button>
@@ -3203,7 +3255,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
           <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">
             <Target size={18} className="text-blue-500"/> Plan de Partido
           </h3>
-          {role !== 'staff' && (
+          {role !== 'staff' && role !== 'public' && (
             <button onClick={onEditMatchPlan} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Plan de Partido">
               <Edit2 size={16} strokeWidth={3} />
             </button>
@@ -3266,7 +3318,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
              <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-2">
                <BarChart2 size={18}/> Decisión
              </h3>
-             {role !== 'staff' && (
+             {role !== 'staff' && role !== 'public' && (
                <button onClick={onEditTechDec} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Decisión">
                  <Edit2 size={14} strokeWidth={3} />
                </button>
