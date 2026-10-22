@@ -1269,6 +1269,103 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 };
 
 // ==========================================
+// GENERADOR DE BRIEFING MATCHDAY PDF
+// ==========================================
+const exportarBriefingPDF = async (matches, rivals, gks, showNotification) => {
+  try {
+    if (showNotification) showNotification("Generando Briefing Matchday...", "success");
+    const jspdfModule = await loadJsPDF();
+    const doc = new jspdfModule.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await loadCustomFonts(doc);
+
+    const safeImgLoad = (url) => new Promise(resolve => {
+        if(!url) return resolve(null);
+        const img = new Image(); img.crossOrigin = "Anonymous";
+        img.onload = () => {
+          const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+          canvas.getContext('2d').drawImage(img, 0, 0); resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => resolve(null); img.src = url;
+    });
+
+    const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
+
+    const pageWidth = 210; const pageHeight = 297;
+    let currentY = 0;
+
+    const drawHeader = () => {
+        doc.setFillColor(11, 19, 43); // Deep Navy
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        doc.setFillColor(220, 38, 38);
+        doc.rect(0, 0, pageWidth, 40, 'F');
+        if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', 15, 8, 24, 24);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(28); doc.setFont("Roboto", "bolditalic");
+        doc.text("MATCHDAY BRIEFING", 45, 22);
+        doc.setFontSize(10); doc.setFont("Roboto", "bold");
+        doc.text(`DEPARTAMENTO DE PORTEROS • ATLÉTICO DE MADRID`, 45, 28);
+        currentY = 55;
+    };
+
+    drawHeader();
+
+    if (!matches || matches.length === 0) {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(14);
+        doc.text("No hay partidos programados en los próximos días.", pageWidth/2, 100, {align: 'center'});
+        doc.save('BRIEFING_MATCHDAY.pdf');
+        return;
+    }
+
+    for (let i = 0; i < matches.length; i++) {
+        const m = matches[i];
+        const rival = rivals.find(r => r.id === m.rivalId);
+        const rivalShield = await safeImgLoad(rival?.shieldUrl);
+
+        if (currentY > 240) { doc.addPage(); drawHeader(); }
+
+        doc.setFillColor(30, 41, 59);
+        doc.roundedRect(15, currentY, pageWidth - 30, 45, 3, 3, 'F');
+
+        doc.setFillColor(15, 23, 42);
+        doc.roundedRect(20, currentY + 5, 35, 35, 2, 2, 'F');
+        doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("Roboto", "bolditalic");
+        doc.text(m.time || '--:--', 37.5, currentY + 20, {align: 'center'});
+        doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont("Roboto", "bold");
+        doc.text(formatDate(m.date), 37.5, currentY + 28, {align: 'center'});
+
+        if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', 65, currentY + 10, 16, 16);
+        doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("Roboto", "bold");
+        doc.text(m.myTeam || 'ATLETI', 85, currentY + 20);
+
+        doc.setTextColor(148, 163, 184); doc.setFontSize(10); doc.text("VS", 115, currentY + 20);
+
+        if (rivalShield) doc.addImage(rivalShield, 'PNG', 130, currentY + 10, 16, 16);
+        doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("Roboto", "bold");
+        let safeRivalName = rival?.name || 'RIVAL';
+        if(doc.getTextWidth(safeRivalName) > 40) safeRivalName = safeRivalName.substring(0,20) + '...';
+        doc.text(safeRivalName, 150, currentY + 20);
+
+        doc.setTextColor(148, 163, 184); doc.setFontSize(8);
+        doc.text(`COMPETICIÓN: ${m.league || '-'} • J${m.matchday || '-'}`, 65, currentY + 35);
+        doc.setTextColor(248, 113, 113); 
+        doc.text(`CAMPO: ${m.field || 'Por definir'}`, 65, currentY + 40);
+
+        currentY += 55;
+    }
+
+    doc.setTextColor(148, 163, 184); doc.setFontSize(8);
+    doc.text("Generado automáticamente por Atleti Plan de Partido", pageWidth/2, 285, {align: 'center'});
+
+    doc.save(`BRIEFING_MATCHDAY_${formatDate(new Date().toISOString().split('T')[0]).replace(/\//g,'-')}.pdf`);
+    if (showNotification) showNotification("Briefing Descargado Exitosamente", "success");
+
+  } catch (error) {
+    console.error("Error generando Briefing:", error);
+    if (showNotification) showNotification("Error exportando PDF.", "error");
+  }
+};
+
+// ==========================================
 // COMPONENTES DE UI REUTILIZABLES (DRY)
 // ==========================================
 
@@ -1831,7 +1928,6 @@ export default function App() {
   }
 
   // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
-  // APP PRIVADA: DASHBOARD PRINCIPAL Y RENDER MODULES
   const renderModule = () => {
     if (selectedGkId && currentModule === 'reporte_detalle') {
       return (
@@ -1877,6 +1973,7 @@ export default function App() {
           setViewLockerRoom={setViewLockerRoom}
           onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)}
           role={role}
+          showNotification={showNotification} 
         />
       );
       case 'porteros': return <ModulePorteros gks={visibleGoalkeepers} role={role} onSelect={(id) => { setSelectedGkId(id); setCurrentModule('reporte_detalle'); }} onNew={() => { setEditingGk(null); setIsGkFormOpen(true); }} onEdit={(gk) => { setEditingGk(gk); setIsGkFormOpen(true); }} onDelete={(id) => handleDeleteDoc('goalkeepers', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
@@ -1885,10 +1982,10 @@ export default function App() {
       case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} />;
       case 'ajustes': return <ModuleAjustes users={usersList} currentUserData={currentUserData} role={role} onNewUser={() => {setEditingUser(null); setIsUserFormOpen(true);}} onEditUser={(u) => {setEditingUser(u); setIsUserFormOpen(true);}} onSaveProfile={handleSaveProfile} onBackup={downloadBackup} theme={theme} darkMode={darkMode} />;
       case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} existingReports={informesList} onSave={async (data) => { const id = await handleSaveDoc('informes', data, !data.id, data.isDraft ? "Borrador guardado" : "Informe finalizado"); if (id && !data.id) data.id = id; return id; }} onDelete={(id) => handleDeleteDoc('informes', id)} showNotification={showNotification} />;
-      default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={visibleRivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} />;
+      default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={visibleRivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} showNotification={showNotification} />;
     }
   };
-
+  
   return (
     <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''} bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100`}>
       <style>{`
@@ -2470,12 +2567,14 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // ==========================================
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
-function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
+function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role, showNotification }) {
   const todayStr = new Date().toISOString().split('T')[0];
   const upcomingMatches = [...matches]
     .filter(m => m.date >= todayStr)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
+    
   const [weatherData, setWeatherData] = useState({ temp: '--', desc: 'Cargando...', city: 'Madrid', isRainy: false });
+  const [countdown, setCountdown] = useState('');
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -2496,12 +2595,34 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
     fetchWeather();
   }, []);
 
+  // LÓGICA DE CUENTA ATRÁS EN VIVO
+  useEffect(() => {
+    if (!upcomingMatches.length) return;
+    const nextM = upcomingMatches[0];
+    const mDate = new Date(`${nextM.date}T${nextM.time || '00:00'}:00`);
+
+    const timer = setInterval(() => {
+      const diff = mDate - new Date();
+      if (diff <= 0) { setCountdown('EN JUEGO'); return; }
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      setCountdown(`${d > 0 ? d + 'd ' : ''}${h}h ${m}m`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [upcomingMatches]);
+
   const hour = new Date().getHours();
   let greeting = "BUENOS DÍAS";
   if (hour >= 13 && hour < 20) greeting = "BUENAS TARDES";
   else if (hour >= 20 || hour < 5) greeting = "BUENAS NOCHES";
 
   const userName = currentUserData?.name ? currentUserData.name.split(' ')[0].toUpperCase() : 'ENTRENADOR';
+
+  // DETECTAR SI ES SEMANA DE PARTIDO (Próximos 7 días)
+  const nextMatchDate = upcomingMatches.length > 0 ? new Date(upcomingMatches[0].date) : null;
+  const daysToNextMatch = nextMatchDate ? (nextMatchDate - new Date()) / (1000 * 60 * 60 * 24) : 999;
+  const isGameday = daysToNextMatch <= 7;
 
   if (isDataLoading) {
     return (
@@ -2516,35 +2637,109 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
 
   return (
     <div className="space-y-8">
+      {/* HEADER DINÁMICO: GAMEDAY vs SALUDO NORMAL */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="md:col-span-2 bg-blue-950 rounded-[2.5rem] p-8 flex flex-col justify-center relative overflow-hidden shadow-sm min-h-[140px]">
-           <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
-              <Shield size={180} />
-           </div>
-           <div className="relative z-10 text-left">
-             <h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">
-               {greeting}, {userName}
-             </h2>
-           </div>
-         </div>
+         {isGameday ? (
+           // MODO CINEMATOGRÁFICO: CARTEL MATCHDAY
+           <div className="md:col-span-3 bg-[#0a0f1c] rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-center relative overflow-hidden shadow-2xl border border-slate-800 group min-h-[320px]">
+             {/* Luces y Efectos de Fondo */}
+             <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-red-600/30 transition-colors duration-700"></div>
+             <div className="absolute bottom-[-50%] right-[-10%] w-[60%] h-[150%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-600/30 transition-colors duration-700"></div>
 
-         <div className={`md:col-span-1 rounded-[2.5rem] p-6 flex items-center justify-between text-white relative overflow-hidden shadow-sm min-h-[140px] ${weatherData.isRainy ? 'bg-gradient-to-r from-slate-600 to-slate-800' : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}>
-           <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none -mr-8">
-              {weatherData.isRainy ? <CloudRain size={120} /> : <Sun size={120} />}
+             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10 h-full">
+               
+               {/* 1. Información Izquierda y Botón Briefing */}
+               <div className="flex flex-col items-center md:items-start w-full md:w-1/3 text-center md:text-left">
+                  <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg mb-4 flex items-center gap-2 shadow-lg">
+                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span></span>
+                    Matchday Briefing
+                  </span>
+                  <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
+                    {upcomingMatches[0].myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br/>{rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.name || 'RIVAL'}
+                  </h2>
+                  <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">{upcomingMatches[0].league || 'Competición Oficial'}</p>
+
+                  <button onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
+                    <Download size={18} /> Exportar Briefing PDF
+                  </button>
+               </div>
+
+               {/* 2. Escudos Enfrentados Centrales */}
+               <div className="flex items-center justify-center gap-6 md:gap-8 w-full md:w-1/3">
+                  <img src={ESCUDO_ATM_URL} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-[0_0_25px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-transform" alt="Atleti"/>
+                  <span className="text-2xl md:text-3xl text-slate-500 font-black italic drop-shadow-md">VS</span>
+                  {rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.shieldUrl ? (
+                     <img src={rivals.find(r=>r.id===upcomingMatches[0].rivalId).shieldUrl} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:scale-110 transition-transform" alt="Rival"/>
+                  ) : (
+                     <Swords className="w-24 h-24 md:w-32 md:h-32 text-slate-600 drop-shadow-md" />
+                  )}
+               </div>
+
+               {/* 3. Cuenta Atrás y Línea de Tiempo (HUD) Derecha */}
+               <div className="flex flex-col items-center md:items-end w-full md:w-1/3">
+                  <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/80 p-4 rounded-2xl flex flex-col items-center mb-2 shadow-inner min-w-[200px]">
+                     <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-1">Inicia en</span>
+                     <span className="text-3xl lg:text-4xl font-black text-white italic tracking-tighter tabular-nums drop-shadow-md">{countdown || '--h --m'}</span>
+                  </div>
+
+                  {/* Línea de tiempo Vertical Glassmorphism */}
+                  {upcomingMatches.length > 1 && (
+                    <div className="w-full flex flex-col gap-3 mt-4 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-700 before:to-transparent">
+                       {upcomingMatches.slice(1, 4).map((m, i) => (
+                          <div key={m.id} className="relative flex items-center justify-between md:justify-center group">
+                             <div className="absolute left-0 md:left-1/2 w-6 h-6 rounded-full border-4 border-[#0a0f1c] bg-slate-700 group-hover:bg-red-500 group-hover:border-red-900 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
+                               <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                             </div>
+                             <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 text-left md:text-right">
+                                <span className="text-white text-xs font-black truncate block drop-shadow-md">{rivals.find(r=>r.id===m.rivalId)?.name || 'Rival'}</span>
+                                <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{m.time || 'TBD'} • {formatDate(m.date)}</span>
+                             </div>
+                             <div className="hidden md:flex md:w-1/2 md:pl-8 text-left justify-start">
+                                <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-300 text-[8px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
+                                  {m.field?.includes('Cerro') ? <Home size={10} className="text-red-400"/> : <MapPin size={10} className="text-blue-400"/>}
+                                  {m.myTeam}
+                                </span>
+                             </div>
+                          </div>
+                       ))}
+                    </div>
+                  )}
+               </div>
+             </div>
            </div>
-           <div className="flex items-center gap-4 z-10 w-full">
-              <div className="bg-white/20 p-4 rounded-[1.5rem] backdrop-blur-sm shrink-0">
-                 {weatherData.isRainy ? <CloudRain size={36} /> : <Sun size={36} />}
-              </div>
-              <div className="text-left">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-white/90 mb-1">{weatherData.city}</p>
-                 <div className="flex items-baseline gap-2">
-                   <span className="text-4xl font-black tracking-tighter leading-none">{weatherData.temp}º</span>
-                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">{weatherData.desc}</span>
-                 </div>
-              </div>
-           </div>
-         </div>
+         ) : (
+           // SALUDO NORMAL (Si no hay partidos en 7 días)
+           <>
+             <div className="md:col-span-2 bg-blue-950 rounded-[2.5rem] p-8 flex flex-col justify-center relative overflow-hidden shadow-sm min-h-[140px]">
+               <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
+                  <Shield size={180} />
+               </div>
+               <div className="relative z-10 text-left">
+                 <h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">
+                   {greeting}, {userName}
+                 </h2>
+               </div>
+             </div>
+
+             <div className={`md:col-span-1 rounded-[2.5rem] p-6 flex items-center justify-between text-white relative overflow-hidden shadow-sm min-h-[140px] ${weatherData.isRainy ? 'bg-gradient-to-r from-slate-600 to-slate-800' : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}>
+               <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none -mr-8">
+                  {weatherData.isRainy ? <CloudRain size={120} /> : <Sun size={120} />}
+               </div>
+               <div className="flex items-center gap-4 z-10 w-full">
+                  <div className="bg-white/20 p-4 rounded-[1.5rem] backdrop-blur-sm shrink-0">
+                     {weatherData.isRainy ? <CloudRain size={36} /> : <Sun size={36} />}
+                  </div>
+                  <div className="text-left">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-white/90 mb-1">{weatherData.city}</p>
+                     <div className="flex items-baseline gap-2">
+                       <span className="text-4xl font-black tracking-tighter leading-none">{weatherData.temp}º</span>
+                       <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">{weatherData.desc}</span>
+                     </div>
+                  </div>
+               </div>
+             </div>
+           </>
+         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2559,7 +2754,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
         <div className="md:col-span-2 overflow-hidden flex flex-col gap-4">
           <div className="flex justify-between items-end px-2 mb-2">
              <div className="text-left">
-               <h3 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Próximos Partidos</h3>
+               <h3 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Calendario General</h3>
              </div>
              {upcomingMatches.length > 1 && <span className="text-[10px] uppercase font-black tracking-widest text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-xl">Desliza →</span>}
           </div>
