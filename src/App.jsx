@@ -2558,10 +2558,7 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // ==========================================
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
-// ==========================================
-// MÓDULOS DE LA APLICACIÓN
-// ==========================================
-function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role, showNotification }) {
+function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
   
   // PARSEADOR SEGURO PARA ORDENAR POR FECHA Y HORA EXACTAS
   const parseSafeDate = (d, t) => {
@@ -2658,15 +2655,15 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                <div className="flex flex-col items-center md:items-start w-full md:w-1/3 text-center md:text-left">
                   <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg mb-4 flex items-center gap-2 shadow-lg">
                     <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span></span>
-                    Matchday Briefing
+                    Matchday
                   </span>
                   <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
                     {upcomingMatches[0].myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br/>{rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.name || 'RIVAL'}
                   </h2>
                   <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">{upcomingMatches[0].league || 'Competición Oficial'}</p>
 
-                  <button onClick={() => { if(typeof exportarBriefingPDF === 'function') exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification); else console.log("exportarBriefingPDF no definido"); }} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
-                    <Download size={18} /> Exportar Briefing PDF
+                  <button onClick={() => setModule('partidos')} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
+                    <CalendarDays size={18} /> Ver Partidos
                   </button>
                </div>
 
@@ -2701,17 +2698,19 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                              
                              <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 flex flex-col md:items-end justify-center w-full">
                                 <div className="flex items-center gap-2 mb-1 justify-start md:justify-end bg-slate-800/50 border border-slate-700/50 p-2 rounded-xl backdrop-blur-sm shadow-md">
-                                   <div className="flex items-center gap-1.5 pr-2 border-r border-slate-600">
+                                   <div className="flex flex-col items-center">
                                      <img src={ESCUDO_ATM_URL} className="w-6 h-6 object-contain drop-shadow-md" alt="Atleti" />
-                                     <span className="text-[9px] text-slate-500 font-black italic">VS</span>
+                                   </div>
+                                   <span className="text-[9px] text-slate-500 font-black italic">VS</span>
+                                   <div className="flex flex-col items-center">
                                      {rInfo?.shieldUrl ? (
                                         <img src={rInfo.shieldUrl} className="w-6 h-6 object-contain drop-shadow-md" alt="Rival" />
                                      ) : (
                                         <Swords className="w-6 h-6 text-slate-500" />
                                      )}
                                    </div>
-                                   <div className="flex flex-col text-left">
-                                      <span className="text-white text-xs font-black uppercase truncate max-w-[120px]">{m.myTeam || 'ATLETI'}</span>
+                                   <div className="ml-2 pl-2 border-l border-slate-600 flex flex-col text-left">
+                                      <span className="text-white text-xs font-black uppercase truncate max-w-[120px]" title={m.myTeam || 'ATLETI'}>{m.myTeam || 'ATLETI'}</span>
                                       <span className="text-red-400 text-[10px] font-black tracking-widest">{m.time || '--:--'}</span>
                                    </div>
                                 </div>
@@ -2721,8 +2720,8 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                                 <div className="flex flex-col items-start gap-1">
                                   <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{formatDate(m.date)}</span>
                                   <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-200 text-[9px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
-                                    {m.field?.includes('Cerro') ? <Home size={10} className="text-red-400"/> : <MapPin size={10} className="text-blue-400"/>}
-                                    {m.myTeam || 'ATLETI'}
+                                    <MapPin size={10} className="text-blue-400"/>
+                                    {m.field || 'Por definir'}
                                   </span>
                                 </div>
                              </div>
