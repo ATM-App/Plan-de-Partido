@@ -795,10 +795,10 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.text("COMPETICIÓN", 60, tY + 7);
     doc.text("RIVAL", 140, tY + 7);
     doc.text("CAMPO", 200, tY + 7);
-    doc.text("MINUTOS", 265, tY + 7); // CAMBIADO DE "GOLES" A "MINUTOS"
+    doc.text("MINUTOS", 265, tY + 7); // AHORA PONE MINUTOS
     tY += 14;
 
-    const gkMatchesAll = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(b.date) - new Date(a.date)); // Ordenados del más reciente al más antiguo para el historial
+    const gkMatchesAll = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(b.date) - new Date(a.date));
     
     if (gkMatchesAll.length === 0) {
       doc.setTextColor(...p.textMain);
@@ -807,10 +807,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     } else {
       gkMatchesAll.forEach((m) => {
         if (tY > pageHeight - 20) {
-          doc.addPage();
-          drawBackground();
-          drawHeader();
-          tY = 40;
+          doc.addPage(); drawBackground(); drawHeader(); tY = 40;
         }
 
         const rival = rivals.find(r => r.id === m.rivalId);
@@ -818,26 +815,20 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         doc.setDrawColor(...p.line);
         doc.line(15, tY + 10, pageWidth - 15, tY + 10);
         
-        doc.setTextColor(...p.textMuted);
-        doc.setFont("Roboto", "normal");
+        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
         doc.text(m.date || '--', 20, tY + 6);
-        
         doc.text(`${m.league || '--'} ${m.matchday ? `(J${m.matchday})` : ''}`, 60, tY + 6);
         
-        doc.setTextColor(...p.textMain);
-        doc.setFont("Roboto", "bold");
+        doc.setTextColor(...p.textMain); doc.setFont("Roboto", "bold");
         doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 140, tY + 6, { maxWidth: 55 });
         
-        doc.setTextColor(...p.textMuted);
-        doc.setFont("Roboto", "normal");
+        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
         if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3);
         doc.text(m.field || '--', 200, tY + 6, { maxWidth: 60 });
         
-        // AHORA IMPRIME LOS MINUTOS JUGADOS
+        // IMPRIME LOS MINUTOS JUGADOS
         doc.setTextColor(...p.textMain); 
         doc.setFont("Roboto", "bold");
-        
-        // Obtenemos los minutos específicos de este portero guardados en gkMinutes
         const minsJugados = (m.gkMinutes && m.gkMinutes[gk.id]) ? m.gkMinutes[gk.id] : '-';
         doc.text(String(minsJugados), 265, tY + 6);
         
@@ -2568,10 +2559,19 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
 function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
+  
+  // PARSEADOR SEGURO PARA ORDENAR POR FECHA Y HORA EXACTAS
+  const parseSafeDate = (d, t) => {
+    if(!d) return 0;
+    const [y, mo, day] = d.split('-');
+    const [h, mi] = (t || '00:00').split(':');
+    return new Date(y, mo - 1, day, h, mi).getTime();
+  };
+
   const todayStr = new Date().toISOString().split('T')[0];
   const upcomingMatches = [...matches]
     .filter(m => m.date >= todayStr)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+    .sort((a, b) => parseSafeDate(a.date, a.time) - parseSafeDate(b.date, b.time)); // ORDENADO PERFECTAMENTE
     
   const [weatherData, setWeatherData] = useState({ temp: '--', desc: 'Cargando...', city: 'Madrid', isRainy: false });
   const [countdown, setCountdown] = useState('');
@@ -2595,15 +2595,14 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
     fetchWeather();
   }, []);
 
-  // LÓGICA DE CUENTA ATRÁS EN VIVO (MÉTODO SEGURO)
+  // LÓGICA DE CUENTA ATRÁS EN VIVO (MÉTODO SEGURO MULTINAVEGADOR)
   useEffect(() => {
     if (!upcomingMatches.length) return;
     const nextM = upcomingMatches[0];
     
-    // Parsear fecha de forma segura para evitar NaN
     const [year, month, day] = nextM.date.split('-');
     const [hours, minutes] = (nextM.time || '00:00').split(':');
-    const mDate = new Date(year, month - 1, day, hours || 0, minutes || 0);
+    const mDate = new Date(year, month - 1, day, hours, minutes);
 
     const timer = setInterval(() => {
       const diff = mDate.getTime() - new Date().getTime();
@@ -2711,8 +2710,8 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                                      )}
                                    </div>
                                    <div className="ml-2 pl-2 border-l border-slate-600 flex flex-col text-left">
-                                      <span className="text-white text-xs font-black truncate max-w-[120px]" title={rInfo?.name || 'Rival'}>{rInfo?.name || 'Rival'}</span>
-                                      <span className="text-red-400 text-[10px] font-black tracking-widest">{m.time || 'TBD'}</span>
+                                      <span className="text-white text-xs font-black uppercase truncate max-w-[120px]" title={m.myTeam || 'ATLETI'}>{m.myTeam || 'ATLETI'}</span>
+                                      <span className="text-red-400 text-[10px] font-black tracking-widest">{m.time || '--:--'}</span>
                                    </div>
                                 </div>
                              </div>
@@ -2721,8 +2720,8 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                                 <div className="flex flex-col items-start gap-1">
                                   <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{formatDate(m.date)}</span>
                                   <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-200 text-[9px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
-                                    {m.field?.includes('Cerro') ? <Home size={10} className="text-red-400"/> : <MapPin size={10} className="text-blue-400"/>}
-                                    {m.myTeam || 'ATLETI'}
+                                    <MapPin size={10} className="text-blue-400"/>
+                                    {m.field || 'Por definir'}
                                   </span>
                                 </div>
                              </div>
