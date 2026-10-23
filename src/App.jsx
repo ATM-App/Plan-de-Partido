@@ -1652,7 +1652,7 @@ export default function App() {
   const [isAddSeasonModalOpen, setIsAddSeasonModalOpen] = useState(false);
   const [exportTrigger, setExportTrigger] = useState(0);
 
-  const [viewLockerRoom, setViewLockerRoom] = useState(true);
+  const [viewLockerRoom, setViewLockerRoom] = useState(false);
   const [lockerSelectedGk, setLockerSelectedGk] = useState(null);
 
   // 2. DECLARACIÓN DE TODOS LOS EFECTOS (useEffect)
