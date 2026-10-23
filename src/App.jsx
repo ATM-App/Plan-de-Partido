@@ -1661,7 +1661,7 @@ export default function App() {
   const [isAddSeasonModalOpen, setIsAddSeasonModalOpen] = useState(false);
   const [exportTrigger, setExportTrigger] = useState(0);
 
-  const [viewLockerRoom, setViewLockerRoom] = useState(true);
+  const [viewLockerRoom, setViewLockerRoom] = useState(false);
   const [lockerSelectedGk, setLockerSelectedGk] = useState(null);
 
   // 2. DECLARACIÓN DE TODOS LOS EFECTOS (useEffect)
@@ -2567,7 +2567,7 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // ==========================================
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
-function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role, showNotification }) {
+function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
   const todayStr = new Date().toISOString().split('T')[0];
   const upcomingMatches = [...matches]
     .filter(m => m.date >= todayStr)
@@ -2595,14 +2595,18 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
     fetchWeather();
   }, []);
 
-  // LÓGICA DE CUENTA ATRÁS EN VIVO
+  // LÓGICA DE CUENTA ATRÁS EN VIVO (MÉTODO SEGURO)
   useEffect(() => {
     if (!upcomingMatches.length) return;
     const nextM = upcomingMatches[0];
-    const mDate = new Date(`${nextM.date}T${nextM.time || '00:00'}:00`);
+    
+    // Parsear fecha de forma segura para evitar NaN
+    const [year, month, day] = nextM.date.split('-');
+    const [hours, minutes] = (nextM.time || '00:00').split(':');
+    const mDate = new Date(year, month - 1, day, hours || 0, minutes || 0);
 
     const timer = setInterval(() => {
-      const diff = mDate - new Date();
+      const diff = mDate.getTime() - new Date().getTime();
       if (diff <= 0) { setCountdown('EN JUEGO'); return; }
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
       const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
@@ -2652,15 +2656,15 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                <div className="flex flex-col items-center md:items-start w-full md:w-1/3 text-center md:text-left">
                   <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg mb-4 flex items-center gap-2 shadow-lg">
                     <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span></span>
-                    Matchday Briefing
+                    Matchday
                   </span>
                   <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
                     {upcomingMatches[0].myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br/>{rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.name || 'RIVAL'}
                   </h2>
                   <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">{upcomingMatches[0].league || 'Competición Oficial'}</p>
 
-                  <button onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
-                    <Download size={18} /> Exportar Briefing PDF
+                  <button onClick={() => setModule('partidos')} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
+                    <CalendarDays size={18} /> Ver Partidos
                   </button>
                </div>
 
@@ -2682,26 +2686,48 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
                      <span className="text-3xl lg:text-4xl font-black text-white italic tracking-tighter tabular-nums drop-shadow-md">{countdown || '--h --m'}</span>
                   </div>
 
-                  {/* Línea de tiempo Vertical Glassmorphism */}
+                  {/* Línea de tiempo Vertical Glassmorphism con Escudos */}
                   {upcomingMatches.length > 1 && (
                     <div className="w-full flex flex-col gap-3 mt-4 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-700 before:to-transparent">
-                       {upcomingMatches.slice(1, 4).map((m, i) => (
+                       {upcomingMatches.slice(1, 4).map((m, i) => {
+                          const rInfo = rivals.find(r=>r.id===m.rivalId);
+                          return (
                           <div key={m.id} className="relative flex items-center justify-between md:justify-center group">
                              <div className="absolute left-0 md:left-1/2 w-6 h-6 rounded-full border-4 border-[#0a0f1c] bg-slate-700 group-hover:bg-red-500 group-hover:border-red-900 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                              </div>
-                             <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 text-left md:text-right">
-                                <span className="text-white text-xs font-black truncate block drop-shadow-md">{rivals.find(r=>r.id===m.rivalId)?.name || 'Rival'}</span>
-                                <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{m.time || 'TBD'} • {formatDate(m.date)}</span>
+                             
+                             <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 flex flex-col md:items-end justify-center w-full">
+                                <div className="flex items-center gap-2 mb-1 justify-start md:justify-end bg-slate-800/50 border border-slate-700/50 p-2 rounded-xl backdrop-blur-sm shadow-md">
+                                   <div className="flex flex-col items-center">
+                                     <img src={ESCUDO_ATM_URL} className="w-6 h-6 object-contain drop-shadow-md" alt="Atleti" />
+                                   </div>
+                                   <span className="text-[9px] text-slate-500 font-black italic">VS</span>
+                                   <div className="flex flex-col items-center">
+                                     {rInfo?.shieldUrl ? (
+                                        <img src={rInfo.shieldUrl} className="w-6 h-6 object-contain drop-shadow-md" alt="Rival" />
+                                     ) : (
+                                        <Swords className="w-6 h-6 text-slate-500" />
+                                     )}
+                                   </div>
+                                   <div className="ml-2 pl-2 border-l border-slate-600 flex flex-col text-left">
+                                      <span className="text-white text-xs font-black truncate max-w-[120px]" title={rInfo?.name || 'Rival'}>{rInfo?.name || 'Rival'}</span>
+                                      <span className="text-red-400 text-[10px] font-black tracking-widest">{m.time || 'TBD'}</span>
+                                   </div>
+                                </div>
                              </div>
+                             
                              <div className="hidden md:flex md:w-1/2 md:pl-8 text-left justify-start">
-                                <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-300 text-[8px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
-                                  {m.field?.includes('Cerro') ? <Home size={10} className="text-red-400"/> : <MapPin size={10} className="text-blue-400"/>}
-                                  {m.myTeam}
-                                </span>
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{formatDate(m.date)}</span>
+                                  <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-200 text-[9px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
+                                    {m.field?.includes('Cerro') ? <Home size={10} className="text-red-400"/> : <MapPin size={10} className="text-blue-400"/>}
+                                    {m.myTeam || 'ATLETI'}
+                                  </span>
+                                </div>
                              </div>
                           </div>
-                       ))}
+                       )})}
                     </div>
                   )}
                </div>
