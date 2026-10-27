@@ -2978,9 +2978,25 @@ function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, d
 }
 
 function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
+  const [equipoFiltro, setEquipoFiltro] = useState('Todos');
+
   const todayStr = new Date().toISOString().split('T')[0];
-  const upcomingMatches = [...matches].filter(m => m.date >= todayStr).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const pastMatches = [...matches].filter(m => m.date < todayStr).sort((a, b) => new Date(b.date) - new Date(a.date)); // Descendente
+  
+  const upcomingMatches = [...matches]
+    .filter(m => m.date >= todayStr)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+  let pastMatches = [...matches]
+    .filter(m => m.date < todayStr)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Aplicar filtro por equipo solo al historial
+  if (equipoFiltro !== 'Todos') {
+    pastMatches = pastMatches.filter(m => m.myTeam === equipoFiltro);
+  }
+
+  // Obtener la lista de equipos que realmente tienen partidos en el historial para mostrar en los botones
+  const equiposConHistorial = ['Todos', ...new Set(matches.filter(m => m.date < todayStr).map(m => m.myTeam).filter(Boolean))];
 
   if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
 
@@ -3014,14 +3030,33 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
       </div>
 
       {/* SECCIÓN HISTORIAL */}
-      {pastMatches.length > 0 && (
+      {matches.filter(m => m.date < todayStr).length > 0 && (
         <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50">
-          <h3 className="text-xl font-black italic tracking-tighter uppercase text-slate-500 dark:text-slate-400 mb-6 flex items-center gap-2"><RotateCcw className="text-slate-400"/> Historial de Partidos</h3>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 opacity-80 hover:opacity-100 transition-opacity">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h3 className="text-xl font-black italic tracking-tighter uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2"><RotateCcw className="text-slate-400"/> Historial de Partidos</h3>
+            
+            {/* Botones de filtro por equipo */}
+            <div className="flex flex-wrap gap-2">
+               {equiposConHistorial.map(equipo => (
+                 <button 
+                   key={equipo}
+                   onClick={() => setEquipoFiltro(equipo)}
+                   className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm ${equipoFiltro === equipo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-400'}`}
+                 >
+                   {equipo}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 opacity-90 hover:opacity-100 transition-opacity">
             {pastMatches.map(match => {
               const rival = rivals.find(r => r.id === match.rivalId);
               return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
             })}
+            {pastMatches.length === 0 && (
+               <div className="col-span-full py-8 text-center text-slate-400 font-bold text-sm">No hay partidos jugados con este equipo.</div>
+            )}
           </div>
         </div>
       )}
@@ -3304,38 +3339,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const nextMatch = gkMatches.filter(m => m.date >= todayStr)[0];
   const nextMatchRival = nextMatch ? rivals.find(r => r.id === nextMatch.rivalId) : null;
 
-  // LÓGICA DE ESTADÍSTICAS DINÁMICAS (AUTOMÁTICA A PARTIR DE PARTIDOS DISPUTADOS)
-  const pastGkMatches = gkMatches.filter(m => m.date < todayStr);
-  let dMins = 0, dStarts = 0, dSubs = 0, dGoals = 0, dCleanSheets = 0;
-  
-  pastGkMatches.forEach(m => {
-      const mins = parseInt(m.gkMinutes?.[gk.id]);
-      if (!isNaN(mins) && mins > 0) {
-          dMins += mins;
-          if (m.gkStarter?.[gk.id]) dStarts += 1; else dSubs += 1;
-          
-          const goals = parseInt(m.gkGoalsConceded?.[gk.id]);
-          if (!isNaN(goals)) {
-             dGoals += goals;
-             if (goals === 0) dCleanSheets += 1;
-          } else {
-             // Si no hay goles específicos del portero, usa los del rival en el partido
-             const rGoals = parseInt(m.goalsRival);
-             if (!isNaN(rGoals)) {
-                dGoals += rGoals;
-                if (rGoals === 0) dCleanSheets += 1;
-             }
-          }
-      }
-  });
-
-  // Combinar datos manuales con los dinámicos generados
-  const totalMins = (parseInt(gk.stats?.minutes) || 0) + dMins;
-  const totalStarts = (parseInt(gk.stats?.starts) || 0) + dStarts;
-  const totalSubs = (parseInt(gk.stats?.subs) || 0) + dSubs;
-  const totalGoalsConceded = (parseInt(gk.stats?.goalsConceded) || 0) + dGoals;
-  const totalCleanSheets = (parseInt(gk.stats?.cleanSheets) || 0) + dCleanSheets;
-
   const getGkState = (formScore) => {
     if (formScore >= 8.0) return { text: 'EN FORMA', icon: '🟢', color: 'text-emerald-500 dark:text-emerald-400' };
     if (formScore >= 5.0) return { text: 'REGULAR', icon: '🟠', color: 'text-orange-500 dark:text-orange-400' };
@@ -3355,15 +3358,65 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
   const recommendation = gk.technicalDecision || { title: 'PENDIENTE', reason: 'Aún no se ha introducido una valoración técnica para este portero.' };
 
-  const teamMatches = gk.stats?.teamMatches || Math.max(matches.length, totalStarts + totalSubs);
-  const teamMinutes = gk.stats?.teamMinutes || teamMatches * 90;
-  const playedMatches = totalStarts + totalSubs;
+  // --- CÁLCULO DINÁMICO DE ESTADÍSTICAS BASADO SÓLO EN LOS PARTIDOS ---
+  // Calculamos todo en base al array gkMatches filtrando los ya jugados
+  const pastGkMatches = gkMatches.filter(m => m.date < todayStr);
   
-  const minsPercent = teamMinutes > 0 ? Math.round((totalMins / teamMinutes) * 100) : 0;
-  const startsPercent = teamMatches > 0 ? Math.round((totalStarts / teamMatches) * 100) : 0;
-  const subsPercent = teamMatches > 0 ? Math.round((totalSubs / teamMatches) * 100) : 0;
-  const goalsPercent = playedMatches > 0 ? Math.min(100, Math.round((totalGoalsConceded / playedMatches) * 50)) : 0;
-  const cleanSheetsPercent = playedMatches > 0 ? Math.round((totalCleanSheets / playedMatches) * 100) : 0;
+  let dynamicMinutes = 0;
+  let dynamicStarts = 0;
+  let dynamicSubs = 0;
+  let dynamicGoals = 0;
+  let dynamicCleanSheets = 0;
+
+  pastGkMatches.forEach(m => {
+      // Minutos jugados en este partido
+      const mins = parseInt(m.gkMinutes?.[gk.id]);
+      if (!isNaN(mins) && mins > 0) {
+          dynamicMinutes += mins;
+          
+          // Titular o suplente
+          if (m.gkStarter?.[gk.id]) {
+             dynamicStarts += 1;
+          } else {
+             dynamicSubs += 1;
+          }
+          
+          // Goles encajados
+          const goals = parseInt(m.gkGoalsConceded?.[gk.id]);
+          if (!isNaN(goals)) {
+             dynamicGoals += goals;
+             if (goals === 0) dynamicCleanSheets += 1;
+          } else {
+             // Si no definió goles recibidos por él, usa los del equipo
+             const teamGoals = parseInt(m.goalsRival);
+             if (!isNaN(teamGoals)) {
+                dynamicGoals += teamGoals;
+                if (teamGoals === 0) dynamicCleanSheets += 1;
+             }
+          }
+      }
+  });
+
+  // Los partidos de su equipo en total (sean convocados o no) para hacer el % de "partidos totales"
+  const totalTeamMatches = matches.filter(m => m.myTeam === gk.team && m.date < todayStr).length;
+  
+  // Usamos EXCLUSIVAMENTE los datos dinámicos (ignorando los manuales si generan conflicto)
+  // De esta forma siempre coincidirá con lo que vemos en el historial.
+  const finalMinutes = dynamicMinutes > 0 ? dynamicMinutes : (gk.stats?.minutes || 0);
+  const finalStarts = dynamicStarts > 0 ? dynamicStarts : (gk.stats?.starts || 0);
+  const finalSubs = dynamicSubs > 0 ? dynamicSubs : (gk.stats?.subs || 0);
+  const finalGoals = dynamicGoals > 0 ? dynamicGoals : (gk.stats?.goalsConceded || 0);
+  const finalCleanSheets = dynamicCleanSheets > 0 ? dynamicCleanSheets : (gk.stats?.cleanSheets || 0);
+  const finalPlayedMatches = finalStarts + finalSubs;
+  const finalTeamMatches = totalTeamMatches > finalPlayedMatches ? totalTeamMatches : finalPlayedMatches || 1; 
+
+  const teamTotalMinutes = finalTeamMatches * 90;
+
+  const minsPercent = teamTotalMinutes > 0 ? Math.round((finalMinutes / teamTotalMinutes) * 100) : 0;
+  const startsPercent = finalTeamMatches > 0 ? Math.round((finalStarts / finalTeamMatches) * 100) : 0;
+  const subsPercent = finalTeamMatches > 0 ? Math.round((finalSubs / finalTeamMatches) * 100) : 0;
+  const goalsPercent = finalPlayedMatches > 0 ? Math.min(100, Math.round((finalGoals / finalPlayedMatches) * 50)) : 0;
+  const cleanSheetsPercent = finalPlayedMatches > 0 ? Math.round((finalCleanSheets / finalPlayedMatches) * 100) : 0;
   const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
 
   return (
