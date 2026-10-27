@@ -3319,7 +3319,6 @@ function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, on
   );
 }
 
-
 // --- VISTA DETALLADA DEL PORTERO (DASHBOARD) ---
 function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTechDec, onEditStats, onEditMatchPlan, activeSeason, isDataLoading, exportTrigger, resetExportTrigger, showNotification, role }) {
   
@@ -3366,6 +3365,8 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   let dynamicSubs = 0;
   let dynamicGoals = 0;
   let dynamicCleanSheets = 0;
+  
+  const hasDynamic = pastGkMatches.some(m => m.gkMinutes && m.gkMinutes[gk.id] !== undefined);
 
   pastGkMatches.forEach(m => {
       const mins = parseInt(m.gkMinutes?.[gk.id]);
@@ -3392,18 +3393,29 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       }
   });
 
+  const getMatchDuration = (teamName) => {
+     const t = (teamName || '').toLowerCase();
+     if (t.includes('juvenil') || t.includes('aficionado') || t.includes('primer equipo')) return 90;
+     if (t.includes('cadete')) return 80;
+     if (t.includes('infantil')) return 70;
+     if (t.includes('alevín') || t.includes('alevin')) return 60;
+     if (t.includes('benjamín') || t.includes('benjamin')) return 50;
+     if (t.includes('prebenjamín') || t.includes('prebenjamin')) return 40;
+     return 90; 
+  };
+
   const totalTeamMatches = matches.filter(m => m.myTeam === gk.team && m.date < todayStr).length;
   
-  const finalMinutes = dynamicMinutes > 0 ? dynamicMinutes : (gk.stats?.minutes || 0);
-  const finalStarts = dynamicStarts > 0 ? dynamicStarts : (gk.stats?.starts || 0);
-  const finalSubs = dynamicSubs > 0 ? dynamicSubs : (gk.stats?.subs || 0);
-  const finalGoals = dynamicGoals > 0 ? dynamicGoals : (gk.stats?.goalsConceded || 0);
-  const finalCleanSheets = dynamicCleanSheets > 0 ? dynamicCleanSheets : (gk.stats?.cleanSheets || 0);
+  const finalMinutes = hasDynamic ? dynamicMinutes : (gk.stats?.minutes || 0);
+  const finalStarts = hasDynamic ? dynamicStarts : (gk.stats?.starts || 0);
+  const finalSubs = hasDynamic ? dynamicSubs : (gk.stats?.subs || 0);
+  const finalGoals = hasDynamic ? dynamicGoals : (gk.stats?.goalsConceded || 0);
+  const finalCleanSheets = hasDynamic ? dynamicCleanSheets : (gk.stats?.cleanSheets || 0);
   
   const finalPlayedMatches = finalStarts + finalSubs;
   const finalTeamMatches = totalTeamMatches > finalPlayedMatches ? totalTeamMatches : finalPlayedMatches || 1; 
 
-  const teamTotalMinutes = finalTeamMatches * 90;
+  const teamTotalMinutes = hasDynamic ? (finalTeamMatches * getMatchDuration(gk.team)) : (gk.stats?.teamMinutes || finalTeamMatches * 90);
 
   const minsPercent = teamTotalMinutes > 0 ? Math.round((finalMinutes / teamTotalMinutes) * 100) : 0;
   const startsPercent = finalTeamMatches > 0 ? Math.round((finalStarts / finalTeamMatches) * 100) : 0;
@@ -3425,28 +3437,16 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} 
                 alt={gk.name} 
                 className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" 
-                style={{ 
-                  objectPosition: 'center 15%', 
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-                  maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)'
-                }} 
+                style={{ objectPosition: 'center 15%', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} 
                 crossOrigin="anonymous"
               />
             </div>
-            <span 
-              className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" 
-              style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}
-            >
+            <span className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}>
               {gk.number}
             </span>
             <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${darkMode ? 'from-slate-900' : 'from-white'} to-transparent z-10 pointer-events-none`}></div>
             <div className="relative z-20 text-center pb-6 px-2">
-              <span 
-                className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" 
-                style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}
-              >
-                {gk.name}
-              </span>
+              <span className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}>{gk.name}</span>
               <p className="text-[11px] font-black text-red-600 dark:text-red-500 uppercase tracking-[0.3em] mt-2 drop-shadow-sm">{gk.team || 'Atlético de Madrid'}</p>
             </div>
           </div>
@@ -3521,7 +3521,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos</span>
+                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos Totales</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-blue-950 dark:text-white">{finalMinutes}/{teamTotalMinutes}</span>
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamTotalMinutes > 0 ? Math.round((finalMinutes / teamTotalMinutes) * 100) : 0}%</span>
