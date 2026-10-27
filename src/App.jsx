@@ -3334,8 +3334,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   if (!gk) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const gkMatches = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const nextMatch = gkMatches.filter(m => m.date >= todayStr)[0];
+  const nextMatch = matches.filter(m => m.goalkeeperIds?.includes(gk.id) && m.date >= todayStr).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
   const nextMatchRival = nextMatch ? rivals.find(r => r.id === nextMatch.rivalId) : null;
 
   const getGkState = (formScore) => {
@@ -3357,42 +3356,13 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
   const recommendation = gk.technicalDecision || { title: 'PENDIENTE', reason: 'Aún no se ha introducido una valoración técnica para este portero.' };
 
-  // --- CÁLCULO DINÁMICO DE ESTADÍSTICAS ---
-  const pastGkMatches = gkMatches.filter(m => m.date < todayStr);
+  // --- NUEVA LÓGICA DE CÁLCULO ESTRICTA ---
   
-  let dynamicMinutes = 0;
-  let dynamicStarts = 0;
-  let dynamicSubs = 0;
-  let dynamicGoals = 0;
-  let dynamicCleanSheets = 0;
-  
-  const hasDynamic = pastGkMatches.some(m => m.gkMinutes && m.gkMinutes[gk.id] !== undefined);
+  // 1. Filtrar SOLO los partidos del EQUIPO del portero que ya se han jugado
+  const allTeamPastMatches = matches.filter(m => m.myTeam === gk.team && m.date < todayStr);
+  const finalTeamMatches = allTeamPastMatches.length;
 
-  pastGkMatches.forEach(m => {
-      const mins = parseInt(m.gkMinutes?.[gk.id]);
-      if (!isNaN(mins) && mins > 0) {
-          dynamicMinutes += mins;
-          
-          if (m.gkStarter?.[gk.id]) {
-             dynamicStarts += 1;
-          } else {
-             dynamicSubs += 1;
-          }
-          
-          const goals = parseInt(m.gkGoalsConceded?.[gk.id]);
-          if (!isNaN(goals)) {
-             dynamicGoals += goals;
-             if (goals === 0) dynamicCleanSheets += 1;
-          } else {
-             const teamGoals = parseInt(m.goalsRival);
-             if (!isNaN(teamGoals)) {
-                dynamicGoals += teamGoals;
-                if (teamGoals === 0) dynamicCleanSheets += 1;
-             }
-          }
-      }
-  });
-
+  // 2. Determinar los minutos que dura un partido de este equipo según la categoría
   const getMatchDuration = (teamName) => {
      const t = (teamName || '').toLowerCase();
      if (t.includes('juvenil') || t.includes('aficionado') || t.includes('primer equipo')) return 90;
@@ -3403,25 +3373,80 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
      if (t.includes('prebenjamín') || t.includes('prebenjamin')) return 40;
      return 90; 
   };
+  const minutesPerMatch = getMatchDuration(gk.team);
+  const teamTotalMinutes = finalTeamMatches * minutesPerMatch;
 
-  const totalTeamMatches = matches.filter(m => m.myTeam === gk.team && m.date < todayStr).length;
-  
+  // 3. Calcular los datos individuales del portero revisando partido a partido
+  let dynamicConvocatorias = 0;
+  let dynamicPlayed = 0;
+  let dynamicMinutes = 0;
+  let dynamicStarts = 0;
+  let dynamicSubs = 0;
+  let dynamicGoals = 0;
+  let dynamicCleanSheets = 0;
+
+  // Solo revisamos los partidos en los que este portero ESTABA CONVOCADO
+  const pastGkMatches = allTeamPastMatches.filter(m => m.goalkeeperIds?.includes(gk.id));
+  const hasDynamic = pastGkMatches.some(m => m.gkMinutes && m.gkMinutes[gk.id] !== undefined);
+
+  pastGkMatches.forEach(m => {
+      dynamicConvocatorias += 1; // Si está en la lista de convovados, suma 1 convocatoria
+
+      const mins = parseInt(m.gkMinutes?.[gk.id]);
+      
+      // Si el portero jugó más de 0 minutos en este partido:
+      if (!isNaN(mins) && mins > 0) {
+          dynamicPlayed += 1; // Sumamos un partido jugado
+          dynamicMinutes += mins; // Sumamos los minutos
+          
+          if (m.gkStarter?.[gk.id]) {
+             dynamicStarts += 1;
+          } else {
+             dynamicSubs += 1;
+          }
+          
+          // Cálculo de Goles Encajados y Porterías a Cero
+          const goals = parseInt(m.gkGoalsConceded?.[gk.id]);
+          if (!isNaN(goals)) {
+             dynamicGoals += goals;
+             if (goals === 0) dynamicCleanSheets += 1;
+          } else {
+             // Si el entrenador no puso los goles de ese portero, tomamos los del equipo rival
+             const teamGoals = parseInt(m.goalsRival);
+             if (!isNaN(teamGoals)) {
+                dynamicGoals += teamGoals;
+                if (teamGoals === 0) dynamicCleanSheets += 1;
+             }
+          }
+      } else {
+          // Si el portero NO JUGÓ (0 minutos o vacío), pero el equipo dejó la portería a 0, NO se le suma la portería a 0 al suplente.
+      }
+  });
+
+  // 4. Determinar los valores finales a mostrar. 
+  // Si tenemos datos dinámicos del historial, usamos los dinámicos. Si el historial está vacío, intentamos usar los de la ficha manual (gk.stats).
   const finalMinutes = hasDynamic ? dynamicMinutes : (gk.stats?.minutes || 0);
   const finalStarts = hasDynamic ? dynamicStarts : (gk.stats?.starts || 0);
   const finalSubs = hasDynamic ? dynamicSubs : (gk.stats?.subs || 0);
   const finalGoals = hasDynamic ? dynamicGoals : (gk.stats?.goalsConceded || 0);
   const finalCleanSheets = hasDynamic ? dynamicCleanSheets : (gk.stats?.cleanSheets || 0);
+  const finalConvocatorias = hasDynamic ? dynamicConvocatorias : (gk.stats?.calledUpMatches || 0);
+  const finalPlayedMatches = hasDynamic ? dynamicPlayed : (finalStarts + finalSubs);
+
+  // 5. Cálculos de porcentajes seguros (evitando divisiones por 0)
+  const safeTeamMatchesForCalc = finalTeamMatches > 0 ? finalTeamMatches : 1;
+  const safeTeamMinutesForCalc = teamTotalMinutes > 0 ? teamTotalMinutes : 1;
   
-  const finalPlayedMatches = finalStarts + finalSubs;
-  const finalTeamMatches = totalTeamMatches > finalPlayedMatches ? totalTeamMatches : finalPlayedMatches || 1; 
-
-  const teamTotalMinutes = hasDynamic ? (finalTeamMatches * getMatchDuration(gk.team)) : (gk.stats?.teamMinutes || finalTeamMatches * 90);
-
-  const minsPercent = teamTotalMinutes > 0 ? Math.round((finalMinutes / teamTotalMinutes) * 100) : 0;
-  const startsPercent = finalTeamMatches > 0 ? Math.round((finalStarts / finalTeamMatches) * 100) : 0;
-  const subsPercent = finalTeamMatches > 0 ? Math.round((finalSubs / finalTeamMatches) * 100) : 0;
+  const minsPercent = Math.round((finalMinutes / safeTeamMinutesForCalc) * 100);
+  const startsPercent = Math.round((finalStarts / safeTeamMatchesForCalc) * 100);
+  const subsPercent = Math.round((finalSubs / safeTeamMatchesForCalc) * 100);
+  
+  // Porcentaje de goles: Promedio de goles por partido jugado
   const goalsPercent = finalPlayedMatches > 0 ? Math.min(100, Math.round((finalGoals / finalPlayedMatches) * 50)) : 0;
+  
+  // Ratio Porterías a Cero = (Partidos a cero / Partidos Jugados) * 100
   const cleanSheetsPercent = finalPlayedMatches > 0 ? Math.round((finalCleanSheets / finalPlayedMatches) * 100) : 0;
+  
   const penaltiesPercent = (gk.stats?.penaltiesFaced || 0) > 0 ? Math.round(((gk.stats?.penaltiesSaved || 0) / gk.stats.penaltiesFaced) * 100) : 0;
 
   return (
@@ -3509,8 +3534,8 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{gk.stats?.calledUpMatches || 0}/{finalTeamMatches}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{finalTeamMatches > 0 ? Math.round(((gk.stats?.calledUpMatches || 0) / finalTeamMatches) * 100) : 0}%</span>
+                    <span className="text-xs font-black text-blue-950 dark:text-white">{finalConvocatorias}/{finalTeamMatches}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{finalTeamMatches > 0 ? Math.round((finalConvocatorias / finalTeamMatches) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
@@ -3521,7 +3546,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Minutos Totales</span>
+                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Min. Totales Equipo</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-blue-950 dark:text-white">{finalMinutes}/{teamTotalMinutes}</span>
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{teamTotalMinutes > 0 ? Math.round((finalMinutes / teamTotalMinutes) * 100) : 0}%</span>
