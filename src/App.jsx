@@ -970,11 +970,19 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.text(tituloString, 15, 18);
         doc.setFontSize(9); doc.setFont("Roboto", "bold"); doc.setTextColor(...p.textMuted);
         
-        let subtitleHeader = informe.fecha || '';
-        if (informe.tipo === 'torneo') subtitleHeader = `${informe.titulo || ''} • ${gk.team} • ${informe.fecha}`;
-        else if (informe.rival) subtitleHeader = `VS ${informe.rival.toUpperCase()} • ${informe.fecha}`;
+        const fParts = (informe.fecha || '').split('-');
+        const fStr = fParts.length === 3 ? `${fParts[2]}-${fParts[1]}-${fParts[0]}` : informe.fecha; // Formato DD-MM-YYYY
+
+        if (informe.tipo === 'torneo') {
+            doc.text(`${informe.titulo || ''} • ${gk.team} • ${fStr}`, 15, 24);
+        } else if (informe.rival) {
+            doc.text(`VS ${informe.rival.toUpperCase()} • `, 15, 24);
+            doc.setTextColor(220, 38, 38); // Rojo corporativo
+            doc.text(fStr, 15 + doc.getTextWidth(`VS ${informe.rival.toUpperCase()} • `), 24);
+        } else {
+            doc.text(fStr, 15, 24);
+        }
         
-        doc.text(subtitleHeader, 15, 24);
         if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', pageWidth - 25, 5, 20, 20);
         if (informe.tipo === 'torneo' && torneoLogoB64) doc.addImage(torneoLogoB64, 'PNG', 150, 5, 20, 20);
     };
@@ -1217,10 +1225,41 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
         doc.setFillColor(220,38,38); doc.roundedRect(155, currentY + 4, 30, 14, 2, 2, 'F');
         doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont("Roboto", "bold"); doc.text(informe.partidoResultado || '- : -', 170, currentY + 13.5, {align:'center'}); currentY += 28;
         printBox(15, currentY, 55, 18, "ESTADO", informe.partidoTitular || 'Titular'); printBox(75, currentY, 55, 18, "MINUTOS", informe.partidoMinutos || '-'); printBox(135, currentY, 60, 18, "NOTA GLOBAL", `${informe.nota || '-'}/10`, p.accent); currentY += 25;
-        printHeader("Registro Rápido Estadístico"); const stats = [{l:'Paradas',v:informe.statParadas},{l:'Salidas',v:informe.statSalidas},{l:'Centros',v:informe.statCentros},{l:'Pases',v:informe.statPases},{l:'1 vs 1',v:informe.stat1v1},{l:'A.B.P.',v:informe.statABP},{l:'Errores',v:informe.statErrores},{l:'Goles Rec.',v:informe.statGoles}]; let sX = 15; stats.forEach((s, i) => { printBox(sX, currentY, 40, 16, s.l, s.v || '0'); sX += 45; if ((i + 1) % 4 === 0) { sX = 15; currentY += 20; }});
-        printHeader("Evaluación por Áreas"); let vX = 15; ['Tecnico', 'Tactico', 'Fisico', 'Mental'].forEach(a => { printBox(vX, currentY, 40, 16, a.toUpperCase(), `${informe[`val${a}Partido`] || '-'}/5`); vX += 45; }); currentY += 25;
-        printHeader("Análisis Técnico y Táctico", iTarget); printText("Paradas Relevantes", informe.obsParadas); printText("Análisis de Goles Recibidos", informe.obsGoles); printText("Juego Aéreo y Dominio del Área", informe.obsAereo); printText("Juego con los Pies y Distribución", informe.obsPies); printText("Fuera del Área y Coberturas", informe.obsFueraArea); printText("Uno vs Uno", informe.obs1v1); printText("Acciones a Balón Parado", informe.obsABP); printText("Comunicación y Liderazgo", informe.obsComunicacion); printText("Aspecto Mental y Resiliencia", informe.obsMental);
-        printHeader("Información Adicional", iGit); printText("Cronología", informe.partidoCronologia); printText("Fortalezas en el partido", informe.planFortalezas); printText("Debilidades a corregir", informe.planDebilidades);
+        
+        printHeader("Registro Rápido Estadístico"); 
+        const stats = [{l:'Paradas',v:informe.statParadas},{l:'Salidas',v:informe.statSalidas},{l:'Centros',v:informe.statCentros},{l:'Pases',v:informe.statPases},{l:'1 vs 1',v:informe.stat1v1},{l:'A.B.P.',v:informe.statABP},{l:'Errores',v:informe.statErrores},{l:'Goles Rec.',v:informe.statGoles}]; 
+        let sX = 15; stats.forEach((s, i) => { printBox(sX, currentY, 40, 16, s.l, s.v || '0'); sX += 45; if ((i + 1) % 4 === 0) { sX = 15; currentY += 20; }});
+        
+        printHeader("Evaluación por Áreas"); 
+        let vX = 15; ['Tecnico', 'Tactico', 'Fisico', 'Mental'].forEach(a => { printBox(vX, currentY, 40, 16, a.toUpperCase(), `${informe[`val${a}Partido`] || '-'}/5`); vX += 45; }); currentY += 25;
+        
+        const buildFieldText = (val, obs) => {
+            let res = '';
+            if (val) res += `[ ${val.toUpperCase()} ]\n`;
+            if (obs) res += obs;
+            return res.trim();
+        };
+
+        printHeader("Análisis Técnico y Táctico", iTarget); 
+        printText("Paradas Relevantes", buildFieldText(informe.valParadas, informe.obsParadas)); 
+        printText("Goles Recibidos", buildFieldText(informe.valGoles !== '' ? `${informe.valGoles} GOLES` : '', informe.obsGoles)); 
+        printText("Juego Aéreo", buildFieldText(informe.valAereo, informe.obsAereo)); 
+        printText("Juego con los Pies", buildFieldText(informe.valPies, informe.obsPies)); 
+        printText("Fuera del Área", buildFieldText(informe.valFueraArea, informe.obsFueraArea)); 
+        printText("1 VS 1", buildFieldText(informe.val1v1, informe.obs1v1)); 
+        printText("A.B.P.", buildFieldText(informe.valABP, informe.obsABP)); 
+        printText("Comunicación / Org.", buildFieldText(informe.valComunicacion, informe.obsComunicacion)); 
+        printText("Aspecto Mental", buildFieldText(informe.valMental, informe.obsMental));
+        
+        printHeader("Información Adicional", iGit); 
+        let cronoStr = '';
+        if (informe.partidoCronologiaList && informe.partidoCronologiaList.length > 0) {
+            cronoStr = informe.partidoCronologiaList.map(c => `[${c.minuto}] - ${c.accion}`).join('\n');
+        }
+        printText("Cronología", cronoStr); 
+        printText("Fortalezas", informe.planFortalezas); 
+        printText("Debilidades a corregir", informe.planDebilidades);
+        printText("Objetivos semanales", informe.planObjetivos);
     }
     
     else if (informe.tipo === 'objetivos') {
@@ -4143,7 +4182,9 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
     // Semestral
     jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '', golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '', torneosAsistidos: '', torneosConvocado: '', repTecDefensivo: '3', repTecOfensivo: '3', adecuacionRecursos: '3', nivelCompetitivo: '3', constanciaRendimiento: '3', comprensionJuego: '3', implicacionEntrenamientos: '3', liderazgoGrupo: '3', destrezaGeneral: '3', concienciaObjetivos: '3', motivacionIndividual: '3', comportamientoActitudinal: '3', posicionBasica: '3', blocaje: '3', colocacion: '3', desplazamientosCaidas: '3', dominioArea: '3', reinicioJuego: '3', unoContraUno: '3', velocidadEspecifica: '3', agilidad: '3', ataque: '3', transDef: '3', defensa: '3', transOf: '3', obsTecnicoTacticas: '', sociabilidad: '3', constanciaAct: '3', disciplina: '3', actitud: '3', compromiso: '3', evolucion: '3', obsActitudinales: '', eval1Media: '', eval1Asig: '', eval1Susp: '', eval2Media: '', eval2Asig: '', eval2Susp: '', eval3Media: '', eval3Asig: '', eval3Susp: '', valoracionGeneral: 'MEDIA',
     // Partido
-    partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '', statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0, obsParadas: '', obsGoles: '', obsAereo: '', obsPies: '', obsFueraArea: '', obs1v1: '', obsABP: '', obsComunicacion: '', obsMental: '', partidoCronologia: '', partidoVideos: '', partidoComparativa: '', valTecnicoPartido: '3', valTacticoPartido: '3', valFisicoPartido: '3', valMentalPartido: '3', planFortalezas: '', planDebilidades: '', planObjetivos: '',
+    partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '', statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0, 
+    valParadas: '', obsParadas: '', valGoles: '', obsGoles: '', valAereo: '', obsAereo: '', valPies: '', obsPies: '', valFueraArea: '', obsFueraArea: '', val1v1: '', obs1v1: '', valABP: '', obsABP: '', valComunicacion: '', obsComunicacion: '', valMental: '', obsMental: '', 
+    partidoCronologiaList: [], partidoVideos: '', partidoComparativa: '', valTecnicoPartido: '3', valTacticoPartido: '3', valFisicoPartido: '3', valMentalPartido: '3', planFortalezas: '', planDebilidades: '', planObjetivos: '',
     // Torneo
     ubicacionTorneo: '', hotelTorneo: '', logoTorneo: '', partidosTorneo: [], ctxNivel: '3', ctxLogistica: '3', ctxCarga: '3', ctxInstalaciones: '3', medInicial: '', medIncidencias: '', valPersonalidad: '3', valMando: '3', valConc: '3', valError: '3', valConfianza: '3', valMentalidad: '3', valActitudGol: '3', valPrimerUltimo: '3', valRitmo: '3', valMejoraBajon: '3', valEntorno: '3', val1v1: '3', valOrg: '3', valCom: '3', obsPenaltis: '', obsDecisivas: '', obsPos: '', obsImprovements: '',
     // Flash
@@ -4268,6 +4309,56 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
   };
 
   const torneosPrevios = existingReports.filter(r => r.tipo === 'torneo');
+
+  // Lógica de cronología (minutos del partido)
+  const cronoOptions = useMemo(() => {
+     const opts = [];
+     for(let i=1; i<=45; i++) opts.push(`1T - ${i}'`);
+     opts.push(`1T - 45+'`);
+     for(let i=46; i<=90; i++) opts.push(`2T - ${i}'`);
+     opts.push(`2T - 90+'`);
+     opts.push(`Prórroga`);
+     opts.push(`Penaltis`);
+     return opts;
+  }, []);
+
+  const addCronologia = () => setFormData(prev => ({ ...prev, partidoCronologiaList: [...(prev.partidoCronologiaList || []), { id: Date.now(), minuto: "1T - 1'", accion: '' }] }));
+  const removeCronologia = (id) => setFormData(prev => ({ ...prev, partidoCronologiaList: prev.partidoCronologiaList.filter(c => c.id !== id) }));
+  const updateCronologia = (id, field, value) => setFormData(prev => ({ ...prev, partidoCronologiaList: prev.partidoCronologiaList.map(c => c.id === id ? { ...c, [field]: value } : c) }));
+
+  // Helper visual para preguntas dinámicas
+  const renderPartidoField = (num, title, stateValName, stateObsName, type, options) => (
+    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-3">
+      <label className={labelClass}>{num} - {title}</label>
+      {type === 'select' ? (
+        <select value={formData[stateValName]} onChange={handleChange} name={stateValName} className={`${inputClass} !py-2.5 font-bold`}>
+          <option value="">- Seleccionar -</option>
+          {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {options.map(opt => (
+            <button 
+              type="button" 
+              key={opt}
+              onClick={() => setFormData(prev => ({...prev, [stateValName]: opt}))}
+              className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-colors flex-1 min-w-[120px] ${formData[stateValName] === opt ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-400'}`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+      <input 
+        type="text" 
+        name={stateObsName} 
+        value={formData[stateObsName]} 
+        onChange={handleChange} 
+        placeholder="Anotación adicional (opcional)..." 
+        className={`${inputClass} !py-2.5 !text-xs bg-white dark:bg-slate-900`}
+      />
+    </div>
+  );
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto h-full overflow-y-auto custom-scrollbar">
@@ -4420,19 +4511,21 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
               )}
 
               {/* ============================================================== */}
+              {/* ============================================================== */}
               {/* INFORME DE PARTIDO                                             */}
               {/* ============================================================== */}
               {tipoInforme === 'partido' && (
                 <div className="space-y-10">
                   <div>
                     <h3 className={sectionTitleClass}>01 y 02 — Datos del Partido y Portero</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
                       <div><label className={labelClass}>Rival</label><input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid" className={inputClass} required/></div>
                       <div><label className={labelClass}>Competición</label><input type="text" name="partidoCompeticion" value={formData.partidoCompeticion} onChange={handleChange} placeholder="Ej: Liga Autonómica" className={inputClass} /></div>
                       <div><label className={labelClass}>Jornada</label><input type="text" name="partidoJornada" value={formData.partidoJornada} onChange={handleChange} placeholder="Ej: 14" className={inputClass} /></div>
                       <div><label className={labelClass}>Resultado</label><input type="text" name="partidoResultado" value={formData.partidoResultado} onChange={handleChange} placeholder="ATM 2 - 1 RIV" className={inputClass} /></div>
-                      <div className="flex gap-2">
+                      <div><label className={labelClass}>Nota Global (0-10)</label><input type="number" step="0.1" name="nota" value={formData.nota} onChange={handleChange} placeholder="Ej: 8.5" className={inputClass} /></div>
+                      <div className="col-span-2 flex gap-2">
                          <div className="flex-1">
                             <label className={labelClass}>Condición</label>
                             <select name="partidoTitular" value={formData.partidoTitular} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
@@ -4469,24 +4562,54 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
                   <div>
                     <h3 className={sectionTitleClass}>04 al 12 — Análisis Específico Post-Partido</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div><label className={labelClass}>04 - Paradas Relevantes</label><textarea name="obsParadas" value={formData.obsParadas} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>05 - Goles Recibidos</label><textarea name="obsGoles" value={formData.obsGoles} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>06 - Juego Aéreo</label><textarea name="obsAereo" value={formData.obsAereo} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>07 - Juego con los Pies</label><textarea name="obsPies" value={formData.obsPies} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>08 - Fuera del Área</label><textarea name="obsFueraArea" value={formData.obsFueraArea} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>09 - 1 VS 1</label><textarea name="obs1v1" value={formData.obs1v1} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>10 - A.B.P.</label><textarea name="obsABP" value={formData.obsABP} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>11 - Comunicación y Organización</label><textarea name="obsComunicacion" value={formData.obsComunicacion} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div className="col-span-1 md:col-span-2"><label className={labelClass}>12 - Aspecto Mental</label><textarea name="obsMental" value={formData.obsMental} onChange={handleChange} rows="2" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                       {renderPartidoField('04', 'Paradas Relevantes', 'valParadas', 'obsParadas', 'radio', ['Sí', 'No'])}
+                       {renderPartidoField('05', 'Goles Recibidos', 'valGoles', 'obsGoles', 'select', [...Array(16).keys()])}
+                       {renderPartidoField('06', 'Juego Aéreo', 'valAereo', 'obsAereo', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                       {renderPartidoField('07', 'Juego con los Pies', 'valPies', 'obsPies', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                       {renderPartidoField('08', 'Fuera del Área', 'valFueraArea', 'obsFueraArea', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                       {renderPartidoField('09', '1 VS 1', 'val1v1', 'obs1v1', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                       {renderPartidoField('10', 'A.B.P.', 'valABP', 'obsABP', 'radio', ['Bien ejecutado', 'Mal ejecutado', 'Bien posic. barrera', 'Mal posic. barrera'])}
+                       {renderPartidoField('11', 'Comunicación / Org.', 'valComunicacion', 'obsComunicacion', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                       <div className="col-span-1 md:col-span-2">
+                         {renderPartidoField('12', 'Aspecto Mental', 'valMental', 'obsMental', 'radio', ['Fuerte', 'Normal', 'Débil'])}
+                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className={sectionTitleClass}>13 al 15 — Datos Adicionales</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                       <div><label className={labelClass}>13 - Cronología</label><textarea name="partidoCronologia" value={formData.partidoCronologia} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>14 - Enlaces a Vídeos</label><textarea name="partidoVideos" value={formData.partidoVideos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       <div><label className={labelClass}>15 - Comparativa (Opcional)</label><textarea name="partidoComparativa" value={formData.partidoComparativa} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                    <h3 className={sectionTitleClass}>13 al 15 — Datos Adicionales y Cronología</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       
+                       <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-4">
+                         <label className={labelClass}>13 - Cronología de Acciones</label>
+                         <div className="space-y-3">
+                           {(formData.partidoCronologiaList || []).map((crono) => (
+                             <div key={crono.id} className="flex gap-2 items-start">
+                               <select 
+                                 value={crono.minuto} 
+                                 onChange={(e) => updateCronologia(crono.id, 'minuto', e.target.value)}
+                                 className={`${inputClass} !py-2.5 !w-32 font-bold !text-xs cursor-pointer`}
+                               >
+                                 {cronoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                               </select>
+                               <input 
+                                 type="text" 
+                                 value={crono.accion} 
+                                 onChange={(e) => updateCronologia(crono.id, 'accion', e.target.value)}
+                                 placeholder="Descripción..."
+                                 className={`${inputClass} !py-2.5 flex-1 !text-xs`}
+                               />
+                               <button type="button" onClick={() => removeCronologia(crono.id)} className="w-10 h-10 flex shrink-0 items-center justify-center bg-red-100 text-red-600 hover:bg-red-200 rounded-xl transition-colors"><X size={16}/></button>
+                             </div>
+                           ))}
+                           <button type="button" onClick={addCronologia} className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 font-bold text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm">+ Añadir Acción</button>
+                         </div>
+                       </div>
+
+                       <div className="flex flex-col gap-6">
+                         <div><label className={labelClass}>14 - Enlaces a Vídeos</label><textarea name="partidoVideos" value={formData.partidoVideos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="https://..." /></div>
+                         <div><label className={labelClass}>15 - Comparativa (Opcional)</label><textarea name="partidoComparativa" value={formData.partidoComparativa} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                       </div>
                     </div>
                   </div>
 
