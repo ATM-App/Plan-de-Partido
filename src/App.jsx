@@ -2448,14 +2448,32 @@ const StreakDisplay = ({ streak }) => {
 };
 
 // ==========================================
-// VESTUARIO VIRTUAL 2.5D INTERACTIVO
+// VESTUARIO VIRTUAL 2.5D INTERACTIVO (REDISEÑO PREMIUM + MINUTOS DINÁMICOS)
 // ==========================================
-function VestuarioVirtual({ gks, onOpenPlan, theme }) {
+function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Algoritmo para calcular los minutos exactos (igual que en el Dashboard)
+  const calcularMinutosReales = (gk) => {
+    if (!matches) return gk.stats?.minutes || 0;
+    const pastGkMatches = matches.filter(m => m.date < todayStr && m.goalkeeperIds?.includes(gk.id));
+    let dynamicMins = 0;
+    let hasDynamic = false;
+    pastGkMatches.forEach(m => {
+       const mins = parseInt(m.gkMinutes?.[gk.id]);
+       if (!isNaN(mins) && mins > 0) {
+           dynamicMins += mins;
+           hasDynamic = true;
+       }
+    });
+    return hasDynamic ? dynamicMins : (gk.stats?.minutes || 0);
+  };
+
   return (
-    <div className="w-full bg-gradient-to-b from-slate-900 to-slate-950 rounded-[3rem] p-6 md:p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
-      {/* Fondo inmersivo: Luces tipo estadio / vestuario premium */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+    <div className="w-full bg-[#030712] rounded-[3rem] p-6 md:p-10 border border-slate-800 shadow-[inset_0_0_100px_rgba(0,0,0,0.8)] relative overflow-hidden">
+      {/* Ambiente lumínico de vestuario profesional */}
+      <div className="absolute top-0 left-1/4 w-1/2 h-full bg-gradient-to-b from-blue-600/10 via-transparent to-transparent blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] bg-red-600/10 blur-[100px] rounded-full pointer-events-none"></div>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 px-2 relative z-10">
         <div>
@@ -2466,71 +2484,73 @@ function VestuarioVirtual({ gks, onOpenPlan, theme }) {
             </span>
             Centro de Mando: Vestuario
           </h3>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Selecciona a un portero para configurar su plan táctico</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Selecciona la taquilla para diseñar el plan de partido</p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg">
+        <div className="mt-4 md:mt-0 flex items-center gap-2 bg-slate-900 border border-slate-700/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg">
             <img src={ESCUDO_ATM_URL} alt="" className="w-4 h-4 object-contain" />
-            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Atleti KMP Report</span>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">KMP Tactic Room</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
-        {gks.map(gk => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+        {gks.map(gk => {
+          const minsReales = calcularMinutosReales(gk);
+
+          return (
           <div 
             key={gk.id} 
             onClick={() => onOpenPlan(gk)}
-            className="group cursor-pointer relative flex flex-col w-full aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-slate-900 border border-slate-700/50 hover:border-red-500/50 transition-all duration-500 hover:shadow-[0_0_30px_rgba(220,38,38,0.2)] hover:-translate-y-2"
+            className="group cursor-pointer relative flex flex-col w-full aspect-[3/4] rounded-[2rem] overflow-hidden bg-gradient-to-b from-slate-800 to-slate-950 border border-slate-700 hover:border-red-500 transition-all duration-500 shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:shadow-[0_0_40px_rgba(220,38,38,0.4)] hover:-translate-y-2"
           >
-            {/* Tira LED Superior */}
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-800 group-hover:bg-red-500 group-hover:shadow-[0_0_10px_#ef4444] transition-colors duration-500 z-20"></div>
+            {/* Placa Metálica de la Taquilla */}
+            <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-slate-700 to-slate-800/90 border-b border-slate-600/50 flex items-center justify-between px-4 z-30 shadow-md">
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-red-500 group-hover:shadow-[0_0_8px_#ef4444] transition-all"></div>
+                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] truncate max-w-[110px]">{gk.team}</span>
+               </div>
+               <span className="text-xl font-black italic text-white drop-shadow-md">{gk.number}</span>
+            </div>
 
-            {/* Imagen del portero (Hero) */}
-            <div className="absolute inset-0 z-0">
+            {/* Luz interior de la taquilla */}
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 w-3/4 h-40 bg-white/5 blur-3xl group-hover:bg-red-500/20 transition-all duration-700 z-10"></div>
+
+            {/* Imagen del portero */}
+            <div className="absolute inset-0 pt-12 z-10">
               <img 
                 src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} 
                 alt={gk.name}
-                className="w-full h-full object-cover grayscale opacity-50 group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                style={{ objectPosition: 'center 15%' }}
+                className="w-full h-full object-cover grayscale-[0.7] opacity-80 group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                style={{ objectPosition: 'center 10%' }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-[#030712]/80 to-transparent h-full"></div>
             </div>
 
-            {/* Número en marca de agua gigante */}
-            <span className="absolute top-4 right-4 text-slate-800/50 font-black italic text-6xl md:text-7xl z-10 group-hover:text-red-500/20 transition-colors duration-500 select-none">
-              {gk.number}
-            </span>
-
-            {/* HUD Overlay (Aparece en Hover) */}
+            {/* HUD Overlay (Pizarra Táctica) */}
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-slate-950/40 backdrop-blur-[2px]">
-               <div className="w-16 h-16 rounded-full border-2 border-red-500 flex items-center justify-center bg-slate-900/80 text-red-500 mb-3 shadow-[0_0_15px_rgba(220,38,38,0.5)] transform scale-75 group-hover:scale-100 transition-transform duration-500">
+               <div className="w-16 h-16 rounded-full border-2 border-red-500 flex items-center justify-center bg-slate-900 text-red-500 mb-3 shadow-[0_0_20px_rgba(220,38,38,0.7)] transform scale-75 group-hover:scale-100 transition-transform duration-500">
                   <Target size={28} strokeWidth={2.5} />
                </div>
-               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Ver Plan Táctico</span>
+               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white drop-shadow-lg">Pizarra Táctica</span>
             </div>
 
-            {/* Info inferior (Siempre visible) */}
-            <div className="mt-auto relative z-30 p-6 flex flex-col justify-end">
-               <div className="flex items-end justify-between mb-2">
-                 <div>
-                    <h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md">{gk.name}</h4>
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-red-500 mt-2">{gk.team}</p>
-                 </div>
-               </div>
+            {/* Panel de Info Inferior */}
+            <div className="mt-auto relative z-30 p-5 flex flex-col justify-end">
+               <h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md mb-4">{gk.name}</h4>
 
-               {/* Micro-stats */}
-               <div className="flex gap-4 mt-4 pt-4 border-t border-slate-800/80">
-                 <div>
-                   <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma</span>
+               {/* Instrumentos / Micro-stats */}
+               <div className="grid grid-cols-2 gap-2 p-2 bg-slate-900/90 rounded-xl border border-slate-700/80 backdrop-blur-md shadow-inner">
+                 <div className="flex flex-col items-center justify-center p-1.5 border-r border-slate-700">
+                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma Actual</span>
                    <span className="text-sm font-black text-emerald-400">{gk.form || '5.0'}</span>
                  </div>
-                 <div>
-                   <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Min. Jugados</span>
-                   <span className="text-sm font-black text-white">{gk.stats?.minutes || 0}</span>
+                 <div className="flex flex-col items-center justify-center p-1.5">
+                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Min. Jugados</span>
+                   <span className="text-sm font-black text-white">{minsReales}</span>
                  </div>
                </div>
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   );
@@ -2898,6 +2918,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
       {viewLockerRoom ? (
         <VestuarioVirtual 
           gks={gks} 
+          matches={pastMatches}
           onOpenPlan={onOpenLockerPlan} 
           theme={theme}
         />
