@@ -2918,7 +2918,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
       {viewLockerRoom ? (
         <VestuarioVirtual 
           gks={gks} 
-          matches={pastMatches}
+          matches={matches}
           onOpenPlan={onOpenLockerPlan} 
           theme={theme}
         />
