@@ -86,6 +86,14 @@ const TEAMS_LIST = [
   "PREBENJAMÍN A"
 ];
 
+// --- ENLACES A LA CLASIFICACIÓN RFFM ---
+const ENLACES_RFFM = {
+  "ALEVÍN A": "https://www.rffm.es/competicion/clasificaciones?temporada=22&competicion=26737923&grupo=26737925&jornada=4&tipojuego=2",
+  "BENJAMÍN A": "https://www.rffm.es/competicion/clasificaciones?temporada=22&competicion=26738273&grupo=26743068&jornada=3&tipojuego=2",
+  "BENJAMÍN B": "https://www.rffm.es/competicion/clasificaciones?temporada=22&competicion=26738273&grupo=26738277&jornada=3&tipojuego=2",
+  "PREBENJAMÍN A": "https://www.rffm.es/competicion/clasificaciones?temporada=22&competicion=26738167&grupo=26738200&jornada=2&tipojuego=2"
+};
+
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
@@ -2313,17 +2321,31 @@ const BottomNavItem = ({ icon, label, active, onClick }) => (
 
 const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layout = 'grid' }) => {
   const convocados = gks.filter(gk => match.goalkeeperIds?.includes(gk.id));
+  const enlaceRFFM = typeof ENLACES_RFFM !== 'undefined' ? ENLACES_RFFM[match.myTeam] : null;
   
   return (
     <div className={`rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-sm dark:shadow-md overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
       <div className="absolute inset-0 bg-gradient-to-b from-blue-900/5 dark:from-blue-900/20 to-transparent pointer-events-none" />
 
-      {/* BARRA DE COMPETICIÓN */}
-      <div className="bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700/80 py-3 px-4 text-center relative z-10 flex flex-wrap items-center justify-center gap-2">
-        <span className="text-[10px] md:text-xs font-black uppercase text-blue-950 dark:text-blue-400 tracking-[0.15em]">
+      {/* BARRA DE COMPETICIÓN CON TROFEO RFFM */}
+      <div className="bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700/80 py-3 px-4 relative z-10 flex flex-wrap items-center justify-center gap-2">
+        <span className="text-[10px] md:text-xs font-black uppercase text-blue-950 dark:text-blue-400 tracking-[0.15em] text-center">
           {match.league || 'Competición por definir'} {match.group && ` • ${match.group}`} {match.matchday && ` • JORNADA ${match.matchday}`}
         </span>
         <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{match.season || '2026/27'}</span>
+        
+        {enlaceRFFM && enlaceRFFM !== "" && !enlaceRFFM.includes("AQUI_URL") && (
+          <a 
+            href={enlaceRFFM} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="ml-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-500/20 dark:hover:bg-amber-500/40 border border-amber-300 dark:border-amber-500/50 p-1.5 rounded-lg transition-colors shadow-sm cursor-pointer flex items-center justify-center animate-in fade-in"
+            title="Ver clasificación en RFFM"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Trophy size={14} className="text-amber-600 dark:text-amber-400" />
+          </a>
+        )}
       </div>
 
       {/* Cabecera con FECHA, LUGAR y RESULTADOS (Cuadrados Rojos) */}
