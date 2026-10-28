@@ -2995,8 +2995,21 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
     pastMatches = pastMatches.filter(m => m.myTeam === equipoFiltro);
   }
 
-  // Obtener la lista de equipos que realmente tienen partidos en el historial para mostrar en los botones
-  const equiposConHistorial = ['Todos', ...new Set(matches.filter(m => m.date < todayStr).map(m => m.myTeam).filter(Boolean))];
+  // Orden estricto deseado para los botones
+  const ordenDeseado = ["ALEVÍN A", "BENJAMÍN A", "BENJAMÍN B", "PREBENJAMÍN A"];
+
+  // Obtener equipos únicos del historial y ordenarlos
+  const equiposUnicos = Array.from(new Set(matches.filter(m => m.date < todayStr).map(m => m.myTeam).filter(Boolean)));
+  equiposUnicos.sort((a, b) => {
+    const indexA = ordenDeseado.indexOf(a.toUpperCase());
+    const indexB = ordenDeseado.indexOf(b.toUpperCase());
+    if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Si no están en la lista, orden alfabético
+    if (indexA === -1) return 1; // Si A no está, va al final
+    if (indexB === -1) return -1; // Si B no está, va al final
+    return indexA - indexB; // Ordena según la posición en ordenDeseado
+  });
+
+  const equiposConHistorial = ['Todos', ...equiposUnicos];
 
   if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
 
@@ -3372,9 +3385,9 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
      if (t.includes('juvenil') || t.includes('aficionado') || t.includes('primer equipo')) return 90;
      if (t.includes('cadete')) return 80;
      if (t.includes('infantil')) return 70;
-     if (t.includes('alevin')) return 60;
+     if (t.includes('alevin')) return 50; // Corregido: Alevín son 50 minutos (2x25)
      if (t.includes('benjamin')) return 50;
-     if (t.includes('prebenjamin')) return 40;
+     if (t.includes('prebenjamin')) return 40; // Confirmado: Prebenjamín son 40 minutos (2x20)
      return 90; 
   };
   const minsPerMatch = getMatchDuration(gk.team);
