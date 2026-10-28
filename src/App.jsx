@@ -446,7 +446,9 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
           
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(13);
-          doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' }); // Fecha más abajo si hay dos líneas
+          const fParts = (nextMatchPdf.date || '').split('-');
+          const fStr = fParts.length === 3 ? `${fParts[2]}-${fParts[1]}-${fParts[0]}` : nextMatchPdf.date;
+          doc.text(fStr, leftCX, 61, { align: 'center' }); // Fecha en formato DD-MM-YYYY
       } else {
           // Si el texto cabe en una línea, lo centramos normal
           if (iPin) doc.addImage(iPin, 'PNG', leftCX - (fieldWidth / 2) - 8, 48.5, 6, 6);
@@ -454,7 +456,9 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
           
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(13);
-          doc.text(formatDate(nextMatchPdf.date), leftCX, 61, { align: 'center' });
+          const fParts = (nextMatchPdf.date || '').split('-');
+          const fStr = fParts.length === 3 ? `${fParts[2]}-${fParts[1]}-${fParts[0]}` : nextMatchPdf.date;
+          doc.text(fStr, leftCX, 61, { align: 'center' });
       }
 
       // Matchup Area
@@ -497,44 +501,46 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setFont("Roboto", "bold");
       doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
 
-      // Match Stats Bottom Left
-      const statsY = 168;
+      // Match Stats Bottom Left (SOLO SI ES ALEVÍN A)
+      if (gk.team && gk.team.toUpperCase().includes('ALEVÍN A')) {
+          const statsY = 168;
 
-      doc.setTextColor(148, 163, 184); 
-      doc.setFontSize(8);
-      doc.setFont("Roboto", "bold");
-      doc.text("GOLES RIVAL", leftCX - 35, statsY, {align: 'center'});
-      
-      doc.setFillColor(255, 255, 255); 
-      doc.roundedRect(leftCX - 50, statsY + 4, 30, 14, 7, 7, 'F'); 
-      doc.setTextColor(239, 68, 68); 
-      doc.setFontSize(24);
-      doc.setFont("Roboto", "bolditalic");
-      doc.text(String(nextMatchPdf.goalsScored || rivalPdf?.goalsScored || '0'), leftCX - 35, statsY + 15, {align: 'center'});
+          doc.setTextColor(148, 163, 184); 
+          doc.setFontSize(8);
+          doc.setFont("Roboto", "bold");
+          doc.text("GOLES RIVAL", leftCX - 35, statsY, {align: 'center'});
+          
+          doc.setFillColor(255, 255, 255); 
+          doc.roundedRect(leftCX - 50, statsY + 4, 30, 14, 7, 7, 'F'); 
+          doc.setTextColor(239, 68, 68); 
+          doc.setFontSize(24);
+          doc.setFont("Roboto", "bolditalic");
+          doc.text(String(nextMatchPdf.goalsScored || rivalPdf?.goalsScored || '0'), leftCX - 35, statsY + 15, {align: 'center'});
 
-      doc.setTextColor(148, 163, 184);
-      doc.setFontSize(8);
-      doc.setFont("Roboto", "bold");
-      doc.text("RACHA RIVAL", leftCX + 35, statsY, {align: 'center'});
-      
-      if (nextMatchPdf.streak && nextMatchPdf.streak.length > 0) {
-          let stX = leftCX + 35 - ((nextMatchPdf.streak.length * 12) / 2) + 6;
-          nextMatchPdf.streak.forEach(res => {
-              if (res === 'V') doc.setFillColor(16, 185, 129); // Emerald
-              else if (res === 'E') doc.setFillColor(59, 130, 246); // Blue
-              else doc.setFillColor(239, 68, 68); // Red
+          doc.setTextColor(148, 163, 184);
+          doc.setFontSize(8);
+          doc.setFont("Roboto", "bold");
+          doc.text("RACHA RIVAL", leftCX + 35, statsY, {align: 'center'});
+          
+          if (nextMatchPdf.streak && nextMatchPdf.streak.length > 0) {
+              let stX = leftCX + 35 - ((nextMatchPdf.streak.length * 12) / 2) + 6;
+              nextMatchPdf.streak.forEach(res => {
+                  if (res === 'V') doc.setFillColor(16, 185, 129); // Emerald
+                  else if (res === 'E') doc.setFillColor(59, 130, 246); // Blue
+                  else doc.setFillColor(239, 68, 68); // Red
 
-              doc.circle(stX, statsY + 11, 5, 'F'); 
-              doc.setTextColor(255,255,255);
-              doc.setFontSize(9); 
-              doc.setFont("Roboto", "bold");
-              doc.text(res, stX, statsY + 11, {align: 'center', baseline: 'middle'}); 
-              stX += 12;
-          });
-      } else {
-          doc.setTextColor(100, 116, 139);
-          doc.setFontSize(14);
-          doc.text("--", leftCX + 35, statsY + 11, {align: 'center'});
+                  doc.circle(stX, statsY + 11, 5, 'F'); 
+                  doc.setTextColor(255,255,255);
+                  doc.setFontSize(9); 
+                  doc.setFont("Roboto", "bold");
+                  doc.text(res, stX, statsY + 11, {align: 'center', baseline: 'middle'}); 
+                  stX += 12;
+              });
+          } else {
+              doc.setTextColor(100, 116, 139);
+              doc.setFontSize(14);
+              doc.text("--", leftCX + 35, statsY + 11, {align: 'center'});
+          }
       }
     } else {
         doc.setTextColor(255, 255, 255);
@@ -790,7 +796,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.text("HISTORIAL COMPLETO DE PARTIDOS", 23, 48);
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
-    // Header Tabla
+    // Header Tabla (Ajustado con RESULTADO y MINUTOS)
     let tY = 56;
     doc.setFillColor(...p.card);
     doc.setDrawColor(...p.line);
@@ -800,10 +806,11 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.setFontSize(9);
     doc.setFont("Roboto", "bold");
     doc.text("FECHA", 20, tY + 7);
-    doc.text("COMPETICIÓN", 60, tY + 7);
-    doc.text("RIVAL", 140, tY + 7);
-    doc.text("CAMPO", 200, tY + 7);
-    doc.text("MINUTOS", 265, tY + 7); // AHORA PONE MINUTOS
+    doc.text("COMPETICIÓN", 55, tY + 7);
+    doc.text("RIVAL", 120, tY + 7);
+    doc.text("CAMPO", 185, tY + 7);
+    doc.text("RES.", 245, tY + 7);
+    doc.text("MIN", 270, tY + 7);
     tY += 14;
 
     const gkMatchesAll = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -815,7 +822,10 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     } else {
       gkMatchesAll.forEach((m) => {
         if (tY > pageHeight - 20) {
-          doc.addPage(); drawBackground(); drawHeader(); tY = 40;
+          doc.addPage();
+          drawBackground();
+          drawHeader();
+          tY = 40;
         }
 
         const rival = rivals.find(r => r.id === m.rivalId);
@@ -823,22 +833,34 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         doc.setDrawColor(...p.line);
         doc.line(15, tY + 10, pageWidth - 15, tY + 10);
         
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
-        doc.text(m.date || '--', 20, tY + 6);
-        doc.text(`${m.league || '--'} ${m.matchday ? `(J${m.matchday})` : ''}`, 60, tY + 6);
+        doc.setTextColor(...p.textMuted);
+        doc.setFont("Roboto", "normal");
         
-        doc.setTextColor(...p.textMain); doc.setFont("Roboto", "bold");
-        doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 140, tY + 6, { maxWidth: 55 });
+        const fParts = (m.date || '').split('-');
+        const fStr = fParts.length === 3 ? `${fParts[2]}/${fParts[1]}/${fParts[0]}` : m.date;
+        doc.text(fStr || '--', 20, tY + 6);
         
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
-        if (iPin) doc.addImage(iPin, 'PNG', 196, tY + 3, 3, 3);
-        doc.text(m.field || '--', 200, tY + 6, { maxWidth: 60 });
+        doc.text(`${m.league || '--'} ${m.matchday ? `(J${m.matchday})` : ''}`, 55, tY + 6);
         
-        // IMPRIME LOS MINUTOS JUGADOS
+        doc.setTextColor(...p.textMain);
+        doc.setFont("Roboto", "bold");
+        doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 120, tY + 6, { maxWidth: 60 });
+        
+        doc.setTextColor(...p.textMuted);
+        doc.setFont("Roboto", "normal");
+        if (iPin) doc.addImage(iPin, 'PNG', 181, tY + 3, 3, 3);
+        doc.text(m.field || '--', 185, tY + 6, { maxWidth: 50 });
+        
+        // RESULTADO
         doc.setTextColor(...p.textMain); 
         doc.setFont("Roboto", "bold");
+        const gAtm = m.goalsMyTeam !== undefined && m.goalsMyTeam !== '' ? m.goalsMyTeam : '-';
+        const gRiv = m.goalsRival !== undefined && m.goalsRival !== '' ? m.goalsRival : '-';
+        doc.text(`${gAtm} - ${gRiv}`, 248, tY + 6, { align: 'center' });
+        
+        // MINUTOS
         const minsJugados = (m.gkMinutes && m.gkMinutes[gk.id]) ? m.gkMinutes[gk.id] : '-';
-        doc.text(String(minsJugados), 265, tY + 6);
+        doc.text(String(minsJugados), 273, tY + 6, { align: 'center' });
         
         tY += 12;
       });
