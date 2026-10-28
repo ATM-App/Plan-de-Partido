@@ -3903,7 +3903,7 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
   const [formData, setFormData] = useState(initialData || { 
     date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], 
     gkMinutes: {}, gkGoalsConceded: {}, gkStarter: {}, 
-    streak: [], goalsMyTeam: '', goalsRival: '', 
+    streak: [], goalsMyTeam: '', goalsRival: '', goalsScored: '', 
     season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] 
   });
   
@@ -3996,6 +3996,14 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                     <option value="">-- Elige un rival --</option>
                     {rivals.map(r => <option key={r.id} value={r.id}>{r.name} {r.category && `(${r.category})`}</option>)}
                   </select>
+                  
+                  {/* CAMPO CONDICIONAL SOLO PARA ALEVÍN A */}
+                  {formData.myTeam && formData.myTeam.toUpperCase().includes('ALEVÍN A') && (
+                    <div className="mt-6 animate-in fade-in slide-in-from-top-2">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 mb-2 pl-2">Goles Totales Rival (Solo Alevín A)</label>
+                      <input type="number" name="goalsScored" value={formData.goalsScored} onChange={handleChange} className={`${inputClass} bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/50 focus:ring-amber-500`} placeholder="Ej: 45" />
+                    </div>
+                  )}
                 </div>
                 
                 <div>
