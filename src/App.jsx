@@ -3385,9 +3385,9 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
      if (t.includes('juvenil') || t.includes('aficionado') || t.includes('primer equipo')) return 90;
      if (t.includes('cadete')) return 80;
      if (t.includes('infantil')) return 70;
-     if (t.includes('alevin')) return 50; // Corregido: Alevín son 50 minutos (2x25)
-     if (t.includes('benjamin')) return 50;
-     if (t.includes('prebenjamin')) return 40; // Confirmado: Prebenjamín son 40 minutos (2x20)
+     if (t.includes('alevin')) return 50; 
+     if (t.includes('prebenjamin')) return 40; // <-- Prebenjamín TIENE que ir antes que Benjamín
+     if (t.includes('benjamin')) return 50; 
      return 90; 
   };
   const minsPerMatch = getMatchDuration(gk.team);
