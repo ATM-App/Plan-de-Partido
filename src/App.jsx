@@ -796,7 +796,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     doc.text("HISTORIAL COMPLETO DE PARTIDOS", 23, 48);
     if(typeof doc.setCharSpace === 'function') doc.setCharSpace(0);
 
-    // Header Tabla (Ajustado con RESULTADOS y MINUTOS)
+    // Header Tabla (Ajustado con RESULTADO y MINUTOS)
     let tY = 56;
     doc.setFillColor(...p.card);
     doc.setDrawColor(...p.line);
@@ -822,7 +822,10 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
     } else {
       gkMatchesAll.forEach((m) => {
         if (tY > pageHeight - 20) {
-          doc.addPage(); drawBackground(); drawHeader(); tY = 40;
+          doc.addPage();
+          drawBackground();
+          drawHeader();
+          tY = 40;
         }
 
         const rival = rivals.find(r => r.id === m.rivalId);
@@ -830,7 +833,8 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         doc.setDrawColor(...p.line);
         doc.line(15, tY + 10, pageWidth - 15, tY + 10);
         
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
+        doc.setTextColor(...p.textMuted);
+        doc.setFont("Roboto", "normal");
         
         const fParts = (m.date || '').split('-');
         const fStr = fParts.length === 3 ? `${fParts[2]}/${fParts[1]}/${fParts[0]}` : m.date;
@@ -838,21 +842,23 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         
         doc.text(`${m.league || '--'} ${m.matchday ? `(J${m.matchday})` : ''}`, 55, tY + 6);
         
-        doc.setTextColor(...p.textMain); doc.setFont("Roboto", "bold");
+        doc.setTextColor(...p.textMain);
+        doc.setFont("Roboto", "bold");
         doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 120, tY + 6, { maxWidth: 60 });
         
-        doc.setTextColor(...p.textMuted); doc.setFont("Roboto", "normal");
+        doc.setTextColor(...p.textMuted);
+        doc.setFont("Roboto", "normal");
         if (iPin) doc.addImage(iPin, 'PNG', 181, tY + 3, 3, 3);
         doc.text(m.field || '--', 185, tY + 6, { maxWidth: 50 });
         
-        // RESULTADO (En la coordenada X: 248)
+        // RESULTADO
         doc.setTextColor(...p.textMain); 
         doc.setFont("Roboto", "bold");
         const gAtm = m.goalsMyTeam !== undefined && m.goalsMyTeam !== '' ? m.goalsMyTeam : '-';
         const gRiv = m.goalsRival !== undefined && m.goalsRival !== '' ? m.goalsRival : '-';
         doc.text(`${gAtm} - ${gRiv}`, 248, tY + 6, { align: 'center' });
         
-        // MINUTOS (En la coordenada X: 273)
+        // MINUTOS
         const minsJugados = (m.gkMinutes && m.gkMinutes[gk.id]) ? m.gkMinutes[gk.id] : '-';
         doc.text(String(minsJugados), 273, tY + 6, { align: 'center' });
         
@@ -3895,7 +3901,7 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState(initialData || { 
-    date: '', time: '', field: '', locationType: 'Local', rivalId: '', goalkeeperIds: [], 
+    date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], 
     gkMinutes: {}, gkGoalsConceded: {}, gkStarter: {}, 
     streak: [], goalsMyTeam: '', goalsRival: '', goalsScored: '', 
     season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] 
@@ -3951,7 +3957,7 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
 
           {step === 2 && (
             <div className="grid grid-cols-1 gap-5 animate-in fade-in slide-in-from-right-4">
-              <div className="mb-2">
+              <div className="mb-5">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Mi Equipo</label>
                 <select name="myTeam" value={formData.myTeam} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
                   {TEAMS_LIST.map(team => <option key={team} value={team}>{team}</option>)}
@@ -3962,33 +3968,21 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha *</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Hora</label><input type="time" name="time" value={formData.time} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} /></div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-2">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Condición / Sede</label>
-                  <select name="locationType" value={formData.locationType} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                    <option value="Local">🏠 Local (Casa)</option>
-                    <option value="Visitante">✈️ Visitante (Fuera)</option>
-                    <option value="Sede">🏟️ Sede (Fija/Neutral)</option>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Campo</label>
+                {!isCustomField ? (
+                  <select name="field" value={formData.field} onChange={(e) => { if (e.target.value === 'Otro') { setIsCustomField(true); setFormData({...formData, field: ''}); } else { handleChange(e); } }} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
+                    <option value="">-- Selecciona campo --</option>
+                    <option value="CD ATM Alcalá de Henares">CD ATM Alcalá de Henares</option>
+                    <option value="CD Cerro Del Espino Majadahonda">CD Cerro Del Espino Majadahonda</option>
+                    <option value="Otro">Otro (Especificar manual)</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Campo</label>
-                  {!isCustomField ? (
-                    <select name="field" value={formData.field} onChange={(e) => { if (e.target.value === 'Otro') { setIsCustomField(true); setFormData({...formData, field: ''}); } else { handleChange(e); } }} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
-                      <option value="">-- Selecciona campo --</option>
-                      <option value="CD ATM Alcalá de Henares">CD ATM Alcalá de Henares</option>
-                      <option value="CD Cerro Del Espino Majadahonda">CD Cerro Del Espino</option>
-                      <option value="Pvo. Ernesto Cotorruelo">Pvo. Ernesto Cotorruelo</option>
-                      <option value="Otro">Otro (Escribir manual)</option>
-                    </select>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input type="text" name="field" value={formData.field} onChange={handleChange} className={inputClass} placeholder="Nombre del campo" />
-                      <button type="button" onClick={() => { setIsCustomField(false); setFormData({...formData, field: ''}); }} className="px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-2xl transition-colors"><RotateCcw size={16}/></button>
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input type="text" name="field" value={formData.field} onChange={handleChange} className={inputClass} placeholder="Escribe el nombre del campo" />
+                    <button type="button" onClick={() => { setIsCustomField(false); setFormData({...formData, field: ''}); }} className="px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-2xl transition-colors"><RotateCcw size={16}/></button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -4058,7 +4052,7 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                            <span className={`text-xs font-black uppercase truncate flex-1 ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>{gk.name}</span>
                          </div>
                          
-                         {/* Casillas de Titularidad, Minutos y Goles */}
+                         {/* Casillas de Titularidad, Minutos y Goles (Solo si está convocado) */}
                          {isSelected && (
                            <div className="w-full mt-2 pt-3 border-t border-blue-200 dark:border-blue-800/50 grid grid-cols-3 gap-2">
                              <div>
