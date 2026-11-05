@@ -2490,15 +2490,17 @@ function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
            dynamicMins += mins;
            hasDynamic = true;
            
-           const golesEncajados = parseInt(m.gkGoalsConceded?.[gk.id]);
-           if (!isNaN(golesEncajados)) {
-              dynamicGoals += golesEncajados;
+           // LÓGICA CORREGIDA Y PRECISA
+           let golesEncajados = 0;
+           if (m.gkGoalsConceded && m.gkGoalsConceded[gk.id] !== undefined && m.gkGoalsConceded[gk.id] !== '') {
+               golesEncajados = parseInt(m.gkGoalsConceded[gk.id]) || 0;
            } else {
-              const golesRival = parseInt(m.goalsRival);
-              if (!isNaN(golesRival)) {
-                 dynamicGoals += golesRival;
-              }
+               const jugaron = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+               if (jugaron.length === 1 && jugaron.includes(gk.id)) {
+                   golesEncajados = parseInt(m.goalsRival) || 0;
+               }
            }
+           dynamicGoals += golesEncajados;
        }
     });
     
@@ -2576,7 +2578,6 @@ function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
             <div className="mt-auto relative z-30 p-4 sm:p-5 flex flex-col justify-end">
                <h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md mb-4">{gk.name}</h4>
 
-               {/* Instrumentos / Micro-stats (AHORA 3 COLUMNAS) */}
                <div className="grid grid-cols-3 gap-1 p-2 bg-slate-900/90 rounded-xl border border-slate-700/80 backdrop-blur-md shadow-inner">
                  <div className="flex flex-col items-center justify-center p-1 border-r border-slate-700">
                    <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma</span>
@@ -3461,7 +3462,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const gkTeamNorm = normalizeStr(gk.team);
 
   const pastTeamMatches = matches.filter(m => normalizeStr(m.myTeam) === gkTeamNorm && m.date < todayStr);
-  const finalTeamMatches = pastTeamMatches.length;
+  const hasDynamicMatches = pastTeamMatches.length > 0;
 
   const getMatchDuration = (teamName) => {
      const t = normalizeStr(teamName);
@@ -3474,33 +3475,36 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
      return 90; 
   };
   const minsPerMatch = getMatchDuration(gk.team);
-  const finalTeamMinutes = finalTeamMatches * minsPerMatch;
 
-  let finalMinutes = 0, finalStarts = 0, finalSubs = 0, finalGoals = 0, finalCleanSheets = 0;
-  let finalConvocatorias = 0, finalPenaltiesSaved = 0, finalPenaltiesFaced = 0;
+  let dMins = 0, dStarts = 0, dSubs = 0, dGoals = 0, dCleanSheets = 0;
+  let dConvocatorias = 0, finalPenaltiesSaved = 0, finalPenaltiesFaced = 0;
 
   const pastGkMatches = pastTeamMatches.filter(m => m.goalkeeperIds?.includes(gk.id));
 
   pastGkMatches.forEach(m => {
-      finalConvocatorias += 1;
+      dConvocatorias += 1;
       
       const minsJugados = parseInt(m.gkMinutes?.[gk.id]);
       
       if (!isNaN(minsJugados) && minsJugados > 0) {
-          finalMinutes += minsJugados;
-          if (m.gkStarter?.[gk.id]) finalStarts += 1; else finalSubs += 1;
+          dMins += minsJugados;
+          if (m.gkStarter?.[gk.id]) dStarts += 1; else dSubs += 1;
           
-          const golesEncajados = parseInt(m.gkGoalsConceded?.[gk.id]);
-          if (!isNaN(golesEncajados)) {
-             finalGoals += golesEncajados;
-             if (golesEncajados === 0) finalCleanSheets += 1; // Suma automática portería a 0
+          // LÓGICA CORREGIDA Y PRECISA: GOLES ENCAJADOS Y PORTERÍAS A CERO
+          let golesEncajados = 0;
+          if (m.gkGoalsConceded && m.gkGoalsConceded[gk.id] !== undefined && m.gkGoalsConceded[gk.id] !== '') {
+              golesEncajados = parseInt(m.gkGoalsConceded[gk.id]) || 0;
           } else {
-             const golesRival = parseInt(m.goalsRival);
-             if (!isNaN(golesRival)) {
-                finalGoals += golesRival;
-                if (golesRival === 0) finalCleanSheets += 1; // Suma automática portería a 0
-             }
+              // Si lo deja en blanco, NO asume los del equipo (para evitar robar goles a otro portero)
+              // Salvo que sea el único portero convocado y haya jugado
+              const jugaron = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+              if (jugaron.length === 1 && jugaron.includes(gk.id)) {
+                  golesEncajados = parseInt(m.goalsRival) || 0;
+              }
           }
+
+          dGoals += golesEncajados;
+          if (golesEncajados === 0) dCleanSheets += 1; 
 
           // Penalties
           const penSaved = parseInt(m.gkPenaltiesSaved?.[gk.id]);
@@ -3510,7 +3514,18 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       }
   });
 
+  const finalTeamMatches = hasDynamicMatches ? pastTeamMatches.length : (parseInt(gk.stats?.teamMatches) || 0);
+  const finalTeamMinutes = hasDynamicMatches ? (finalTeamMatches * minsPerMatch) : (parseInt(gk.stats?.teamMinutes) || 0);
+  
+  const finalMinutes = hasDynamicMatches ? dMins : (parseInt(gk.stats?.minutes) || 0);
+  const finalStarts = hasDynamicMatches ? dStarts : (parseInt(gk.stats?.starts) || 0);
+  const finalSubs = hasDynamicMatches ? dSubs : (parseInt(gk.stats?.subs) || 0);
+  const finalGoals = hasDynamicMatches ? dGoals : (parseInt(gk.stats?.goalsConceded) || 0);
+  const finalCleanSheets = hasDynamicMatches ? dCleanSheets : (parseInt(gk.stats?.cleanSheets) || 0);
+  const finalConvocatorias = hasDynamicMatches ? dConvocatorias : (parseInt(gk.stats?.calledUpMatches) || 0);
+
   const finalPlayedMatches = finalStarts + finalSubs;
+
   const safeTeamMatches = finalTeamMatches > 0 ? finalTeamMatches : 1;
   const safeTeamMinutes = finalTeamMinutes > 0 ? finalTeamMinutes : 1;
   const safePlayedMatches = finalPlayedMatches > 0 ? finalPlayedMatches : 1;
