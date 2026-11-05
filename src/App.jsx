@@ -2470,25 +2470,42 @@ const StreakDisplay = ({ streak }) => {
 };
 
 // ==========================================
-// VESTUARIO VIRTUAL 2.5D INTERACTIVO (REDISEÑO PREMIUM + MINUTOS DINÁMICOS)
+// VESTUARIO VIRTUAL 2.5D INTERACTIVO (REDISEÑO PREMIUM + MINUTOS Y GOLES DINÁMICOS)
 // ==========================================
 function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Algoritmo para calcular los minutos exactos (igual que en el Dashboard)
-  const calcularMinutosReales = (gk) => {
-    if (!matches) return gk.stats?.minutes || 0;
+  // Algoritmo para calcular minutos y goles desde el calendario
+  const calcularStatsReales = (gk) => {
+    if (!matches) return { mins: gk.stats?.minutes || 0, goals: gk.stats?.goalsConceded || 0 };
     const pastGkMatches = matches.filter(m => m.date < todayStr && m.goalkeeperIds?.includes(gk.id));
+    
     let dynamicMins = 0;
+    let dynamicGoals = 0;
     let hasDynamic = false;
+    
     pastGkMatches.forEach(m => {
        const mins = parseInt(m.gkMinutes?.[gk.id]);
        if (!isNaN(mins) && mins > 0) {
            dynamicMins += mins;
            hasDynamic = true;
+           
+           const golesEncajados = parseInt(m.gkGoalsConceded?.[gk.id]);
+           if (!isNaN(golesEncajados)) {
+              dynamicGoals += golesEncajados;
+           } else {
+              const golesRival = parseInt(m.goalsRival);
+              if (!isNaN(golesRival)) {
+                 dynamicGoals += golesRival;
+              }
+           }
        }
     });
-    return hasDynamic ? dynamicMins : (gk.stats?.minutes || 0);
+    
+    return {
+      mins: hasDynamic ? dynamicMins : (gk.stats?.minutes || 0),
+      goals: hasDynamic ? dynamicGoals : (gk.stats?.goalsConceded || 0)
+    };
   };
 
   return (
@@ -2516,7 +2533,7 @@ function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {gks.map(gk => {
-          const minsReales = calcularMinutosReales(gk);
+          const statsReales = calcularStatsReales(gk);
 
           return (
           <div 
@@ -2556,18 +2573,22 @@ function VestuarioVirtual({ gks, matches, onOpenPlan, theme }) {
             </div>
 
             {/* Panel de Info Inferior */}
-            <div className="mt-auto relative z-30 p-5 flex flex-col justify-end">
+            <div className="mt-auto relative z-30 p-4 sm:p-5 flex flex-col justify-end">
                <h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-md mb-4">{gk.name}</h4>
 
-               {/* Instrumentos / Micro-stats */}
-               <div className="grid grid-cols-2 gap-2 p-2 bg-slate-900/90 rounded-xl border border-slate-700/80 backdrop-blur-md shadow-inner">
-                 <div className="flex flex-col items-center justify-center p-1.5 border-r border-slate-700">
-                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma Actual</span>
-                   <span className="text-sm font-black text-emerald-400">{gk.form || '5.0'}</span>
+               {/* Instrumentos / Micro-stats (AHORA 3 COLUMNAS) */}
+               <div className="grid grid-cols-3 gap-1 p-2 bg-slate-900/90 rounded-xl border border-slate-700/80 backdrop-blur-md shadow-inner">
+                 <div className="flex flex-col items-center justify-center p-1 border-r border-slate-700">
+                   <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Forma</span>
+                   <span className="text-xs sm:text-sm font-black text-emerald-400">{gk.form || '5.0'}</span>
                  </div>
-                 <div className="flex flex-col items-center justify-center p-1.5">
-                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Min. Jugados</span>
-                   <span className="text-sm font-black text-white">{minsReales}</span>
+                 <div className="flex flex-col items-center justify-center p-1 border-r border-slate-700">
+                   <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Minutos</span>
+                   <span className="text-xs sm:text-sm font-black text-white">{statsReales.mins}</span>
+                 </div>
+                 <div className="flex flex-col items-center justify-center p-1">
+                   <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">G. Encaj.</span>
+                   <span className="text-xs sm:text-sm font-black text-red-400">{statsReales.goals}</span>
                  </div>
                </div>
             </div>
