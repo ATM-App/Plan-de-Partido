@@ -3504,15 +3504,14 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       
       if (!isNaN(minsJugados) && minsJugados > 0) {
           dMins += minsJugados;
-          if (m.gkStarter?.[gk.id]) dStarts += 1; else dSubs += 1;
           
-          // LÓGICA CORREGIDA Y PRECISA: GOLES ENCAJADOS Y PORTERÍAS A CERO
+          const isTitular = m.gkStarter?.[gk.id] === true || String(m.gkStarter?.[gk.id]) === 'true';
+          if (isTitular) dStarts += 1; else dSubs += 1;
+          
           let golesEncajados = 0;
           if (m.gkGoalsConceded && m.gkGoalsConceded[gk.id] !== undefined && m.gkGoalsConceded[gk.id] !== '') {
               golesEncajados = parseInt(m.gkGoalsConceded[gk.id]) || 0;
           } else {
-              // Si lo deja en blanco, NO asume los del equipo (para evitar robar goles a otro portero)
-              // Salvo que sea el único portero convocado y haya jugado
               const jugaron = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
               if (jugaron.length === 1 && jugaron.includes(gk.id)) {
                   golesEncajados = parseInt(m.goalsRival) || 0;
@@ -3522,7 +3521,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
           dGoals += golesEncajados;
           if (golesEncajados === 0) dCleanSheets += 1; 
 
-          // Penalties
           const penSaved = parseInt(m.gkPenaltiesSaved?.[gk.id]);
           const penFaced = parseInt(m.gkPenaltiesFaced?.[gk.id]);
           if (!isNaN(penSaved)) finalPenaltiesSaved += penSaved;
@@ -3541,7 +3539,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const finalConvocatorias = hasDynamicMatches ? dConvocatorias : (parseInt(gk.stats?.calledUpMatches) || 0);
 
   const finalPlayedMatches = finalStarts + finalSubs;
-
   const safeTeamMatches = finalTeamMatches > 0 ? finalTeamMatches : 1;
   const safeTeamMinutes = finalTeamMinutes > 0 ? finalTeamMinutes : 1;
   const safePlayedMatches = finalPlayedMatches > 0 ? finalPlayedMatches : 1;
@@ -3552,6 +3549,16 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const goalsPercent = finalPlayedMatches > 0 ? Math.min(100, Math.round((finalGoals / safePlayedMatches) * 50)) : 0;
   const cleanSheetsPercent = finalPlayedMatches > 0 ? Math.min(100, Math.round((finalCleanSheets / safePlayedMatches) * 100)) : 0;
   const penaltiesPercent = finalPenaltiesFaced > 0 ? Math.round((finalPenaltiesSaved / finalPenaltiesFaced) * 100) : 0;
+
+  // --- NUEVO: ESTADO EN EL ÚLTIMO PARTIDO ---
+  const lastPlayedMatch = [...pastGkMatches].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  let lastMatchCond = null;
+  if (lastPlayedMatch) {
+      const isTit = lastPlayedMatch.gkStarter?.[gk.id] === true || String(lastPlayedMatch.gkStarter?.[gk.id]) === 'true';
+      const mins = parseInt(lastPlayedMatch.gkMinutes?.[gk.id]) || 0;
+      if (mins === 0) lastMatchCond = 'NO JUGÓ';
+      else lastMatchCond = isTit ? 'TITULAR' : 'SUPLENTE';
+  }
 
   return (
     <div className="flex flex-col gap-8 relative">
@@ -3594,7 +3601,21 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 <p className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>Forma</p>
                 <div className="flex items-end gap-1"><span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">{gk.form || '5.0'}</span><span className={`text-xs mb-1 font-bold ${theme.textMuted}`}>/10</span></div>
               </div>
-              <div className="flex gap-1.5">{gk.lastMatches?.map((m, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full ${m === 'W' ? 'bg-emerald-500' : m === 'D' ? 'bg-blue-500' : 'bg-red-500'} shadow-sm`}></div>)}</div>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex gap-1.5">{gk.lastMatches?.map((m, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full ${m === 'W' ? 'bg-emerald-500' : m === 'D' ? 'bg-blue-500' : 'bg-red-500'} shadow-sm`}></div>)}</div>
+                {/* ETIQUETA NUEVA DE ÚLTIMO PARTIDO */}
+                {lastMatchCond && (
+                  <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${
+                    lastMatchCond === 'TITULAR' 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' 
+                      : lastMatchCond === 'SUPLENTE' 
+                        ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800'
+                        : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                  }`}>
+                    Últ. Partido: {lastMatchCond}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
