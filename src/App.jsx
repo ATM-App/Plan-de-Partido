@@ -859,14 +859,16 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         const gRiv = m.goalsRival !== undefined && m.goalsRival !== '' ? m.goalsRival : '-';
         doc.text(`${gAtm} - ${gRiv}`, 238, tY + 6, { align: 'center' });
         
-        // CONDICIÓN (TITULAR O SUPLENTE)
+        // CONDICIÓN (TITULAR O SUPLENTE - CON CORTAFUEGOS DE TEXTO)
         let condText = '-';
         if (m.gkStarter && m.gkStarter[gk.id] !== undefined) {
-            condText = m.gkStarter[gk.id] ? 'TIT' : 'SUP';
+            // Evaluamos de forma estricta para evitar que el texto "false" lo marque como TITULAR
+            const isTitular = m.gkStarter[gk.id] === true || String(m.gkStarter[gk.id]) === 'true';
+            condText = isTitular ? 'TIT' : 'SUP';
         }
         
-        if (condText === 'TIT') doc.setTextColor(16, 185, 129); // Verde Esmeralda
-        else if (condText === 'SUP') doc.setTextColor(249, 115, 22); // Naranja
+        if (condText === 'TIT') doc.setTextColor(16, 185, 129); // Verde Esmeralda (Titular)
+        else if (condText === 'SUP') doc.setTextColor(249, 115, 22); // Naranja Vibrante (Suplente)
         else doc.setTextColor(...p.textMuted);
         
         doc.text(condText, 258, tY + 6, { align: 'center' });
