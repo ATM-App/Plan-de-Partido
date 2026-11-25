@@ -1965,12 +1965,16 @@ export default function App() {
     showNotification("Backup descargado con éxito");
   };
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   const theme = {
-    bg: darkMode ? 'dark bg-slate-900' : 'bg-slate-50',
-    card: darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-sm',
+    bg: darkMode ? 'dark bg-[#070b18]' : 'bg-[#f4f6fb]',
+    card: darkMode 
+      ? 'bg-slate-900/70 backdrop-blur-xl border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]' 
+      : 'bg-white/80 backdrop-blur-xl border-white/90 shadow-[0_10px_35px_rgba(15,23,42,0.05)]',
     text: darkMode ? 'text-slate-100' : 'text-slate-800',
     textMuted: darkMode ? 'text-slate-400' : 'text-slate-500',
-    border: darkMode ? 'border-slate-700' : 'border-slate-200'
+    border: darkMode ? 'border-white/10' : 'border-slate-200/70'
   };
 
   // ===============================================
@@ -2063,106 +2067,163 @@ export default function App() {
   };
   
   return (
-    <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''} bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100`}>
+    <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 relative ${darkMode ? 'dark bg-[#070b18] text-slate-100' : 'bg-[#f4f6fb] text-slate-800'}`}>
+      {/* Halos ambientales sutiles estilo visionOS */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
+        <div className="absolute -top-32 left-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/10 dark:bg-blue-600/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[450px] h-[450px] rounded-full bg-red-500/5 dark:bg-red-600/10 blur-[120px]" />
+      </div>
+
       <style>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 999px; }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.6); }
       `}</style>
 
       {notification && (
-        <div className={`fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white no-print transform transition-all ${notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
-          {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+        <div className={`fixed top-5 right-5 z-[9999] flex items-center gap-2 px-5 py-3 rounded-2xl backdrop-blur-xl shadow-2xl border border-white/20 text-white no-print transform transition-all ${notification.type === 'error' ? 'bg-red-600/90' : 'bg-emerald-600/90'}`}>
+          {notification.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
           <span className="font-bold text-xs tracking-wide">{notification.msg}</span>
         </div>
       )}
 
-      {/* SIDEBAR (Desktop Only) */}
-      <aside className={`hidden md:flex w-24 lg:w-28 h-screen overflow-hidden flex-shrink-0 flex-col bg-blue-950 text-white no-print z-20 transition-colors`}>
-        <div className={`h-24 flex items-center justify-center border-b border-blue-900/50 pt-4 pb-4 shrink-0`}>
-          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-12 h-12 object-contain drop-shadow-[0_0_12px_rgba(220,38,38,0.4)]" />
-        </div>
+      {/* SIDEBAR FLOTANTE ESTILO VISION OS (Desktop) */}
+      <div className="hidden md:flex p-3.5 pr-1 h-screen flex-shrink-0 no-print z-20">
+        <aside className={`${sidebarCollapsed ? 'w-[84px]' : 'w-[250px]'} h-full flex flex-col rounded-[2rem] bg-gradient-to-b from-[#172554] via-[#10193d] to-[#0a1029] text-white border border-white/15 shadow-[0_20px_50px_rgba(10,16,41,0.35)] transition-all duration-300 relative overflow-hidden`}>
+          {/* Brillo superior cristal */}
+          <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
 
-        <nav className="flex-1 py-2 flex flex-col gap-0 items-center justify-center w-full">
-          <SidebarItem darkMode={darkMode} icon={<Home/>} label="INICIO" active={currentModule === 'inicio'} onClick={() => setCurrentModule('inicio')} />
-          <SidebarItem darkMode={darkMode} icon={<User/>} label="PORTEROS" active={currentModule === 'porteros' || currentModule === 'reporte_detalle'} onClick={() => setCurrentModule('porteros')} />
-          <SidebarItem darkMode={darkMode} icon={<CalendarDays/>} label="PARTIDOS" active={currentModule === 'partidos'} onClick={() => setCurrentModule('partidos')} />
-          {role !== 'staff' && <SidebarItem darkMode={darkMode} icon={<Swords/>} label="RIVALES" active={currentModule === 'rivales'} onClick={() => setCurrentModule('rivales')} />}
-          <SidebarItem darkMode={darkMode} icon={<GitCompare/>} label="COMPARA" active={currentModule === 'comparador'} onClick={() => setCurrentModule('comparador')} />
-          <SidebarItem darkMode={darkMode} icon={<FileText/>} label="INFORMES" active={currentModule === 'informes'} onClick={() => setCurrentModule('informes')} />
-          {role !== 'staff' && <SidebarItem darkMode={darkMode} icon={<Settings/>} label="AJUSTES" active={currentModule === 'ajustes'} onClick={() => setCurrentModule('ajustes')} />}
-        </nav>
-
-        <div className="p-4 border-t border-blue-900/50 bg-blue-950 flex flex-col items-center justify-center gap-2 shrink-0">
-          <div className={`flex flex-col items-center gap-2 overflow-hidden text-center ${role !== 'staff' ? 'cursor-pointer' : ''}`} onClick={() => role !== 'staff' && setCurrentModule('ajustes')} title={role !== 'staff' ? "Ir a ajustes" : "Perfil"}>
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-950 font-black shadow-inner overflow-hidden shrink-0 border-2 border-blue-500">
-              {currentUserData.photoUrl ? (
-                <img src={currentUserData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${currentUserData.photoOffsetY ?? 50}%` }} alt=""/>
-              ) : (
-                currentUserData.name ? currentUserData.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : (role === 'admin' ? 'AD' : 'EN')
+          {/* Cabecera Logo + Botón Colapsar */}
+          <div className={`px-4 pt-6 pb-5 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} relative z-10`}>
+            <div className="flex items-center gap-3 overflow-hidden">
+              <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-9 h-9 object-contain shrink-0 drop-shadow-[0_0_12px_rgba(239,68,68,0.45)]" />
+              {!sidebarCollapsed && (
+                <div className="flex flex-col leading-none">
+                  <span className="text-sm font-black italic tracking-tight text-white">
+                    PLANPARTIDO <span className="text-red-500">ATM</span>
+                  </span>
+                </div>
               )}
             </div>
-            <div className="flex flex-col truncate w-full">
-              <span className="text-[10px] font-black text-white truncate leading-tight">{currentUserData.name ? currentUserData.name.split(' ')[0] : 'Usuario'}</span>
+            {!sidebarCollapsed && (
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all shrink-0"
+                title="Contraer menú"
+              >
+                <ArrowLeft size={13} />
+              </button>
+            )}
+          </div>
+
+          {sidebarCollapsed && (
+            <div className="flex justify-center pb-3 relative z-10">
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all"
+                title="Expandir menú"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          )}
+
+          {/* Separador sutil */}
+          <div className="mx-4 h-px bg-white/10 mb-3" />
+
+          {/* Navegación */}
+          <nav className="flex-1 px-3 py-1 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar relative z-10">
+            <SidebarItem collapsed={sidebarCollapsed} icon={<Home/>} label="Inicio" active={currentModule === 'inicio'} onClick={() => setCurrentModule('inicio')} />
+            <SidebarItem collapsed={sidebarCollapsed} icon={<User/>} label="Porteros" active={currentModule === 'porteros' || currentModule === 'reporte_detalle'} onClick={() => setCurrentModule('porteros')} />
+            <SidebarItem collapsed={sidebarCollapsed} icon={<CalendarDays/>} label="Partidos" active={currentModule === 'partidos'} onClick={() => setCurrentModule('partidos')} />
+            {role !== 'staff' && <SidebarItem collapsed={sidebarCollapsed} icon={<Swords/>} label="Rivales" active={currentModule === 'rivales'} onClick={() => setCurrentModule('rivales')} />}
+            <SidebarItem collapsed={sidebarCollapsed} icon={<GitCompare/>} label="Comparador" active={currentModule === 'comparador'} onClick={() => setCurrentModule('comparador')} />
+            <SidebarItem collapsed={sidebarCollapsed} icon={<FileText/>} label="Informes" active={currentModule === 'informes'} onClick={() => setCurrentModule('informes')} />
+            {role !== 'staff' && <SidebarItem collapsed={sidebarCollapsed} icon={<Settings/>} label="Ajustes" active={currentModule === 'ajustes'} onClick={() => setCurrentModule('ajustes')} />}
+          </nav>
+
+          {/* Footer Perfil Usuario */}
+          <div className="p-3 mt-auto relative z-10">
+            <div className={`p-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center ${sidebarCollapsed ? 'flex-col gap-2' : 'justify-between gap-2'}`}>
+              <div
+                className={`flex items-center gap-2.5 overflow-hidden ${role !== 'staff' ? 'cursor-pointer' : ''}`}
+                onClick={() => role !== 'staff' && setCurrentModule('ajustes')}
+                title={role !== 'staff' ? "Ir a ajustes" : "Perfil"}
+              >
+                <div className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-blue-950 font-black overflow-hidden shrink-0 ring-2 ring-white/25">
+                  {currentUserData.photoUrl ? (
+                    <img src={currentUserData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${currentUserData.photoOffsetY ?? 50}%` }} alt=""/>
+                  ) : (
+                    currentUserData.name ? currentUserData.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : (role === 'admin' ? 'AD' : 'EN')
+                  )}
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="flex flex-col truncate">
+                    <span className="text-xs font-bold text-white truncate leading-tight">
+                      {currentUserData.name || 'Entrenador'}
+                    </span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-blue-300/80">
+                      {role === 'admin' ? 'ADMIN' : role === 'staff' ? 'STAFF' : 'COACH'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-slate-400 hover:text-red-400 p-2 rounded-xl hover:bg-white/10 transition-colors shrink-0"
+                title="Cerrar sesión"
+              >
+                <LogOut size={16}/>
+              </button>
             </div>
           </div>
-          <button onClick={handleLogout} className="text-blue-300 hover:text-red-400 p-2 rounded-xl hover:bg-blue-900 transition-colors" title="Cerrar sesión"><LogOut size={16}/></button>
-        </div>
-      </aside>
+        </aside>
+      </div>
 
-      {/* BOTTOM NAVIGATION (Mobile Only) */}
-      <nav className={`md:hidden fixed bottom-0 left-0 w-full h-16 bg-blue-950 text-white border-t border-blue-900 flex justify-around items-center z-50 px-2 no-print pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.2)] rounded-t-3xl`}>
+      {/* BOTTOM NAVIGATION (Mobile Only - Glassmorphism) */}
+      <nav className={`md:hidden fixed bottom-3 left-3 right-3 h-16 bg-[#10193d]/90 backdrop-blur-xl text-white border border-white/15 flex justify-around items-center z-50 px-2 no-print shadow-2xl rounded-[1.75rem]`}>
           <BottomNavItem icon={<Home/>} label="Inicio" active={currentModule === 'inicio'} onClick={() => setCurrentModule('inicio')} />
           <BottomNavItem icon={<User/>} label="Porteros" active={currentModule === 'porteros' || currentModule === 'reporte_detalle'} onClick={() => setCurrentModule('porteros')} />
           <BottomNavItem icon={<CalendarDays/>} label="Partidos" active={currentModule === 'partidos'} onClick={() => setCurrentModule('partidos')} />
           <BottomNavItem icon={<GitCompare/>} label="Compara" active={currentModule === 'comparador'} onClick={() => setCurrentModule('comparador')} />
           <BottomNavItem icon={<FileText/>} label="Informes" active={currentModule === 'informes'} onClick={() => setCurrentModule('informes')} />
-          <BottomNavItem icon={<Settings/>} label="Ajustes" active={currentModule === 'ajustes'} onClick={() => setCurrentModule('ajustes')} />}
+          <BottomNavItem icon={<Settings/>} label="Ajustes" active={currentModule === 'ajustes'} onClick={() => setCurrentModule('ajustes')} />
       </nav>
 
       {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden print-full-width relative bg-slate-50 dark:bg-slate-900">
-        {/* TOPBAR */}
-        <header className={`h-20 flex-shrink-0 flex items-center justify-between px-4 md:px-8 border-b ${theme.border} bg-white dark:bg-slate-900 no-print z-10 relative`}>
-          <div>
-            <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white">
-              {currentModule === 'reporte_detalle' ? 'INFORME DEL PORTERO' : currentModule}
-            </h1>
-            <p className={`text-[10px] md:text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold`}>Atlético de Madrid</p>
-          </div>
-
-          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="flex items-center gap-2 px-6 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-auto">
-               <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-5 h-5 object-contain" />
-               <span className="text-lg lg:text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white drop-shadow-sm">
-                 ATLETI <span className="text-red-600">PLAN PARTIDO</span>
-               </span>
+      <main className="flex-1 flex flex-col h-screen overflow-hidden print-full-width relative z-10">
+        {/* TOPBAR FLOTANTE TRANSLÚCIDA */}
+        <header className="px-4 md:px-8 pt-4 pb-2 flex-shrink-0 flex items-center justify-between no-print z-10 relative">
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">
+                {currentModule === 'reporte_detalle' ? 'INFORME DEL PORTERO' : currentModule}
+              </h1>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] font-bold mt-1">Atlético de Madrid</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className={`px-2 py-1.5 md:px-4 md:py-2 rounded-xl border ${theme.border} bg-slate-100 dark:bg-slate-800 text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2`}>
+          <div className="flex items-center gap-2.5 md:gap-3">
+            <div className={`px-3 py-2 rounded-2xl border ${theme.border} bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl text-xs font-bold flex items-center gap-1.5 shadow-sm`}>
               <select 
                 value={activeSeason} 
                 onChange={handleSeasonChange} 
-                className="bg-transparent outline-none cursor-pointer appearance-none text-slate-700 dark:text-slate-200"
+                className="bg-transparent outline-none cursor-pointer appearance-none text-slate-700 dark:text-slate-200 pr-1"
               >
-                {availableSeasons.map(s => <option key={s} value={s}>{s}</option>)}
+                {availableSeasons.map(s => <option key={s} value={s} className="text-slate-800">{s}</option>)}
                 <option value="add_new" className="font-bold text-blue-500">+ Añadir...</option>
               </select>
-              <ChevronDown size={14} className="text-slate-500 pointer-events-none -ml-1" />
+              <ChevronDown size={14} className="text-slate-400 pointer-events-none" />
             </div>
             
-            <button onClick={() => setDarkMode(!darkMode)} className={`p-2.5 rounded-xl border ${theme.border} bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors`}>
-              {darkMode ? <Sun size={18} className="text-slate-400" /> : <Moon size={18} className="text-slate-500" />}
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-2.5 rounded-2xl border ${theme.border} bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl hover:scale-105 transition-all shadow-sm`}>
+              {darkMode ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-slate-600" />}
             </button>
 
             {currentModule === 'reporte_detalle' && (
-              <button onClick={() => setExportTrigger(prev => prev + 1)} className="flex items-center gap-2 px-3 md:px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors shadow-lg shadow-red-900/20 font-black text-xs uppercase tracking-widest">
-                <Download size={16} /> <span className="hidden sm:inline">Exportar PDF</span>
+              <button onClick={() => setExportTrigger(prev => prev + 1)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl transition-all shadow-lg shadow-red-600/25 font-black text-xs uppercase tracking-widest">
+                <Download size={15} /> <span className="hidden sm:inline">Exportar PDF</span>
               </button>
             )}
           </div>
@@ -4400,17 +4461,26 @@ function UserFormModal({ initialData, onClose, onSave, theme }) {
 }
 
 // --- COMPONENTES UI PEQUEÑOS ---
-const SidebarItem = ({ icon, label, active, onClick }) => (
+const SidebarItem = ({ icon, label, active, onClick, collapsed }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex flex-col items-center justify-center gap-1 py-3 transition-all border-l-4
+    title={collapsed ? label : ''}
+    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'justify-start px-3'} py-2.5 rounded-2xl transition-all duration-200 group relative
       ${active 
-        ? `border-red-600 bg-white text-red-600 font-black shadow-lg` 
-        : `border-transparent text-blue-200 hover:text-white hover:bg-blue-900 font-bold`}
+        ? 'bg-white/15 backdrop-blur-md text-white border border-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_12px_rgba(0,0,0,0.15)] font-bold' 
+        : 'text-slate-300/80 hover:text-white hover:bg-white/8 border border-transparent font-medium'}
     `}
   >
-    {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2, className: active ? 'text-red-600' : '' })}
-    <span className="text-[9px] uppercase tracking-widest mt-1">{label}</span>
+    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all
+      ${active 
+        ? 'bg-red-500/20 text-red-400 border border-red-400/30 shadow-inner' 
+        : 'text-slate-400 group-hover:text-white'}
+    `}>
+      {React.cloneElement(icon, { size: 17, strokeWidth: active ? 2.4 : 1.9 })}
+    </div>
+    {!collapsed && (
+      <span className="ml-3 text-[13px] tracking-wide truncate">{label}</span>
+    )}
   </button>
 );
 
