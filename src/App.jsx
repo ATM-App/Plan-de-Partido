@@ -2117,13 +2117,13 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const theme = {
-    bg: darkMode ? 'dark bg-[#070b18]' : 'bg-[#f4f6fb]',
+    bg: darkMode ? 'dark bg-[#182452]' : 'atm-light bg-[#f2f5fc]',
     card: darkMode 
-      ? 'bg-slate-900/70 backdrop-blur-xl border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]' 
-      : 'bg-white/80 backdrop-blur-xl border-white/90 shadow-[0_10px_35px_rgba(15,23,42,0.05)]',
-    text: darkMode ? 'text-slate-100' : 'text-slate-800',
-    textMuted: darkMode ? 'text-slate-400' : 'text-slate-500',
-    border: darkMode ? 'border-white/10' : 'border-slate-200/70'
+      ? 'bg-[#213068]/80 backdrop-blur-xl border-white/15 shadow-[0_10px_32px_rgba(15,23,56,0.35)]' 
+      : 'bg-white/90 backdrop-blur-xl border-white shadow-[0_10px_35px_rgba(39,46,97,0.07)]',
+    text: darkMode ? 'text-white' : 'text-[#272E61]',
+    textMuted: darkMode ? 'text-blue-200/75' : 'text-slate-500',
+    border: darkMode ? 'border-white/15' : 'border-slate-200/80'
   };
 
   // ===============================================
@@ -2134,8 +2134,8 @@ export default function App() {
   if (publicReportViewId) {
     if (informesList.length === 0 && loadingAuth === false) {
         return (
-          <div className="flex h-screen items-center justify-center bg-slate-950 text-white font-sans">
-             <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="flex h-screen items-center justify-center bg-[#272E61] text-white font-sans">
+             <div className="w-8 h-8 border-4 border-[#CB3524] border-t-transparent rounded-full animate-spin"></div>
           </div>
         );
     }
@@ -2145,8 +2145,8 @@ export default function App() {
   // APP PRIVADA: CARGANDO
   if (loadingAuth || (user && isDataLoading)) {
     return (
-      <div className="flex h-screen items-center justify-center bg-blue-950 text-white font-sans">
-        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-[#272E61] via-[#213C8C] to-[#1B2756] text-white font-sans">
+        <div className="w-9 h-9 border-4 border-[#CB3524] border-t-white rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -2237,41 +2237,88 @@ export default function App() {
   };
   
   return (
-    <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 relative ${darkMode ? 'dark bg-[#070b18] text-slate-100' : 'bg-[#f4f6fb] text-slate-800'}`}>
-      {/* Halos ambientales sutiles estilo visionOS */}
+    <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 relative ${darkMode ? 'dark bg-[#182452] text-white' : 'atm-light bg-[#f2f5fc] text-[#272E61]'}`}>
+      {/* Halos ambientales rojiblancos y azul corporativo estilo visionOS */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute -top-32 left-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/10 dark:bg-blue-600/10 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[450px] h-[450px] rounded-full bg-red-500/5 dark:bg-red-600/10 blur-[120px]" />
+        <div className="absolute -top-32 left-1/4 w-[520px] h-[520px] rounded-full bg-[#272E61]/12 dark:bg-blue-500/15 blur-[130px]" />
+        <div className="absolute bottom-0 right-1/4 w-[480px] h-[480px] rounded-full bg-[#CB3524]/8 dark:bg-[#CB3524]/15 blur-[130px]" />
       </div>
 
       <style>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 999px; }
-        .dark ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(39, 46, 97, 0.28); border-radius: 999px; }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); }
+
+        /* PALETA CORPORATIVA OFICIAL CLUB ATLÉTICO DE MADRID */
+        /* Tarjetas Scouting, Partidos, Rivales, Comparador y Categorías -> Azul Atlético Luminoso */
+        [class*="from-[#152246]"],
+        [class*="from-[#1d3168]"],
+        [class*="to-[#090e20]"] {
+          background-image: linear-gradient(145deg, #2E428E 0%, #272E61 54%, #1F295C 100%) !important;
+          border-color: rgba(255, 255, 255, 0.22) !important;
+        }
+
+        /* Cabeceras de Módulos y Modales -> Azul Real e Institucional ATM */
+        [class*="from-[#142042]"],
+        [class*="from-[#172554]"] {
+          background-image: linear-gradient(125deg, #272E61 0%, #234194 52%, #272E61 100%) !important;
+          border-color: rgba(255, 255, 255, 0.24) !important;
+        }
+
+        /* Banner Matchday Principal -> Fusión Rojiblanca y Azul Metropolitano */
+        [class*="from-[#1c1229]"],
+        .bg-\\[\\#0a0f1c\\] {
+          background-image: linear-gradient(125deg, #B52421 0%, #272E61 48%, #213C8C 100%) !important;
+          border-color: rgba(255, 255, 255, 0.24) !important;
+        }
+
+        /* Tarjeta Decisión Técnica -> Acento Rojiblanco Corporativo */
+        [class*="from-[#1b1635]"] {
+          background-image: linear-gradient(145deg, #A32220 0%, #272E61 58%, #21377D 100%) !important;
+        }
+
+        /* Tipografía y píldoras activas en Modo Claro con Azul Escudo Oficial (#272E61) */
+        .atm-light .text-blue-950 {
+          color: #272E61;
+        }
+        .atm-light .bg-\\[\\#142042\\] {
+          background-color: #272E61;
+        }
+        .border-\\[\\#0f1833\\],
+        .border-\\[\\#111c3b\\] {
+          border-color: #272E61 !important;
+        }
       `}</style>
 
       {notification && (
-        <div className={`fixed top-5 right-5 z-[9999] flex items-center gap-2 px-5 py-3 rounded-2xl backdrop-blur-xl shadow-2xl border border-white/20 text-white no-print transform transition-all ${notification.type === 'error' ? 'bg-red-600/90' : 'bg-emerald-600/90'}`}>
+        <div className={`fixed top-5 right-5 z-[9999] flex items-center gap-2 px-5 py-3 rounded-2xl backdrop-blur-xl shadow-2xl border border-white/25 text-white no-print transform transition-all ${notification.type === 'error' ? 'bg-[#CB3524]/95' : 'bg-emerald-600/95'}`}>
           {notification.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
           <span className="font-bold text-xs tracking-wide">{notification.msg}</span>
         </div>
       )}
 
-      {/* SIDEBAR FLOTANTE ESTILO VISION OS (Desktop) */}
+      {/* SIDEBAR FLOTANTE CORPORATIVO ATLÉTICO DE MADRID (Desktop) */}
       <div className="hidden md:flex p-3.5 pr-1 h-screen flex-shrink-0 no-print z-20">
-        <aside className={`${sidebarCollapsed ? 'w-[84px]' : 'w-[250px]'} h-full flex flex-col rounded-[2rem] bg-gradient-to-b from-[#172554] via-[#10193d] to-[#0a1029] text-white border border-white/15 shadow-[0_20px_50px_rgba(10,16,41,0.35)] transition-all duration-300 relative overflow-hidden`}>
+        <aside className={`${sidebarCollapsed ? 'w-[84px]' : 'w-[252px]'} h-full flex flex-col rounded-[2rem] bg-gradient-to-b from-[#2B3E8A] via-[#272E61] to-[#1D2554] text-white border border-white/20 shadow-[0_20px_50px_rgba(39,46,97,0.35)] transition-all duration-300 relative overflow-hidden`}>
+          {/* Cinta superior Rojiblanca Corporativa */}
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#CB3524] via-white to-[#CB3524] opacity-90 shrink-0" />
           {/* Brillo superior cristal */}
-          <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+          <div className="absolute top-1.5 inset-x-0 h-28 bg-gradient-to-b from-white/12 to-transparent pointer-events-none" />
 
           {/* Cabecera Logo + Botón Colapsar */}
-          <div className={`px-4 pt-6 pb-5 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} relative z-10`}>
+          <div className={`px-4 pt-5 pb-5 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} relative z-10`}>
             <div className="flex items-center gap-3 overflow-hidden">
-              <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-9 h-9 object-contain shrink-0 drop-shadow-[0_0_12px_rgba(239,68,68,0.45)]" />
+              <div className="w-10 h-10 rounded-2xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-md">
+                <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain" />
+              </div>
               {!sidebarCollapsed && (
                 <div className="flex flex-col leading-none">
                   <span className="text-sm font-black italic tracking-tight text-white">
-                    PLANPARTIDO <span className="text-red-500">ATM</span>
+                    PLANPARTIDO <span className="text-[#FF4D42]">ATM</span>
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-200/80 mt-1">
+                    Cantera · GK
                   </span>
                 </div>
               )}
@@ -2279,7 +2326,7 @@ export default function App() {
             {!sidebarCollapsed && (
               <button
                 onClick={() => setSidebarCollapsed(true)}
-                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all shrink-0"
+                className="w-7 h-7 rounded-full bg-white/12 hover:bg-white/25 border border-white/15 flex items-center justify-center text-white/80 hover:text-white transition-all shrink-0"
                 title="Contraer menú"
               >
                 <ArrowLeft size={13} />
@@ -2291,7 +2338,7 @@ export default function App() {
             <div className="flex justify-center pb-3 relative z-10">
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-all"
+                className="w-8 h-8 rounded-full bg-white/12 hover:bg-white/25 border border-white/15 flex items-center justify-center text-white/80 hover:text-white transition-all"
                 title="Expandir menú"
               >
                 <ChevronRight size={15} />
@@ -2300,7 +2347,7 @@ export default function App() {
           )}
 
           {/* Separador sutil */}
-          <div className="mx-4 h-px bg-white/10 mb-3" />
+          <div className="mx-4 h-px bg-white/15 mb-3" />
 
           {/* Navegación */}
           <nav className="flex-1 px-3 py-1 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar relative z-10">
@@ -2315,13 +2362,13 @@ export default function App() {
 
           {/* Footer Perfil Usuario */}
           <div className="p-3 mt-auto relative z-10">
-            <div className={`p-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center ${sidebarCollapsed ? 'flex-col gap-2' : 'justify-between gap-2'}`}>
+            <div className={`p-2.5 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md flex items-center ${sidebarCollapsed ? 'flex-col gap-2' : 'justify-between gap-2'}`}>
               <div
                 className={`flex items-center gap-2.5 overflow-hidden ${role !== 'staff' ? 'cursor-pointer' : ''}`}
                 onClick={() => role !== 'staff' && setCurrentModule('ajustes')}
                 title={role !== 'staff' ? "Ir a ajustes" : "Perfil"}
               >
-                <div className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-blue-950 font-black overflow-hidden shrink-0 ring-2 ring-white/25">
+                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-[#272E61] font-black overflow-hidden shrink-0 ring-2 ring-white/35">
                   {currentUserData.photoUrl ? (
                     <img src={currentUserData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${currentUserData.photoOffsetY ?? 50}%` }} alt=""/>
                   ) : (
@@ -2333,7 +2380,7 @@ export default function App() {
                     <span className="text-xs font-bold text-white truncate leading-tight">
                       {currentUserData.name || 'Entrenador'}
                     </span>
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-blue-300/80">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-sky-200">
                       {role === 'admin' ? 'ADMIN' : role === 'staff' ? 'STAFF' : 'COACH'}
                     </span>
                   </div>
@@ -2341,7 +2388,7 @@ export default function App() {
               </div>
               <button
                 onClick={handleLogout}
-                className="text-slate-400 hover:text-red-400 p-2 rounded-xl hover:bg-white/10 transition-colors shrink-0"
+                className="text-blue-200 hover:text-white p-2 rounded-xl hover:bg-[#CB3524] transition-colors shrink-0"
                 title="Cerrar sesión"
               >
                 <LogOut size={16}/>
@@ -2351,8 +2398,8 @@ export default function App() {
         </aside>
       </div>
 
-      {/* BOTTOM NAVIGATION (Mobile Only - Glassmorphism) */}
-      <nav className={`md:hidden fixed bottom-3 left-3 right-3 h-16 bg-[#10193d]/90 backdrop-blur-xl text-white border border-white/15 flex justify-around items-center z-50 px-2 no-print shadow-2xl rounded-[1.75rem]`}>
+      {/* BOTTOM NAVIGATION (Mobile Only - Azul Corporativo ATM) */}
+      <nav className="md:hidden fixed bottom-3 left-3 right-3 h-16 bg-[#272E61]/95 backdrop-blur-xl text-white border border-white/20 flex justify-around items-center z-50 px-2 no-print shadow-2xl rounded-[1.75rem]">
           <BottomNavItem icon={<Home/>} label="Inicio" active={currentModule === 'inicio'} onClick={() => setCurrentModule('inicio')} />
           <BottomNavItem icon={<User/>} label="Porteros" active={currentModule === 'porteros' || currentModule === 'reporte_detalle'} onClick={() => setCurrentModule('porteros')} />
           <BottomNavItem icon={<CalendarDays/>} label="Partidos" active={currentModule === 'partidos'} onClick={() => setCurrentModule('partidos')} />
@@ -2366,33 +2413,34 @@ export default function App() {
         {/* TOPBAR FLOTANTE TRANSLÚCIDA */}
         <header className="px-4 md:px-8 pt-4 pb-2 flex-shrink-0 flex items-center justify-between no-print z-10 relative">
           <div className="flex items-center gap-3">
+            <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-[#CB3524] to-[#272E61] hidden sm:block" />
             <div>
-              <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">
+              <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-[#272E61] dark:text-white leading-none">
                 {currentModule === 'reporte_detalle' ? 'INFORME DEL PORTERO' : currentModule}
               </h1>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] font-bold mt-1">Atlético de Madrid</p>
+              <p className="text-[10px] text-[#CB3524] dark:text-sky-200 uppercase tracking-[0.22em] font-black mt-1">Club Atlético de Madrid</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 md:gap-3">
-            <div className={`px-3 py-2 rounded-2xl border ${theme.border} bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl text-xs font-bold flex items-center gap-1.5 shadow-sm`}>
+            <div className={`px-3.5 py-2 rounded-2xl border ${theme.border} bg-white/85 dark:bg-[#272E61]/80 backdrop-blur-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm`}>
               <select 
                 value={activeSeason} 
                 onChange={handleSeasonChange} 
-                className="bg-transparent outline-none cursor-pointer appearance-none text-slate-700 dark:text-slate-200 pr-1"
+                className="bg-transparent outline-none cursor-pointer appearance-none text-[#272E61] dark:text-white pr-1"
               >
                 {availableSeasons.map(s => <option key={s} value={s} className="text-slate-800">{s}</option>)}
-                <option value="add_new" className="font-bold text-blue-500">+ Añadir...</option>
+                <option value="add_new" className="font-bold text-[#CB3524]">+ Añadir...</option>
               </select>
-              <ChevronDown size={14} className="text-slate-400 pointer-events-none" />
+              <ChevronDown size={14} className="text-slate-400 dark:text-blue-200 pointer-events-none" />
             </div>
             
-            <button onClick={() => setDarkMode(!darkMode)} className={`p-2.5 rounded-2xl border ${theme.border} bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl hover:scale-105 transition-all shadow-sm`}>
-              {darkMode ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-slate-600" />}
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-2.5 rounded-2xl border ${theme.border} bg-white/85 dark:bg-[#272E61]/80 backdrop-blur-xl hover:scale-105 transition-all shadow-sm`}>
+              {darkMode ? <Sun size={17} className="text-amber-300" /> : <Moon size={17} className="text-[#272E61]" />}
             </button>
 
             {currentModule === 'reporte_detalle' && (
-              <button onClick={() => setExportTrigger(prev => prev + 1)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl transition-all shadow-lg shadow-red-600/25 font-black text-xs uppercase tracking-widest">
+              <button onClick={() => setExportTrigger(prev => prev + 1)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#CB3524] to-[#E02424] hover:from-[#b52d1e] hover:to-[#CB3524] text-white rounded-2xl transition-all shadow-lg shadow-[#CB3524]/30 font-black text-xs uppercase tracking-widest">
                 <Download size={15} /> <span className="hidden sm:inline">Exportar PDF</span>
               </button>
             )}
@@ -2443,127 +2491,226 @@ export default function App() {
 }
 
 // ==========================================
-// PANTALLA DE LOGIN
+// PANTALLA DE LOGIN VISION OS · CORPORATIVA ATLÉTICO DE MADRID
 // ==========================================
 const LoginScreen = ({ users, onLogin }) => {
   const [u, setU] = useState('');
   const [p, setP] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
-  
+
   const submit = (e) => {
     e.preventDefault();
     setError('');
     setIsAuthenticating(true);
 
     setTimeout(() => {
-      const user = users.find(x => (x.username === u || x.email === u) && x.password === p);
-      if (user) { 
-        if(user.active === false) { 
-          setError("Cuenta desactivada.");
+      const cleanU = u.trim();
+      const user = users.find(x => (x.username === cleanU || x.email === cleanU) && x.password === p);
+      if (user) {
+        if (user.active === false) {
+          setError("Esta cuenta se encuentra desactivada.");
           setIsAuthenticating(false);
         } else {
           setIsEntering(true);
-          setTimeout(() => onLogin(user), 700);
+          setTimeout(() => onLogin(user), 650);
         }
       } else {
-        setError("Usuario o contraseña incorrectos");
+        setError("Usuario o contraseña incorrectos.");
         setIsAuthenticating(false);
       }
-    }, 600);
+    }, 500);
   };
-  
+
   return (
-    <div className={`h-screen w-full flex bg-blue-950 overflow-hidden transition-all duration-700 ease-in-out ${isEntering ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>
+    <div className={`min-h-screen w-full flex items-center justify-center lg:justify-between bg-gradient-to-br from-[#272E61] via-[#203882] to-[#192452] relative overflow-hidden p-4 sm:p-8 lg:p-12 transition-all duration-700 ease-in-out ${isEntering ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}>
       <style>{`
         @keyframes shimmer {
           100% { transform: translateX(200%); }
         }
         .animate-shimmer {
-          animation: shimmer 2s infinite;
+          animation: shimmer 2.2s infinite;
+        }
+        /* Neutraliza el recuadro azul de autocompletado de Chrome/Edge y mantiene el diseño limpio */
+        input.atm-login-field:-webkit-autofill,
+        input.atm-login-field:-webkit-autofill:hover,
+        input.atm-login-field:-webkit-autofill:focus,
+        input.atm-login-field:-webkit-autofill:active {
+          -webkit-box-shadow: 0 0 0 1000px #f8fafc inset !important;
+          -webkit-text-fill-color: #272E61 !important;
+          caret-color: #272E61;
+          border-radius: 0.75rem;
+          transition: background-color 5000s ease-in-out 0s;
         }
       `}</style>
 
-      {/* Lado Izquierdo */}
-      <div className="hidden lg:flex flex-1 relative bg-gradient-to-br from-blue-900 to-blue-950 overflow-hidden flex-col justify-end p-24">
-        <div className="absolute inset-0 z-0 opacity-20 pointer-events-none flex items-center justify-center">
-            <img src={ESCUDO_ATM_URL} alt="" className="w-[800px] h-[800px] object-contain transform -rotate-12 opacity-50 grayscale" />
-        </div>
-        <div className="relative z-20 flex flex-col">
-          <h3 className="text-3xl xl:text-4xl font-black text-red-500/90 italic uppercase tracking-tighter mb-4 drop-shadow-xl">
+      {/* Luces ambientales Rojiblancas y Azul Metropolitano */}
+      <div className="pointer-events-none absolute -top-32 -left-24 w-[550px] h-[550px] rounded-full bg-[#CB3524]/30 blur-[135px]" />
+      <div className="pointer-events-none absolute -bottom-40 right-1/4 w-[600px] h-[600px] rounded-full bg-sky-400/15 blur-[140px]" />
+
+      {/* Sutiles franjas rojiblancas diagonales de fondo */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'repeating-linear-gradient(115deg, #ffffff 0px, #ffffff 28px, transparent 28px, transparent 56px)' }} />
+
+      {/* Escudo Marca de Agua Monumental */}
+      <div className="pointer-events-none absolute left-[18%] top-1/2 -translate-y-1/2 hidden lg:flex items-center justify-center opacity-[0.07]">
+        <img src={ESCUDO_ATM_URL} alt="" className="w-[620px] h-[620px] object-contain -rotate-12" />
+      </div>
+
+      {/* COLUMNA IZQUIERDA: IDENTIDAD EDITORIAL DEL CLUB (Desktop) */}
+      <div className="hidden lg:flex flex-1 flex-col justify-between h-full max-w-2xl pl-8 xl:pl-14 pr-8 relative z-10 select-none">
+        <div>
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg mb-8">
+            <span className="w-2 h-2 rounded-full bg-[#FF4D42] animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-[0.22em] text-white">
+              Academia · Departamento de Porteros
+            </span>
+          </div>
+
+          <h3 className="text-2xl xl:text-3xl font-black text-[#FF5A4F] italic uppercase tracking-tight mb-3 drop-shadow">
             "Nunca dejes de creer"
           </h3>
-          <h2 className="text-6xl xl:text-8xl font-black text-white italic uppercase tracking-tighter leading-[0.85] mb-6 drop-shadow-2xl">
-            Observa.<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-400">Reacciona.</span><br/>Lidera.
+
+          <h2 className="text-6xl xl:text-7xl font-black text-white italic uppercase tracking-tighter leading-[0.9] mb-8 drop-shadow-2xl">
+            Observa.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-red-200 to-[#FF5A4F]">
+              Reacciona.
+            </span><br />
+            Lidera.
           </h2>
-          <div className="border-l-4 border-red-500 pl-6 max-w-xl backdrop-blur-sm bg-blue-950/20 p-4 rounded-r-2xl">
-            <p className="text-blue-100 text-lg font-medium">
-              Software de alto rendimiento diseñado exclusivamente para optimizar la toma de decisiones, y el plan de partido de nuestros porteros.
-            </p>
+
+          <div className="p-5 rounded-3xl bg-white/[0.08] backdrop-blur-xl border border-white/15 max-w-lg shadow-xl">
+            <div className="flex items-start gap-3.5">
+              <div className="w-1.5 h-12 rounded-full bg-gradient-to-b from-[#CB3524] to-white shrink-0 mt-0.5" />
+              <p className="text-blue-50/95 text-sm xl:text-base font-medium leading-relaxed">
+                Plataforma integral de análisis táctico, control de competición y seguimiento evolutivo para los porteros del <strong className="text-white font-extrabold">Club Atlético de Madrid</strong>.
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Lado Derecho */}
-      <div className="w-full lg:w-[450px] xl:w-[500px] flex flex-col justify-center px-10 md:px-16 py-12 bg-white z-20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] relative">
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-blue-600"></div>
-        
-        <div className="flex flex-col items-center text-center mb-12">
-          <img src={ESCUDO_ATM_URL} alt="Atleti" className="h-24 w-auto mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.2)]" />
-          <h1 className="text-blue-950 text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4 whitespace-nowrap">ATLETI <span className="text-red-600">PLAN PARTIDO</span></h1>
-          <div className="flex flex-col items-center">
-            <span className="text-slate-500 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">
-              Departamento de porteros
+      {/* TARJETA FLOTANTE VISION OS DE ACCESO (Derecha / Centro en Móvil) */}
+      <div className="w-full max-w-[440px] lg:mr-6 xl:mr-14 rounded-[2.5rem] bg-white/95 backdrop-blur-2xl border border-white shadow-[0_30px_80px_rgba(12,19,48,0.5)] overflow-hidden relative z-20">
+        {/* Franja Superior Corporativa Rojiblanca y Azul */}
+        <div className="h-2 w-full bg-gradient-to-r from-[#CB3524] via-[#272E61] to-[#CB3524]" />
+
+        <div className="px-7 sm:px-10 pt-9 pb-10">
+          {/* Cabecera con Medallón del Escudo */}
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="w-20 h-20 rounded-[1.5rem] bg-gradient-to-b from-white to-slate-100 border border-slate-200/90 shadow-[0_10px_25px_rgba(39,46,97,0.14)] p-3 flex items-center justify-center mb-4">
+              <img src={ESCUDO_ATM_URL} alt="Atlético de Madrid" className="w-full h-full object-contain" />
+            </div>
+
+            <h1 className="text-[#272E61] text-2xl sm:text-3xl font-black italic uppercase tracking-tighter leading-none">
+              ATLETI <span className="text-[#CB3524]">PLAN PARTIDO</span>
+            </h1>
+            <span className="text-slate-400 text-[10px] font-black tracking-[0.22em] uppercase mt-2">
+              Departamento de Porteros · ATM
             </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500 text-sm md:text-base font-black tracking-widest uppercase mt-1">
-              Atlético de Madrid
-            </span>
+          </div>
+
+          {/* Formulario con Etiquetas Fijas Superiores (Cero solapamientos) */}
+          <form onSubmit={submit} className="space-y-5">
+            {/* CAMPO 1: USUARIO O EMAIL */}
+            <div>
+              <label htmlFor="login-user" className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#272E61] mb-2 pl-1">
+                Usuario o Correo Electrónico
+              </label>
+              <div className="group flex items-center gap-3 bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white border-2 border-slate-200/90 focus-within:border-[#272E61] focus-within:ring-4 focus-within:ring-[#272E61]/10 rounded-2xl px-3.5 py-2.5 transition-all">
+                <div className="w-9 h-9 rounded-xl bg-[#272E61]/10 text-[#272E61] group-focus-within:bg-[#272E61] group-focus-within:text-white flex items-center justify-center transition-colors shrink-0">
+                  <User size={17} strokeWidth={2.3} />
+                </div>
+                <input
+                  id="login-user"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  placeholder="Introduce tu usuario"
+                  value={u}
+                  onChange={e => setU(e.target.value)}
+                  disabled={isAuthenticating}
+                  className="atm-login-field w-full bg-transparent text-[#272E61] font-bold text-sm placeholder-slate-400 outline-none py-1.5"
+                />
+              </div>
+            </div>
+
+            {/* CAMPO 2: CONTRASEÑA CON BOTÓN MOSTRAR/OCULTAR */}
+            <div>
+              <label htmlFor="login-pass" className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#272E61] mb-2 pl-1">
+                Contraseña de Acceso
+              </label>
+              <div className="group flex items-center gap-3 bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white border-2 border-slate-200/90 focus-within:border-[#CB3524] focus-within:ring-4 focus-within:ring-[#CB3524]/10 rounded-2xl px-3.5 py-2.5 transition-all">
+                <div className="w-9 h-9 rounded-xl bg-[#CB3524]/10 text-[#CB3524] group-focus-within:bg-[#CB3524] group-focus-within:text-white flex items-center justify-center transition-colors shrink-0">
+                  <Key size={17} strokeWidth={2.3} />
+                </div>
+                <input
+                  id="login-pass"
+                  name="password"
+                  type={showPass ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  placeholder="••••••••••••"
+                  value={p}
+                  onChange={e => setP(e.target.value)}
+                  disabled={isAuthenticating}
+                  className="atm-login-field w-full bg-transparent text-[#272E61] font-bold text-sm placeholder-slate-400 outline-none py-1.5"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  tabIndex={-1}
+                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors shrink-0 flex items-center gap-1 ${
+                    showPass
+                      ? 'bg-[#272E61] text-white'
+                      : 'text-slate-400 hover:text-[#272E61] hover:bg-slate-200/60'
+                  }`}
+                  title={showPass ? "Ocultar contraseña" : "Ver contraseña"}
+                >
+                  <Eye size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Mensaje de Error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-2">
+                <AlertCircle size={17} className="text-[#CB3524] shrink-0" />
+                <p className="text-[#CB3524] text-xs font-bold">{String(error)}</p>
+              </div>
+            )}
+
+            {/* Botón Principal Corporativo Rojiblanco */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isAuthenticating || isEntering}
+                className="relative w-full bg-gradient-to-r from-[#CB3524] to-[#E02424] hover:from-[#b52c1d] hover:to-[#CB3524] text-white font-black text-xs py-4 rounded-2xl uppercase tracking-[0.2em] shadow-[0_12px_28px_rgba(203,53,36,0.35)] transition-all hover:scale-[1.01] overflow-hidden group disabled:opacity-80 disabled:scale-100 flex items-center justify-center gap-2 h-14 cursor-pointer"
+              >
+                <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] group-hover:animate-shimmer" />
+                {isAuthenticating ? (
+                  <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span className="relative z-10">Iniciar Sesión</span>
+                    <ArrowRight size={16} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Pie de Tarjeta */}
+          <div className="mt-7 pt-5 border-t border-slate-100 text-center flex items-center justify-center gap-3">
+            <div className="h-px w-8 bg-gradient-to-r from-transparent to-[#CB3524]" />
+            <p className="text-[#272E61]/70 text-[10px] font-black italic tracking-widest uppercase">
+              "Donde empieza nuestra defensa"
+            </p>
+            <div className="h-px w-8 bg-gradient-to-l from-transparent to-[#272E61]" />
           </div>
         </div>
-
-        <form onSubmit={submit} className="w-full space-y-8">
-          <div className="relative group">
-            <input type="text" id="user" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} disabled={isAuthenticating}/>
-            <label htmlFor="user" className="absolute left-1 top-3 text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all peer-placeholder-shown:top-6 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:text-slate-400 peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-black peer-focus:text-red-600 pointer-events-none">
-              Usuario o Email
-            </label>
-          </div>
-
-          <div className="relative group">
-            <input type="password" id="pass" required className="peer w-full bg-transparent border-b-2 border-slate-200 text-slate-800 px-1 py-3 pt-6 outline-none focus:border-red-600 transition-colors placeholder-transparent" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} disabled={isAuthenticating}/>
-            <label htmlFor="pass" className="absolute left-1 top-3 text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all peer-placeholder-shown:top-6 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:text-slate-400 peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-black peer-focus:text-red-600 pointer-events-none">
-              Contraseña
-            </label>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle size={16} className="text-red-500 shrink-0"/>
-              <p className="text-red-600 text-xs font-bold">{String(error)}</p>
-            </div>
-          )}
-          
-          <div className="pt-6">
-            <button type="submit" disabled={isAuthenticating || isEntering} className="relative w-full bg-red-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest shadow-[0_8px_25px_rgba(220,38,38,0.3)] transition-all hover:scale-[1.02] hover:bg-red-700 overflow-hidden group disabled:opacity-80 disabled:scale-100 flex items-center justify-center h-14">
-              <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] group-hover:animate-shimmer"></div>
-              
-              {isAuthenticating ? (
-                <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <span className="relative z-10">Acceder</span>
-              )}
-            </button>
-            
-            <div className="mt-8 text-center flex items-center justify-center gap-3 opacity-90">
-              <div className="h-px w-10 bg-gradient-to-r from-transparent to-red-500/80"></div>
-              <p className="text-slate-500 text-[10px] font-black italic tracking-widest uppercase">
-                "Donde empieza nuestra defensa."
-              </p>
-              <div className="h-px w-10 bg-gradient-to-l from-transparent to-blue-500/80"></div>
-            </div>
-          </div>
-        </form>
       </div>
     </div>
   );
