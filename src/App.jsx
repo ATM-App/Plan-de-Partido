@@ -2696,7 +2696,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
       <div className="px-4 py-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 relative z-10 flex-1">
         {/* Mi Equipo */}
         <div className="flex flex-col items-center text-center min-w-0">
-          <div className="w-15 h-15 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
             <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.25)]" />
           </div>
           <span className="mt-2.5 text-[11px] font-black uppercase tracking-tight text-white leading-tight line-clamp-2">
@@ -2737,7 +2737,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
 
         {/* Rival */}
         <div className="flex flex-col items-center text-center min-w-0">
-          <div className="w-15 h-15 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
             {rival?.shieldUrl ? (
               <img src={rival.shieldUrl} className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.28)]" alt="Rival" />
             ) : (
@@ -3640,11 +3640,11 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                 {/* Cuerpo Central del Partido */}
                 {targetMatch ? (
                   <div className="p-4 flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-15 h-15 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_18px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
+                    <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/15 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
                       {rivalObj?.shieldUrl ? (
-                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.28)]" />
+                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-sm" />
                       ) : (
-                        <Swords className="w-7 h-7 text-slate-500" />
+                        <Swords className="w-7 h-7 text-slate-400" />
                       )}
                     </div>
 
