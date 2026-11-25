@@ -6,7 +6,7 @@ import {
   Zap, UploadCloud, Search, ChevronRight, User, Settings, Moon, Sun, Shield
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
+  ResponsiveContainer, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
 import { initializeApp } from 'firebase/app';
@@ -3880,6 +3880,580 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
             );
           })}
         </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* NIVEL 4 · TERMÓMETRO DE ROTACIÓN + CURVA EVOLUTIVA        */}
+      {/* ========================================================= */}
+      <InicioAnalyticsSection
+        gks={gks}
+        matches={matches}
+        theme={theme}
+        onSelectGk={onSelectGk}
+      />
+    </div>
+  );
+}
+
+// ==========================================
+// ANALÍTICA EN VIVO DE INICIO (ROTACIÓN + CURVA APPLE FITNESS)
+// ==========================================
+function InicioAnalyticsSection({ gks = [], matches = [], theme, onSelectGk }) {
+  const [evoFilter, setEvoFilter] = useState('Todos');
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const formatShortName = (fullName = '') => {
+    const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'Portero';
+    if (parts.length === 1) return parts[0];
+    const compound = ['jose', 'juan', 'miguel', 'luis', 'carlos'];
+    if (parts.length >= 3 && compound.includes(normalizeStr(parts[0]))) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return `${parts[0]} ${parts[1][0]}.`;
+  };
+
+  // 1. CÁLCULO AUTOMÁTICO: TERMÓMETRO DE ROTACIÓN POR CATEGORÍA
+  const rotationCards = useMemo(() => {
+    return TEAMS_LIST.map((teamName) => {
+      const teamNorm = normalizeStr(teamName);
+      const teamGksRaw = gks.filter(g => normalizeStr(g.team) === teamNorm);
+
+      const hasTeamDynamic = matches.some(
+        m => normalizeStr(m.myTeam) === teamNorm &&
+          (m.date < todayStr || Object.values(m.gkMinutes || {}).some(v => parseInt(v) > 0))
+      );
+
+      const gksWithStats = teamGksRaw
+        .map(gk => {
+          const gkPlayed = matches.filter(
+            m => m.goalkeeperIds?.includes(gk.id) &&
+              (m.date < todayStr || parseInt(m.gkMinutes?.[gk.id]) > 0)
+          );
+          let mins = 0;
+          let starts = 0;
+
+          gkPlayed.forEach(m => {
+            const mVal = parseInt(m.gkMinutes?.[gk.id]);
+            if (!isNaN(mVal) && mVal > 0) {
+              mins += mVal;
+              const isTit = m.gkStarter?.[gk.id] === true || String(m.gkStarter?.[gk.id]) === 'true';
+              if (isTit) starts += 1;
+            }
+          });
+
+          if (!hasTeamDynamic && gkPlayed.length === 0) {
+            mins = parseInt(gk.stats?.minutes) || 0;
+            starts = parseInt(gk.stats?.starts) || 0;
+          }
+
+          return { ...gk, liveMins: mins, liveStarts: starts };
+        })
+        .sort((a, b) => (parseInt(a.number) || 99) - (parseInt(b.number) || 99) || (a.name || '').localeCompare(b.name || ''));
+
+      const gkA = gksWithStats[0] || null;
+      const gkB = gksWithStats[1] || null;
+      const pairMins = (gkA?.liveMins || 0) + (gkB?.liveMins || 0);
+
+      let pctA = 50;
+      let pctB = 50;
+      if (gkA && gkB && pairMins > 0) {
+        pctA = Math.round((gkA.liveMins / pairMins) * 100);
+        pctB = 100 - pctA;
+      } else if (gkA && !gkB) {
+        pctA = 100;
+        pctB = 0;
+      }
+
+      const diffPct = (gkA && gkB && pairMins > 0) ? Math.abs(pctA - pctB) : 0;
+      const diffMins = (gkA && gkB) ? Math.abs(gkA.liveMins - gkB.liveMins) : 0;
+      const isUnbalanced = Boolean(gkA && gkB && pairMins > 0 && diffPct > 20);
+      const needsMinutesGk = (gkA && gkB) ? (gkA.liveMins <= gkB.liveMins ? gkA : gkB) : null;
+
+      return {
+        teamName,
+        gkA,
+        gkB,
+        extraCount: Math.max(0, gksWithStats.length - 2),
+        pairMins,
+        pctA,
+        pctB,
+        diffPct,
+        diffMins,
+        isUnbalanced,
+        needsMinutesGk
+      };
+    });
+  }, [gks, matches, todayStr]);
+
+  // 2. CÁLCULO AUTOMÁTICO: CURVA EVOLUTIVA (JORNADA 1 -> ACTUAL)
+  const { chartData, summaryStats } = useMemo(() => {
+    const relevantMatches = evoFilter === 'Todos'
+      ? matches
+      : matches.filter(m => normalizeStr(m.myTeam) === normalizeStr(evoFilter));
+
+    const playedMatches = [...relevantMatches]
+      .filter(m => {
+        const playedGkIds = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+        const hasScore = m.goalsRival !== undefined && m.goalsRival !== '' && !isNaN(parseInt(m.goalsRival));
+        return m.date <= todayStr && (playedGkIds.length > 0 || hasScore);
+      })
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const teamSeqFallback = {};
+    const bucketsMap = new Map();
+
+    playedMatches.forEach(m => {
+      const tKey = normalizeStr(m.myTeam || 'atm');
+      teamSeqFallback[tKey] = (teamSeqFallback[tKey] || 0) + 1;
+
+      const parsedMd = String(m.matchday || '').match(/\d+/);
+      const mdNum = parsedMd ? parseInt(parsedMd[0], 10) : teamSeqFallback[tKey];
+
+      if (!bucketsMap.has(mdNum)) {
+        bucketsMap.set(mdNum, {
+          mdNum,
+          jornada: `J${mdNum}`,
+          golesEncajados: 0,
+          porteriasCero: 0,
+          partidos: 0
+        });
+      }
+
+      const bucket = bucketsMap.get(mdNum);
+      bucket.partidos += 1;
+
+      const gkIds = m.goalkeeperIds || [];
+      const playedGkIds = gkIds.filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+      const hasTeamScore = m.goalsRival !== undefined && m.goalsRival !== '' && !isNaN(parseInt(m.goalsRival));
+      const anyExplicitGkGoals = playedGkIds.some(
+        id => m.gkGoalsConceded && m.gkGoalsConceded[id] !== undefined && m.gkGoalsConceded[id] !== ''
+      );
+
+      if (playedGkIds.length > 0 && anyExplicitGkGoals) {
+        playedGkIds.forEach(gkId => {
+          const gEnc = parseInt(m.gkGoalsConceded?.[gkId]) || 0;
+          bucket.golesEncajados += gEnc;
+          if (gEnc === 0) bucket.porteriasCero += 1;
+        });
+      } else if (playedGkIds.length > 0 && hasTeamScore) {
+        const teamGoals = parseInt(m.goalsRival) || 0;
+        bucket.golesEncajados += teamGoals;
+        if (teamGoals === 0) {
+          bucket.porteriasCero += playedGkIds.length;
+        }
+      } else if (hasTeamScore) {
+        const teamGoals = parseInt(m.goalsRival) || 0;
+        bucket.golesEncajados += teamGoals;
+        if (teamGoals === 0) bucket.porteriasCero += 1;
+      } else if (playedGkIds.length > 0) {
+        bucket.porteriasCero += playedGkIds.length;
+      }
+    });
+
+    const sortedPoints = Array.from(bucketsMap.values())
+      .sort((a, b) => a.mdNum - b.mdNum)
+      .map(pt => ({
+        ...pt,
+        promedio: pt.partidos > 0 ? Number((pt.golesEncajados / pt.partidos).toFixed(2)) : 0
+      }));
+
+    const totalGoals = sortedPoints.reduce((acc, p) => acc + p.golesEncajados, 0);
+    const totalCS = sortedPoints.reduce((acc, p) => acc + p.porteriasCero, 0);
+    const totalGames = sortedPoints.reduce((acc, p) => acc + p.partidos, 0);
+
+    let trendBadge = { text: 'Solidez Estable →', cls: 'bg-sky-500/20 text-sky-200 border-sky-400/35' };
+    if (sortedPoints.length >= 2) {
+      const mid = Math.floor(sortedPoints.length / 2);
+      const firstHalf = sortedPoints.slice(0, mid);
+      const secondHalf = sortedPoints.slice(mid);
+      const firstGames = firstHalf.reduce((a, x) => a + x.partidos, 0) || 1;
+      const secondGames = secondHalf.reduce((a, x) => a + x.partidos, 0) || 1;
+      const avgFirst = firstHalf.reduce((a, x) => a + x.golesEncajados, 0) / firstGames;
+      const avgSecond = secondHalf.reduce((a, x) => a + x.golesEncajados, 0) / secondGames;
+
+      if (avgSecond < avgFirst - 0.1) {
+        trendBadge = { text: 'Solidez en Mejora ↗', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/35' };
+      } else if (avgSecond > avgFirst + 0.15) {
+        trendBadge = { text: 'Alerta Goles Enc. ↘', cls: 'bg-rose-500/20 text-rose-300 border-rose-400/35' };
+      }
+    }
+
+    return {
+      chartData: sortedPoints,
+      summaryStats: {
+        totalGoals,
+        totalCS,
+        totalGames,
+        avgPerGame: totalGames > 0 ? (totalGoals / totalGames).toFixed(2) : '0.00',
+        trendBadge
+      }
+    };
+  }, [matches, evoFilter, todayStr]);
+
+  return (
+    <div className="space-y-6 pt-2">
+      {/* ========================================================= */}
+      {/* 1. TERMÓMETRO DE ROTACIÓN Y REPARTO DE MINUTOS (4 COLS)   */}
+      {/* ========================================================= */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#272E61]/10 dark:bg-sky-500/15 border border-[#272E61]/20 dark:border-sky-400/25 flex items-center justify-center text-[#272E61] dark:text-sky-300">
+              <GitCompare size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-white leading-none">
+                Termómetro de Rotación y Reparto de Minutos
+              </h3>
+              <p className={`text-[10px] font-semibold ${theme.textMuted} mt-1`}>
+                Equilibrio automático entre parejas de porteros · Umbral de alerta al superar el 20% de diferencia
+              </p>
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" /> ≤20% Equilibrado
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
+              <span className="w-2 h-2 rounded-full bg-amber-500" /> &gt;20% Descompensado
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          {rotationCards.map((card) => (
+            <div
+              key={card.teamName}
+              className="rounded-[1.75rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_14px_32px_rgba(15,23,56,0.28)] flex flex-col justify-between overflow-hidden relative"
+            >
+              {/* Cabecera Categoría + Semáforo Equilibrio */}
+              <div className="px-4 py-3 bg-white/[0.05] border-b border-white/10 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-5 h-5 rounded-md bg-gradient-to-b from-white to-slate-200 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                    <img src={ESCUDO_ATM_URL} alt="" className="w-full h-full object-contain" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-wider text-white truncate">
+                    {card.teamName}
+                  </span>
+                </div>
+
+                {card.gkA && card.gkB ? (
+                  card.pairMins === 0 ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[9px] font-black uppercase tracking-wider text-slate-300 shrink-0">
+                      Sin minutos
+                    </span>
+                  ) : card.isUnbalanced ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/45 text-[9px] font-black uppercase tracking-wider text-amber-200 shrink-0">
+                      ⚠ Descompensado
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-[9px] font-black uppercase tracking-wider text-emerald-200 shrink-0">
+                      ✓ Equilibrado
+                    </span>
+                  )
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[9px] font-bold uppercase tracking-wider text-slate-300 shrink-0">
+                    {card.gkA ? '1 Portero' : 'Sin asignar'}
+                  </span>
+                )}
+              </div>
+
+              {/* Cuerpo Comparativo de la Pareja */}
+              {card.gkA ? (
+                <div className="p-4 space-y-3.5 flex-1 flex flex-col justify-center">
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Portero Izquierda */}
+                    <div
+                      onClick={() => onSelectGk && onSelectGk(card.gkA.id)}
+                      className="flex items-center gap-2.5 min-w-0 cursor-pointer group/gk"
+                      title={`Ver informe de ${card.gkA.name}`}
+                    >
+                      <img
+                        src={card.gkA.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${card.gkA.name}`}
+                        alt={card.gkA.name}
+                        className="w-9 h-9 rounded-xl object-cover border-2 border-sky-400 bg-slate-800 shrink-0 group-hover/gk:scale-105 transition-transform"
+                        style={{ objectPosition: 'center 15%' }}
+                      />
+                      <div className="min-w-0">
+                        <span className="block text-[11px] font-extrabold text-white group-hover/gk:text-sky-300 truncate transition-colors">
+                          {formatShortName(card.gkA.name)}
+                        </span>
+                        <span className="block text-[9px] font-bold text-blue-200/80 tabular-nums">
+                          {card.gkA.liveMins}' · {card.gkA.liveStarts} TIT
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Portero Derecha */}
+                    {card.gkB ? (
+                      <div
+                        onClick={() => onSelectGk && onSelectGk(card.gkB.id)}
+                        className="flex items-center gap-2.5 min-w-0 text-right cursor-pointer group/gk"
+                        title={`Ver informe de ${card.gkB.name}`}
+                      >
+                        <div className="min-w-0">
+                          <span className="block text-[11px] font-extrabold text-white group-hover/gk:text-rose-300 truncate transition-colors">
+                            {formatShortName(card.gkB.name)}
+                          </span>
+                          <span className="block text-[9px] font-bold text-blue-200/80 tabular-nums">
+                            {card.gkB.liveMins}' · {card.gkB.liveStarts} TIT
+                          </span>
+                        </div>
+                        <img
+                          src={card.gkB.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${card.gkB.name}`}
+                          alt={card.gkB.name}
+                          className="w-9 h-9 rounded-xl object-cover border-2 border-[#FF5A4F] bg-slate-800 shrink-0 group-hover/gk:scale-105 transition-transform"
+                          style={{ objectPosition: 'center 15%' }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-blue-200/60 italic">Único efectivo</span>
+                    )}
+                  </div>
+
+                  {/* Porcentajes + Barra Enfrentada con Marca Central del 50% */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-lg font-black text-sky-300 tabular-nums leading-none">
+                        {card.pctA}%
+                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-blue-200/70">
+                        Dif. {card.diffPct}%
+                      </span>
+                      <span className="text-lg font-black text-[#FF6B61] tabular-nums leading-none">
+                        {card.gkB ? `${card.pctB}%` : '--'}
+                      </span>
+                    </div>
+
+                    <div className="h-3 w-full rounded-full bg-black/30 border border-white/15 p-0.5 flex items-center gap-0.5 relative overflow-hidden">
+                      {/* Guía visual exacta del 50% */}
+                      <div className="pointer-events-none absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-white/50 z-10" />
+                      <div
+                        className="h-full rounded-l-full bg-gradient-to-r from-sky-500 to-cyan-300 shadow-[0_0_10px_rgba(56,189,248,0.45)] transition-all duration-500"
+                        style={{ width: `${card.pctA}%` }}
+                      />
+                      {card.gkB && (
+                        <div
+                          className="h-full rounded-r-full bg-gradient-to-l from-[#CB3524] to-[#FF6B61] shadow-[0_0_10px_rgba(255,107,97,0.4)] transition-all duration-500"
+                          style={{ width: `${card.pctB}%` }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 flex-1 flex flex-col items-center justify-center text-center">
+                  <Users size={24} className="text-blue-200/40 mb-1.5" />
+                  <p className="text-[11px] font-bold text-blue-200/70">Sin porteros en esta categoría</p>
+                </div>
+              )}
+
+              {/* Pie de Recomendación Rápida para el Fin de Semana */}
+              <div className="px-4 py-2.5 bg-black/25 border-t border-white/10 flex items-center justify-between gap-2 text-[10px]">
+                <span className="font-bold text-blue-200/75 tabular-nums">
+                  Total: {card.pairMins}' {card.extraCount > 0 ? `(+${card.extraCount} GK)` : ''}
+                </span>
+                {card.gkA && card.gkB && card.pairMins > 0 ? (
+                  card.isUnbalanced && card.needsMinutesGk ? (
+                    <span className="font-black text-amber-300 truncate" title={`Diferencia de ${card.diffMins} minutos`}>
+                      Priorizar: {formatShortName(card.needsMinutesGk.name)} (-{card.diffMins}')
+                    </span>
+                  ) : (
+                    <span className="font-black text-emerald-300 truncate">
+                      Rotación óptima ({card.diffMins}' dif.)
+                    </span>
+                  )
+                ) : (
+                  <span className="font-semibold text-blue-200/50">---</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. CURVA EVOLUTIVA DEL DEPARTAMENTO (ESTILO APPLE FITNESS) */}
+      {/* ========================================================= */}
+      <div className="rounded-[2rem] p-6 sm:p-7 bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_20px_45px_rgba(15,23,56,0.32)] relative overflow-hidden">
+        {/* Halos luminosos estilo Apple Fitness */}
+        <div className="pointer-events-none absolute -top-24 left-1/4 w-72 h-72 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 right-1/4 w-72 h-72 rounded-full bg-rose-500/10 blur-3xl" />
+
+        {/* Cabecera + Filtro por Categoría */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-white/12 relative z-10">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400/25 to-sky-500/25 border border-emerald-300/35 flex items-center justify-center text-emerald-300 shrink-0 shadow-inner">
+              <Activity size={21} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
+                  Curva Evolutiva del Departamento · Jornada 1 → Actual
+                </h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${summaryStats.trendBadge.cls}`}>
+                  {summaryStats.trendBadge.text}
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-blue-100/80 mt-1">
+                Evolución acumulada jornada a jornada de porterías a cero y goles encajados
+              </p>
+            </div>
+          </div>
+
+          {/* Selector interactivo de vista (Global 4 Categorías o Individual) */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-black/25 p-1 rounded-2xl border border-white/12 self-start lg:self-auto">
+            {['Todos', ...TEAMS_LIST].map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setEvoFilter(opt)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                  evoFilter === opt
+                    ? 'bg-white text-[#272E61] shadow-md'
+                    : 'text-blue-100/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {opt === 'Todos' ? '4 Categorías' : opt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Anillos / Píldoras Resumen Apple Fitness */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 my-5 relative z-10">
+          <div className="rounded-2xl bg-white/[0.06] border border-white/12 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-[0_0_12px_#34d399] ring-4 ring-emerald-400/20" />
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-blue-200/80">Porterías a Cero</span>
+                <span className="text-[11px] font-semibold text-emerald-300">Actuaciones imbatido</span>
+              </div>
+            </div>
+            <span className="text-2xl font-black text-emerald-300 tabular-nums">{summaryStats.totalCS}</span>
+          </div>
+
+          <div className="rounded-2xl bg-white/[0.06] border border-white/12 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#FF5A4F] shadow-[0_0_12px_#FF5A4F] ring-4 ring-rose-500/20" />
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-blue-200/80">Goles Encajados</span>
+                <span className="text-[11px] font-semibold text-rose-200">Total en {summaryStats.totalGames} partidos</span>
+              </div>
+            </div>
+            <span className="text-2xl font-black text-white tabular-nums">{summaryStats.totalGoals}</span>
+          </div>
+
+          <div className="rounded-2xl bg-white/[0.06] border border-white/12 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-3.5 h-3.5 rounded-full bg-sky-400 shadow-[0_0_12px_#38bdf8] ring-4 ring-sky-400/20" />
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-blue-200/80">Media Defensiva</span>
+                <span className="text-[11px] font-semibold text-sky-200">Goles por encuentro</span>
+              </div>
+            </div>
+            <span className="text-2xl font-black text-sky-300 tabular-nums">{summaryStats.avgPerGame}</span>
+          </div>
+        </div>
+
+        {/* Gráfica de Área Suavizada Estilo Apple Fitness */}
+        {chartData.length > 0 ? (
+          <div className="w-full h-[250px] sm:h-[280px] relative z-10 pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 16, left: -18, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fitnessCleanSheets" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#34d399" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="fitnessGoalsConceded" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#FF5A4F" stopOpacity={0.42} />
+                    <stop offset="95%" stopColor="#FF5A4F" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                <XAxis
+                  dataKey="jornada"
+                  stroke="rgba(219,234,254,0.75)"
+                  fontSize={11}
+                  fontWeight="800"
+                  tickLine={false}
+                  axisLine={false}
+                  dy={6}
+                />
+                <YAxis
+                  stroke="rgba(219,234,254,0.65)"
+                  fontSize={11}
+                  fontWeight="700"
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                />
+                <RechartsTooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const row = payload[0]?.payload || {};
+                    return (
+                      <div className="rounded-2xl bg-[#18224B]/95 backdrop-blur-xl border border-white/20 px-4 py-3 shadow-2xl text-white">
+                        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-1.5 mb-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-white">{label}</span>
+                          <span className="text-[10px] font-bold text-sky-300">{row.partidos} part.</span>
+                        </div>
+                        <div className="space-y-1 text-xs font-bold">
+                          <div className="flex items-center justify-between gap-4 text-emerald-300">
+                            <span>● Porterías a 0:</span>
+                            <span className="font-black tabular-nums">{row.porteriasCero}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-[#FF6B61]">
+                            <span>● Goles Encajados:</span>
+                            <span className="font-black tabular-nums">{row.golesEncajados}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-blue-200/80 pt-1 border-t border-white/10 text-[10px]">
+                            <span>Media jornada:</span>
+                            <span className="font-black tabular-nums">{row.promedio} g/p</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="porteriasCero"
+                  name="Porterías a 0"
+                  stroke="#34d399"
+                  strokeWidth={3.5}
+                  fillOpacity={1}
+                  fill="url(#fitnessCleanSheets)"
+                  dot={{ r: 4, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
+                  activeDot={{ r: 6.5, fill: '#34d399', stroke: '#ffffff', strokeWidth: 2.5 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="golesEncajados"
+                  name="Goles Encajados"
+                  stroke="#FF5A4F"
+                  strokeWidth={3.5}
+                  fillOpacity={1}
+                  fill="url(#fitnessGoalsConceded)"
+                  dot={{ r: 4, fill: '#CB3524', stroke: '#ffffff', strokeWidth: 2 }}
+                  activeDot={{ r: 6.5, fill: '#FF5A4F', stroke: '#ffffff', strokeWidth: 2.5 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="py-14 text-center relative z-10">
+            <Activity className="w-10 h-10 text-blue-200/40 mx-auto mb-2" />
+            <p className="text-xs font-black uppercase tracking-widest text-blue-200/75">
+              Aún no hay jornadas disputadas para dibujar la curva evolutiva
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
