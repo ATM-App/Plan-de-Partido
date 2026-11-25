@@ -6623,21 +6623,21 @@ const SidebarItem = ({ icon, label, active, onClick, collapsed }) => (
   <button 
     onClick={onClick}
     title={collapsed ? label : ''}
-    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'justify-start px-3'} py-2.5 rounded-2xl transition-all duration-200 group relative
+    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'justify-start px-3.5'} py-2.5 rounded-2xl transition-all duration-200 group relative
       ${active 
-        ? 'bg-white/15 backdrop-blur-md text-white border border-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_12px_rgba(0,0,0,0.15)] font-bold' 
-        : 'text-slate-300/80 hover:text-white hover:bg-white/8 border border-transparent font-medium'}
+        ? 'bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_12px_rgba(0,0,0,0.15)] font-extrabold' 
+        : 'text-blue-100/85 hover:text-white hover:bg-white/10 border border-transparent font-semibold'}
     `}
   >
-    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all
+    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all
       ${active 
-        ? 'bg-red-500/20 text-red-400 border border-red-400/30 shadow-inner' 
-        : 'text-slate-400 group-hover:text-white'}
+        ? 'bg-[#CB3524]/30 text-[#FF6B61] border border-[#FF6B61]/40 shadow-inner' 
+        : 'text-blue-200/75 group-hover:text-white'}
     `}>
-      {React.cloneElement(icon, { size: 17, strokeWidth: active ? 2.4 : 1.9 })}
+      {React.cloneElement(icon, { size: 19, strokeWidth: active ? 2.4 : 2 })}
     </div>
     {!collapsed && (
-      <span className="ml-3 text-[13px] tracking-wide truncate">{label}</span>
+      <span className="ml-3 text-[15px] tracking-wide truncate">{label}</span>
     )}
   </button>
 );
