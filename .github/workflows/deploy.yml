@@ -1,4 +1,5 @@
-name: Desplegar App Atleti
+name: Deploy to GitHub Pages
+
 on:
   push:
     branches: ["main"]
@@ -11,33 +12,42 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist' # Cambia a './build' si usas Create React App
+
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    needs: build
     steps:
-      - name: Descargar codigo
-        uses: actions/checkout@v4
-      - name: Preparar entorno
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Instalar librerias (en la nube)
-        run: npm install --legacy-peer-deps
-      - name: Construir App
-        run: npm run build
-      - name: Configurar Pages
-        uses: actions/configure-pages@v4
-      - name: Subir artefacto
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
-      - name: Publicar en la web
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
