@@ -2625,9 +2625,9 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
   };
 
   return (
-    <div className={`rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/45 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_34px_rgba(7,11,24,0.35)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_20px_42px_rgba(10,20,52,0.55)] hover:-translate-y-1 transition-all duration-300 overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
+    <div className={`rounded-[1.75rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 hover:border-sky-300/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_14px_34px_rgba(7,11,24,0.32)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.26),0_20px_42px_rgba(10,20,52,0.5)] hover:-translate-y-1 transition-all duration-300 overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
       {/* Brillo ambiental superior */}
-      <div className="pointer-events-none absolute -top-14 left-1/2 -translate-x-1/2 w-48 h-28 rounded-full bg-sky-500/10 blur-2xl group-hover:bg-sky-500/20 transition-colors duration-500" />
+      <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 w-56 h-32 rounded-full bg-sky-400/15 blur-2xl group-hover:bg-sky-400/25 transition-colors duration-500" />
 
       {/* CABECERA COMPACTA: COMPETICIÓN + ACCIONES */}
       <div className="px-4 py-2.5 bg-white/[0.04] border-b border-white/10 flex items-center justify-between gap-2 relative z-10">
@@ -2692,14 +2692,14 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
         </div>
       </div>
 
-      {/* ENFRENTAMIENTO CENTRAL (3 COLUMNAS EQUILIBRADAS) */}
+      {/* ENFRENTAMIENTO CENTRAL (3 COLUMNAS EQUILIBRADAS CON MEDALLÓN PERLA) */}
       <div className="px-4 py-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 relative z-10 flex-1">
         {/* Mi Equipo */}
         <div className="flex flex-col items-center text-center min-w-0">
-          <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
-            <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
+          <div className="w-15 h-15 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
+            <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.25)]" />
           </div>
-          <span className="mt-2 text-[11px] font-black uppercase tracking-tight text-white leading-tight line-clamp-2">
+          <span className="mt-2.5 text-[11px] font-black uppercase tracking-tight text-white leading-tight line-clamp-2">
             {match.myTeam || 'ATLETI'}
           </span>
         </div>
@@ -2708,9 +2708,9 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
         <div className="flex flex-col items-center px-1">
           {hasScore ? (
             <>
-              <div className="px-3.5 py-2 rounded-2xl bg-black/35 border border-white/15 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] flex items-center gap-2">
+              <div className="px-3.5 py-2 rounded-2xl bg-slate-950/45 border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-2">
                 <span className="text-xl font-black text-white tabular-nums leading-none">{match.goalsMyTeam}</span>
-                <span className="text-xs font-bold text-slate-500">-</span>
+                <span className="text-xs font-bold text-slate-400">-</span>
                 <span className="text-xl font-black text-rose-400 tabular-nums leading-none">{match.goalsRival}</span>
               </div>
               {outcomeBadge ? (
@@ -2718,17 +2718,17 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
                   {outcomeBadge.text}
                 </span>
               ) : (
-                <span className="mt-1.5 text-[8px] font-bold uppercase tracking-widest text-slate-400">Final</span>
+                <span className="mt-1.5 text-[8px] font-bold uppercase tracking-widest text-slate-300">Final</span>
               )}
             </>
           ) : (
             <>
-              <div className="px-3.5 py-2 rounded-2xl bg-white/[0.08] border border-white/15 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.22)]">
+              <div className="px-3.5 py-2 rounded-2xl bg-white/[0.12] border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)]">
                 <span className="text-lg sm:text-xl font-black text-white tracking-wider tabular-nums leading-none">
                   {match.time || '--:--'}
                 </span>
               </div>
-              <span className="mt-1.5 text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">
+              <span className="mt-1.5 text-[8px] font-black uppercase tracking-[0.2em] text-sky-200/75">
                 Hora
               </span>
             </>
@@ -2737,14 +2737,14 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
 
         {/* Rival */}
         <div className="flex flex-col items-center text-center min-w-0">
-          <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+          <div className="w-15 h-15 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_20px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
             {rival?.shieldUrl ? (
-              <img src={rival.shieldUrl} className="w-full h-full object-contain drop-shadow-sm" alt="Rival" />
+              <img src={rival.shieldUrl} className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.28)]" alt="Rival" />
             ) : (
-              <Swords className="w-7 h-7 text-slate-400" />
+              <Swords className="w-7 h-7 text-slate-500" />
             )}
           </div>
-          <span className="mt-2 text-[11px] font-extrabold uppercase tracking-tight text-slate-100 leading-tight line-clamp-2" title={getMatchRivalName(rival, match)}>
+          <span className="mt-2.5 text-[11px] font-extrabold uppercase tracking-tight text-slate-100 leading-tight line-clamp-2" title={getMatchRivalName(rival, match)}>
             {getMatchRivalName(rival, match)}
           </span>
         </div>
@@ -3231,9 +3231,10 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
       {/* NIVEL 1 · BANNER MATCHDAY CON BOTÓN BRIEFING JORNADA      */}
       {/* ========================================================= */}
       {isGameday && nextMatchObj ? (
-        <div className="bg-[#0a0f1c] rounded-[2.25rem] p-7 md:p-10 flex flex-col justify-center relative overflow-hidden shadow-2xl border border-slate-800/90 group min-h-[300px]">
-          <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-red-600/30 transition-colors duration-700" />
-          <div className="absolute bottom-[-50%] right-[-10%] w-[60%] h-[150%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-600/30 transition-colors duration-700" />
+        <div className="bg-gradient-to-r from-[#1c1229] via-[#132247] to-[#0e1936] rounded-[2.25rem] p-7 md:p-10 flex flex-col justify-center relative overflow-hidden shadow-2xl border border-white/15 group min-h-[300px]">
+          <div className="absolute top-[-50%] left-[-10%] w-[55%] h-[150%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-red-600/30 transition-colors duration-700" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-sky-400/15 blur-[100px] rounded-full pointer-events-none" />
+          <div className="absolute bottom-[-50%] right-[-10%] w-[55%] h-[150%] bg-blue-500/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-500/30 transition-colors duration-700" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 h-full">
             {/* 1. Info Izquierda + Acciones (Ver Partidos & Briefing Jornada) */}
@@ -3249,7 +3250,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                 {nextMatchObj.myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br />
                 {getMatchRivalName(rivals.find(r => r.id === nextMatchObj.rivalId), nextMatchObj)}
               </h2>
-              <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">
+              <p className="text-slate-300/80 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">
                 {nextMatchObj.league || 'Competición Oficial'}
               </p>
 
@@ -3270,48 +3271,58 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
               </div>
             </div>
 
-            {/* 2. Escudos Enfrentados Centrales */}
-            <div className="flex items-center justify-center gap-5 md:gap-7 w-full md:w-3/12">
-              <img src={ESCUDO_ATM_URL} className="w-20 h-20 md:w-28 md:h-28 object-contain drop-shadow-[0_0_25px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-transform" alt="Atleti" />
-              <span className="text-2xl md:text-3xl text-slate-500 font-black italic drop-shadow-md">VS</span>
-              {rivals.find(r => r.id === nextMatchObj.rivalId)?.shieldUrl ? (
-                <img src={rivals.find(r => r.id === nextMatchObj.rivalId).shieldUrl} className="w-20 h-20 md:w-28 md:h-28 object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:scale-110 transition-transform" alt="Rival" />
-              ) : (
-                <Swords className="w-20 h-20 md:w-28 md:h-28 text-slate-600 drop-shadow-md" />
-              )}
+            {/* 2. Escudos Enfrentados Centrales con Medallón Perla VisionOS */}
+            <div className="flex items-center justify-center gap-4 md:gap-6 w-full md:w-3/12">
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-[1.75rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3.5 border border-white/90 ring-4 ring-white/10 shadow-[0_14px_35px_rgba(0,0,0,0.45),0_0_25px_rgba(239,68,68,0.2)] flex items-center justify-center transform hover:scale-105 transition-transform shrink-0">
+                <img src={ESCUDO_ATM_URL} className="w-full h-full object-contain drop-shadow-[0_3px_6px_rgba(15,23,42,0.28)]" alt="Atleti" />
+              </div>
+
+              <span className="text-xl md:text-2xl text-sky-200/80 font-black italic drop-shadow-md">VS</span>
+
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-[1.75rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3.5 border border-white/90 ring-4 ring-white/10 shadow-[0_14px_35px_rgba(0,0,0,0.45),0_0_25px_rgba(56,189,248,0.2)] flex items-center justify-center transform hover:scale-105 transition-transform shrink-0">
+                {rivals.find(r => r.id === nextMatchObj.rivalId)?.shieldUrl ? (
+                  <img src={rivals.find(r => r.id === nextMatchObj.rivalId).shieldUrl} className="w-full h-full object-contain drop-shadow-[0_3px_6px_rgba(15,23,42,0.28)]" alt="Rival" />
+                ) : (
+                  <Swords className="w-12 h-12 text-slate-500" />
+                )}
+              </div>
             </div>
 
             {/* 3. Cuenta Atrás y Línea de Tiempo Derecha */}
             <div className="flex flex-col items-center md:items-end w-full md:w-4/12">
-              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/80 px-5 py-3.5 rounded-2xl flex flex-col items-center mb-2 shadow-inner min-w-[190px]">
-                <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-1">Inicia en</span>
+              <div className="bg-slate-950/60 backdrop-blur-xl border border-white/15 px-5 py-3.5 rounded-2xl flex flex-col items-center mb-2 shadow-inner min-w-[190px]">
+                <span className="text-[10px] text-sky-200/80 uppercase font-black tracking-[0.3em] mb-1">Inicia en</span>
                 <span className="text-3xl lg:text-4xl font-black text-white italic tracking-tighter tabular-nums drop-shadow-md">
                   {countdown || '--h --m'}
                 </span>
               </div>
 
               {upcomingMatches.length > 1 && (
-                <div className="w-full flex flex-col gap-3 mt-3 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-700 before:to-transparent">
+                <div className="w-full flex flex-col gap-3 mt-3 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-white/25 before:to-transparent">
                   {upcomingMatches.slice(1, 4).map((m) => {
                     const rInfo = rivals.find(r => r.id === m.rivalId);
                     return (
                       <div key={m.id} className="relative flex items-center justify-between md:justify-center group">
-                        <div className="absolute left-0 md:left-1/2 w-5 h-5 rounded-full border-4 border-[#0a0f1c] bg-slate-700 group-hover:bg-red-500 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
+                        <div className="absolute left-0 md:left-1/2 w-5 h-5 rounded-full border-4 border-[#111c3b] bg-slate-600 group-hover:bg-red-500 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
                           <div className="w-1.5 h-1.5 bg-white rounded-full" />
                         </div>
 
                         <div className="pl-9 md:pl-0 md:w-1/2 md:pr-6 flex flex-col md:items-end justify-center w-full">
-                          <div className="flex items-center gap-2 justify-start md:justify-end bg-slate-800/55 border border-slate-700/50 p-2 rounded-xl backdrop-blur-sm shadow-md">
-                            <img src={ESCUDO_ATM_URL} className="w-5 h-5 object-contain" alt="Atleti" />
-                            <span className="text-[8px] text-slate-500 font-black italic">VS</span>
-                            {rInfo?.shieldUrl ? (
-                              <img src={rInfo.shieldUrl} className="w-5 h-5 object-contain" alt="Rival" />
-                            ) : (
-                              <Swords className="w-5 h-5 text-slate-500" />
-                            )}
-                            <div className="ml-1.5 pl-2 border-l border-slate-600 flex flex-col text-left">
+                          <div className="flex items-center gap-2 justify-start md:justify-end bg-white/[0.08] border border-white/15 p-2 rounded-xl backdrop-blur-md shadow-md">
+                            <div className="w-6 h-6 rounded-md bg-gradient-to-b from-white to-slate-200 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                              <img src={ESCUDO_ATM_URL} className="w-full h-full object-contain" alt="Atleti" />
+                            </div>
+                            <span className="text-[8px] text-slate-300 font-black italic">VS</span>
+                            <div className="w-6 h-6 rounded-md bg-gradient-to-b from-white to-slate-200 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                              {rInfo?.shieldUrl ? (
+                                <img src={rInfo.shieldUrl} className="w-full h-full object-contain" alt="Rival" />
+                              ) : (
+                                <Swords className="w-3.5 h-3.5 text-slate-500" />
+                              )}
+                            </div>
+                            <div className="ml-1 pl-2 border-l border-white/15 flex flex-col text-left">
                               <span className="text-white text-[11px] font-black uppercase truncate max-w-[105px]">{m.myTeam || 'ATLETI'}</span>
-                              <span className="text-red-400 text-[9px] font-black tracking-widest">{m.time || '--:--'}</span>
+                              <span className="text-rose-400 text-[9px] font-black tracking-widest">{m.time || '--:--'}</span>
                             </div>
                           </div>
                         </div>
@@ -3629,11 +3640,11 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                 {/* Cuerpo Central del Partido */}
                 {targetMatch ? (
                   <div className="p-4 flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/15 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+                    <div className="w-15 h-15 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-2 shadow-[0_8px_18px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform">
                       {rivalObj?.shieldUrl ? (
-                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-sm" />
+                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.28)]" />
                       ) : (
-                        <Swords className="w-7 h-7 text-slate-400" />
+                        <Swords className="w-7 h-7 text-slate-500" />
                       )}
                     </div>
 
@@ -4801,13 +4812,13 @@ function ModuleRivales({ rivals = [], matches = [], allMatches = [], role, onNew
                 )}
               </div>
 
-              {/* Pedestal de Cristal para el Escudo */}
+              {/* Pedestal Perla VisionOS para el Escudo */}
               <div className="px-4 py-5 flex flex-col items-center text-center relative z-10 flex-1 justify-center">
-                <div className="w-20 h-20 rounded-2xl bg-white/[0.06] border border-white/12 flex items-center justify-center p-3 shadow-inner group-hover:scale-105 transition-transform duration-300">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.07] flex items-center justify-center p-3 shadow-[0_10px_24px_rgba(0,0,0,0.35),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform duration-300">
                   {rival.shieldUrl ? (
-                    <img src={rival.shieldUrl} alt={baseName || rival.name} className="w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]" />
+                    <img src={rival.shieldUrl} alt={baseName || rival.name} className="w-full h-full object-contain drop-shadow-[0_2px_5px_rgba(15,23,42,0.28)]" />
                   ) : (
-                    <Swords className="w-9 h-9 text-slate-400" />
+                    <Swords className="w-9 h-9 text-slate-500" />
                   )}
                 </div>
 
@@ -5243,7 +5254,9 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 <div className="flex items-center justify-between gap-4 sm:px-6">
                   {/* Escudo Atleti */}
                   <div className="flex flex-col items-center flex-1">
-                    <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-[1.5rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3 border border-white/90 ring-4 ring-white/[0.08] shadow-[0_10px_25px_rgba(0,0,0,0.4)] flex items-center justify-center">
+                      <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_2px_5px_rgba(15,23,42,0.25)]" />
+                    </div>
                     <span className="font-black text-[11px] sm:text-xs text-white uppercase text-center mt-3 tracking-wide">
                       {nextMatch.myTeam || 'Atleti'}
                     </span>
@@ -5251,27 +5264,28 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
                   {/* Hora / Marcador Cristal */}
                   <div className="flex flex-col items-center px-2">
-                    <div className="px-5 py-3 sm:px-7 sm:py-3.5 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+                    <div className="px-5 py-3 sm:px-7 sm:py-3.5 rounded-2xl bg-white/12 border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)]">
                       <span className="text-2xl sm:text-3xl font-black text-white tracking-widest">
                         {nextMatch.time || '--:--'}
                       </span>
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400 mt-2">Hora</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.25em] text-sky-200/80 mt-2">Hora</span>
                   </div>
 
                   {/* Escudo Rival */}
                   <div className="flex flex-col items-center flex-1">
-                    {nextMatchRival?.shieldUrl ? (
-                      <img src={nextMatchRival.shieldUrl} alt="Rival" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
-                    ) : (
-                      <Swords className="w-16 h-16 sm:w-20 sm:h-20 text-slate-500" />
-                    )}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-[1.5rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3 border border-white/90 ring-4 ring-white/[0.08] shadow-[0_10px_25px_rgba(0,0,0,0.4)] flex items-center justify-center">
+                      {nextMatchRival?.shieldUrl ? (
+                        <img src={nextMatchRival.shieldUrl} alt="Rival" className="w-full h-full object-contain drop-shadow-[0_2px_5px_rgba(15,23,42,0.28)]" />
+                      ) : (
+                        <Swords className="w-10 h-10 text-slate-500" />
+                      )}
+                    </div>
                     <span className="font-black text-[11px] sm:text-xs text-white uppercase text-center mt-3 tracking-wide max-w-[140px]">
                       {getMatchRivalName(nextMatchRival, nextMatch)}
                     </span>
                   </div>
                 </div>
-              </div>
 
               {/* Footer Convocatoria y Racha */}
               <div className="bg-black/25 border-t border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
