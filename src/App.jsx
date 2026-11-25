@@ -2079,8 +2079,8 @@ export default function App() {
         />
       );
       case 'partidos': return <ModulePartidos matches={currentSeasonMatches} rivals={visibleRivals} gks={visibleGoalkeepers} role={role} onNew={() => { setEditingMatch(null); setIsMatchFormOpen(true); }} onEdit={(match) => { setEditingMatch(match); setIsMatchFormOpen(true); }} onDelete={(id) => handleDeleteDoc('matches', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
-      case 'rivales': return <ModuleRivales rivals={visibleRivals} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
-      case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} />;
+      case 'rivales': return <ModuleRivales rivals={visibleRivals} matches={currentSeasonMatches} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
+      case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} matches={currentSeasonMatches} activeSeason={activeSeason} theme={theme} darkMode={darkMode} />;
       case 'ajustes': return <ModuleAjustes users={usersList} currentUserData={currentUserData} role={role} onNewUser={() => {setEditingUser(null); setIsUserFormOpen(true);}} onEditUser={(u) => {setEditingUser(u); setIsUserFormOpen(true);}} onSaveProfile={handleSaveProfile} onBackup={downloadBackup} theme={theme} darkMode={darkMode} />;
       case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} existingReports={informesList} onSave={async (data) => { const id = await handleSaveDoc('informes', data, !data.id, data.isDraft ? "Borrador guardado" : "Informe finalizado"); if (id && !data.id) data.id = id; return id; }} onDelete={(id) => handleDeleteDoc('informes', id)} showNotification={showNotification} />;
       default: return <ModuleInicio gks={visibleGoalkeepers} matches={currentSeasonMatches} rivals={visibleRivals} theme={theme} setModule={setCurrentModule} darkMode={darkMode} isDataLoading={isDataLoading} currentUserData={currentUserData} viewLockerRoom={viewLockerRoom} setViewLockerRoom={setViewLockerRoom} onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)} role={role} showNotification={showNotification} />;
@@ -4042,153 +4042,609 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
   );
 }
 
-function ModuleComparador({ gks, theme, darkMode }) {
+// ==========================================
+// COMPARADOR DE RENDIMIENTO VISION OS (CON DATOS REALES DEL CALENDARIO)
+// ==========================================
+function ModuleComparador({ gks = [], matches = [], activeSeason, theme, darkMode }) {
+  const [catFilter, setCatFilter] = useState('Todos');
   const [gk1Id, setGk1Id] = useState(gks[0]?.id || '');
   const [gk2Id, setGk2Id] = useState(gks[1]?.id || '');
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  // Asegurar selección válida al cargar porteros
+  useEffect(() => {
+    if (gks.length > 0 && (!gk1Id || !gks.some(g => g.id === gk1Id))) {
+      setGk1Id(gks[0]?.id || '');
+    }
+    if (gks.length > 1 && (!gk2Id || !gks.some(g => g.id === gk2Id) || gk2Id === gk1Id)) {
+      const second = gks.find(g => g.id !== (gk1Id || gks[0]?.id));
+      if (second) setGk2Id(second.id);
+    }
+  }, [gks]);
+
+  // Filtro rápido por categoría que empareja automáticamente a los dos porteros del equipo
+  const handleCategorySelect = (cat) => {
+    setCatFilter(cat);
+    if (cat === 'Todos') return;
+    const teamGks = gks.filter(g => normalizeStr(g.team) === normalizeStr(cat));
+    if (teamGks.length >= 2) {
+      setGk1Id(teamGks[0].id);
+      setGk2Id(teamGks[1].id);
+    } else if (teamGks.length === 1) {
+      setGk1Id(teamGks[0].id);
+      const other = gks.find(g => g.id !== teamGks[0].id);
+      if (other) setGk2Id(other.id);
+    }
+  };
+
+  const selectableGks = catFilter === 'Todos'
+    ? gks
+    : gks.filter(g => normalizeStr(g.team) === normalizeStr(catFilter));
 
   const gk1 = gks.find(g => g.id === gk1Id);
   const gk2 = gks.find(g => g.id === gk2Id);
 
+  // Cálculo 100% automático y sincronizado con el calendario de partidos
+  const computeGkLiveStats = (gk) => {
+    if (!gk) return { form: 5.0, minutes: 0, starts: 0, subs: 0, played: 0, callUps: 0, goalsConceded: 0, cleanSheets: 0, avgGoals: 0, penaltiesSaved: 0, penaltiesFaced: 0 };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const gkTeamNorm = normalizeStr(gk.team);
+
+    const pastTeamMatches = matches.filter(m => normalizeStr(m.myTeam) === gkTeamNorm && m.date < todayStr);
+    const gkMatchesPlayedOrPast = matches.filter(m =>
+      m.goalkeeperIds?.includes(gk.id) &&
+      (m.date < todayStr || parseInt(m.gkMinutes?.[gk.id]) > 0)
+    );
+
+    const hasDynamicMatches = pastTeamMatches.length > 0 || gkMatchesPlayedOrPast.length > 0;
+
+    let dMins = 0, dStarts = 0, dSubs = 0, dGoals = 0, dCleanSheets = 0;
+    let dCallUps = 0, dPenSaved = 0, dPenFaced = 0;
+
+    gkMatchesPlayedOrPast.forEach(m => {
+      dCallUps += 1;
+      const minsJugados = parseInt(m.gkMinutes?.[gk.id]);
+
+      if (!isNaN(minsJugados) && minsJugados > 0) {
+        dMins += minsJugados;
+        const isTitular = m.gkStarter?.[gk.id] === true || String(m.gkStarter?.[gk.id]) === 'true';
+        if (isTitular) dStarts += 1; else dSubs += 1;
+
+        let golesEncajados = 0;
+        if (m.gkGoalsConceded && m.gkGoalsConceded[gk.id] !== undefined && m.gkGoalsConceded[gk.id] !== '') {
+          golesEncajados = parseInt(m.gkGoalsConceded[gk.id]) || 0;
+        } else {
+          const jugaron = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+          if (jugaron.length === 1 && jugaron.includes(gk.id)) {
+            golesEncajados = parseInt(m.goalsRival) || 0;
+          }
+        }
+
+        dGoals += golesEncajados;
+        if (golesEncajados === 0) dCleanSheets += 1;
+
+        const penSaved = parseInt(m.gkPenaltiesSaved?.[gk.id]);
+        const penFaced = parseInt(m.gkPenaltiesFaced?.[gk.id]);
+        if (!isNaN(penSaved)) dPenSaved += penSaved;
+        if (!isNaN(penFaced)) dPenFaced += penFaced;
+      }
+    });
+
+    const minutes = hasDynamicMatches ? dMins : (parseInt(gk.stats?.minutes) || 0);
+    const starts = hasDynamicMatches ? dStarts : (parseInt(gk.stats?.starts) || 0);
+    const subs = hasDynamicMatches ? dSubs : (parseInt(gk.stats?.subs) || 0);
+    const played = starts + subs;
+    const callUps = hasDynamicMatches ? dCallUps : (parseInt(gk.stats?.calledUpMatches) || 0);
+    const goalsConceded = hasDynamicMatches ? dGoals : (parseInt(gk.stats?.goalsConceded) || 0);
+    const cleanSheets = hasDynamicMatches ? dCleanSheets : (parseInt(gk.stats?.cleanSheets) || 0);
+    const penaltiesSaved = hasDynamicMatches ? dPenSaved : (parseInt(gk.stats?.penaltiesSaved) || 0);
+    const penaltiesFaced = hasDynamicMatches ? dPenFaced : (parseInt(gk.stats?.penaltiesFaced) || 0);
+    const avgGoals = played > 0 ? Number((goalsConceded / played).toFixed(2)) : 0;
+
+    return {
+      form: Number(parseFloat(gk.form || 5.0).toFixed(1)),
+      minutes,
+      starts,
+      subs,
+      played,
+      callUps,
+      goalsConceded,
+      cleanSheets,
+      avgGoals,
+      penaltiesSaved,
+      penaltiesFaced
+    };
+  };
+
+  const stats1 = useMemo(() => computeGkLiveStats(gk1), [gk1, matches]);
+  const stats2 = useMemo(() => computeGkLiveStats(gk2), [gk2, matches]);
+
   const radarData = useMemo(() => {
     if (!gk1 || !gk2) return [];
-    return gk1.skills.map(s1 => {
-      const s2 = gk2.skills.find(s => s.subject === s1.subject);
+    const baseSkills1 = (Array.isArray(gk1.skills) && gk1.skills.length > 0) ? gk1.skills : DUMMY_GOALKEEPER.skills;
+    const baseSkills2 = (Array.isArray(gk2.skills) && gk2.skills.length > 0) ? gk2.skills : DUMMY_GOALKEEPER.skills;
+    return baseSkills1.map(s1 => {
+      const s2 = baseSkills2.find(s => s.subject === s1.subject);
       return {
         subject: s1.subject,
-        A: s1.A,
-        B: s2 ? s2.A : 0,
+        A: Number(s1.A) || 0,
+        B: s2 ? (Number(s2.A) || 0) : 0,
         fullMark: 100
       };
     });
   }, [gk1, gk2]);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card} text-center shadow-sm`}>
-        <GitCompare className="w-12 h-12 text-blue-500 dark:text-blue-400 mx-auto mb-4 opacity-80" />
-        <h2 className="text-2xl md:text-3xl font-black text-blue-950 dark:text-white uppercase tracking-tighter mb-2">Comparador de Rendimiento</h2>
-        <p className={`text-sm font-medium mb-8 ${theme.textMuted}`}>Analiza y contrasta las habilidades y estadísticas de dos porteros cara a cara.</p>
-        
-        <div className="flex flex-col md:flex-row justify-center items-center gap-4">
-          <select value={gk1Id} onChange={(e) => setGk1Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500`}>
-            <option value="">Selecciona Portero 1</option>
-            {gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk2Id}>{g.name}</option>)}
-          </select>
-          <span className="text-slate-400 font-black uppercase text-xs">VS</span>
-          <select value={gk2Id} onChange={(e) => setGk2Id(e.target.value)} className={`w-full md:w-64 border ${theme.border} rounded-[1rem] px-4 py-3 outline-none font-black text-sm cursor-pointer shadow-inner bg-slate-50 dark:bg-slate-900 text-red-600 dark:text-red-400 focus:ring-2 focus:ring-red-500`}>
-            <option value="">Selecciona Portero 2</option>
-            {gks.map(g => <option key={g.id} value={g.id} disabled={g.id === gk1Id}>{g.name}</option>)}
-          </select>
+    <div className="space-y-6">
+      {/* CABECERA VISION OS + PÍLDORAS DE CATEGORÍA */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
+            <GitCompare size={18} className="text-sky-400" /> Laboratorio de Rendimiento · Comparador
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Datos en tiempo real sincronizados con el calendario {activeSeason ? `· Temp. ${activeSeason}` : ''}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {['Todos', ...TEAMS_LIST].map(cat => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => handleCategorySelect(cat)}
+              className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border ${
+                catFilter === cat
+                  ? 'bg-sky-500 text-white border-sky-300/50 shadow-md shadow-sky-500/20'
+                  : 'bg-white/8 hover:bg-white/15 text-slate-300 border-white/10'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
-      {gk1 && gk2 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 flex flex-col gap-6">
-            <CompareProfileCard gk={gk1} color="blue" theme={theme} darkMode={darkMode} />
-            <CompareProfileCard gk={gk2} color="red" theme={theme} darkMode={darkMode} />
-          </div>
+      {/* SELECTORES DUALES DE PORTEROS ESTILO VISION OS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 relative">
+        <CompareProfileCard
+          gk={gk1}
+          stats={stats1}
+          accent="sky"
+          selectedId={gk1Id}
+          disabledId={gk2Id}
+          options={selectableGks.length >= 2 ? selectableGks : gks}
+          onChange={(id) => setGk1Id(id)}
+        />
+        <CompareProfileCard
+          gk={gk2}
+          stats={stats2}
+          accent="rose"
+          selectedId={gk2Id}
+          disabledId={gk1Id}
+          options={selectableGks.length >= 2 ? selectableGks : gks}
+          onChange={(id) => setGk2Id(id)}
+        />
+      </div>
 
-          <div className={`lg:col-span-8 p-6 md:p-8 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col items-center justify-center min-h-[400px] shadow-sm`}>
-            <h3 className="text-xs font-black text-blue-950 dark:text-white uppercase tracking-widest mb-6 w-full text-center">Atributos Técnicos Cara a Cara</h3>
-            <div className="w-full h-[350px] max-w-md mx-auto">
+      {/* PANEL ANALÍTICO CARA A CARA: RADAR + BARRAS DE COMPETICIÓN */}
+      {gk1 && gk2 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* 1. RADAR TÉCNICO SUPERPUESTO (5/12) */}
+          <div className="lg:col-span-5 rounded-[2rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_18px_40px_rgba(7,11,24,0.35)] p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden">
+            <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-36 rounded-full bg-sky-500/10 blur-3xl" />
+
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-white text-center">
+                Atributos Técnicos Superpuestos
+              </h3>
+              <div className="flex flex-wrap justify-center items-center gap-4 mt-3">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8]" />
+                  {gk1.name}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+                  {gk2.name}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full h-[290px] my-2">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                  <PolarGrid stroke={darkMode ? '#334155' : '#cbd5e1'} />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '900' }} />
+                <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
+                  <PolarGrid stroke="rgba(148, 163, 184, 0.22)" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: '800' }} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar name={gk1.name} dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.4} strokeWidth={2} />
-                  <Radar name={gk2.name} dataKey="B" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} strokeWidth={2} />
-                  <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '16px', color: darkMode ? '#fff' : '#000' }} itemStyle={{ fontWeight: 'bold' }} />
+                  <Radar name={gk1.name} dataKey="A" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.32} strokeWidth={2.5} />
+                  <Radar name={gk2.name} dataKey="B" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.32} strokeWidth={2.5} />
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: '#0a1024', borderColor: 'rgba(255,255,255,0.15)', borderRadius: '14px', color: '#fff' }}
+                    itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Desglose rápido numérico de skills */}
+            <div className="grid grid-cols-5 gap-1.5 pt-3 border-t border-white/10">
+              {radarData.map((item, idx) => (
+                <div key={idx} className="bg-white/[0.04] border border-white/10 rounded-xl p-2 text-center">
+                  <span className="block text-[8px] font-black uppercase tracking-wider text-slate-400 truncate" title={item.subject}>
+                    {item.subject.substring(0, 6)}
+                  </span>
+                  <div className="flex items-center justify-center gap-1 mt-1 text-[11px] font-black tabular-nums">
+                    <span className="text-sky-400">{item.A}</span>
+                    <span className="text-white/25">/</span>
+                    <span className="text-rose-400">{item.B}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-             <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-blue-600 dark:text-blue-400">{gk1.name}</h3>
-               <StatRow label="Forma Actual" val1={gk1.form} val2={gk2.form} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Minutos Jugados" val1={gk1.stats?.minutes || 0} val2={gk2.stats?.minutes || 0} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Porterías a Cero" val1={gk1.stats?.cleanSheets || 0} val2={gk2.stats?.cleanSheets || 0} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Goles Encajados" val1={gk1.stats?.goalsConceded || 0} val2={gk2.stats?.goalsConceded || 0} isHigherBetter={false} darkMode={darkMode} />
-               <StatRow label="Penaltis Parados" val1={gk1.stats?.penaltiesSaved || 0} val2={gk2.stats?.penaltiesSaved || 0} isHigherBetter darkMode={darkMode} />
-             </div>
-             <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-               <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-center text-red-600 dark:text-red-400">{gk2.name}</h3>
-               <StatRow label="Forma Actual" val1={gk2.form} val2={gk1.form} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Minutos Jugados" val1={gk2.stats?.minutes || 0} val2={gk1.stats?.minutes || 0} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Porterías a Cero" val1={gk2.stats?.cleanSheets || 0} val2={gk1.stats?.cleanSheets || 0} isHigherBetter darkMode={darkMode} />
-               <StatRow label="Goles Encajados" val1={gk2.stats?.goalsConceded || 0} val2={gk1.stats?.goalsConceded || 0} isHigherBetter={false} darkMode={darkMode} />
-               <StatRow label="Penaltis Parados" val1={gk2.stats?.penaltiesSaved || 0} val2={gk1.stats?.penaltiesSaved || 0} isHigherBetter darkMode={darkMode} />
-             </div>
+          {/* 2. DUELO ESTADÍSTICO DE TEMPORADA (7/12) */}
+          <div className="lg:col-span-7 rounded-[2rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_18px_40px_rgba(7,11,24,0.35)] p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Activity size={16} className="text-emerald-400" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-white">
+                  Cara a Cara en Competición
+                </h3>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/25 text-[9px] font-black uppercase tracking-wider text-emerald-300">
+                <Zap size={10} /> Sincronizado con Partidos
+              </span>
+            </div>
+
+            <div className="space-y-4 my-4 flex-1 flex flex-col justify-center">
+              <StatRow
+                label="Estado de Forma"
+                val1={stats1.form}
+                val2={stats2.form}
+                suffix="/10"
+                isHigherBetter={true}
+              />
+              <StatRow
+                label="Minutos Jugados"
+                val1={stats1.minutes}
+                val2={stats2.minutes}
+                suffix=" min"
+                isHigherBetter={true}
+              />
+              <StatRow
+                label="Partidos Jugados (Titular)"
+                val1={stats1.played}
+                val2={stats2.played}
+                display1={`${stats1.played} (${stats1.starts} TIT)`}
+                display2={`${stats2.played} (${stats2.starts} TIT)`}
+                isHigherBetter={true}
+              />
+              <StatRow
+                label="Porterías a Cero"
+                val1={stats1.cleanSheets}
+                val2={stats2.cleanSheets}
+                isHigherBetter={true}
+              />
+              <StatRow
+                label="Goles Encajados"
+                val1={stats1.goalsConceded}
+                val2={stats2.goalsConceded}
+                isHigherBetter={false}
+                bothActive={stats1.played > 0 && stats2.played > 0}
+              />
+              <StatRow
+                label="Promedio Goles / Partido"
+                val1={stats1.avgGoals}
+                val2={stats2.avgGoals}
+                display1={stats1.avgGoals.toFixed(2)}
+                display2={stats2.avgGoals.toFixed(2)}
+                isHigherBetter={false}
+                bothActive={stats1.played > 0 && stats2.played > 0}
+              />
+              <StatRow
+                label="Penaltis Parados"
+                val1={stats1.penaltiesSaved}
+                val2={stats2.penaltiesSaved}
+                display1={`${stats1.penaltiesSaved}/${stats1.penaltiesFaced}`}
+                display2={`${stats2.penaltiesSaved}/${stats2.penaltiesFaced}`}
+                isHigherBetter={true}
+              />
+            </div>
           </div>
+        </div>
+      ) : (
+        <div className={`py-16 text-center rounded-[2rem] border ${theme.border} ${theme.card}`}>
+          <GitCompare className="w-10 h-10 text-slate-400 mx-auto mb-3 opacity-60" />
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+            Selecciona dos porteros para iniciar la comparativa
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-const CompareProfileCard = ({ gk, color, theme, darkMode }) => (
-  <div className={`p-5 rounded-[2rem] flex items-center gap-5 shadow-sm border ${theme.border} ${theme.card}`}>
-    <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shrink-0 bg-slate-50 dark:bg-slate-900 ${color === 'blue' ? 'border-blue-500' : 'border-red-500'}`}>
-      <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" alt=""/>
-    </div>
-    <div>
-      <h4 className={`font-black text-sm uppercase ${color === 'blue' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>{gk.name}</h4>
-      <p className={`text-[8px] font-black uppercase tracking-[0.3em] ${theme.textMuted} mt-1.5 ml-0.5`}>{gk.team}</p>
-    </div>
-  </div>
-);
+const CompareProfileCard = ({ gk, stats, accent = 'sky', selectedId, disabledId, options = [], onChange }) => {
+  const isSky = accent === 'sky';
 
-const StatRow = ({ label, val1, val2, isHigherBetter, darkMode }) => {
-  const isBetter = isHigherBetter ? parseFloat(val1) >= parseFloat(val2) : parseFloat(val1) <= parseFloat(val2);
-  const isTie = parseFloat(val1) === parseFloat(val2);
-  
   return (
-    <div className={`flex justify-between items-center py-3 border-b last:border-0 ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-      <span className={`text-base font-black ${isTie ? 'text-slate-400' : isBetter ? 'text-emerald-500' : 'text-slate-400'}`}>
-        {val1}
-      </span>
-    </div>
-  )
-}
+    <div className={`rounded-[1.75rem] p-5 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border ${isSky ? 'border-sky-400/35' : 'border-rose-400/35'} shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_34px_rgba(7,11,24,0.35)] relative overflow-hidden`}>
+      <div className={`pointer-events-none absolute -top-16 -right-16 w-44 h-44 rounded-full blur-3xl ${isSky ? 'bg-sky-500/15' : 'bg-rose-500/15'}`} />
 
-function ModuleRivales({ rivals, role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
-  if (isDataLoading) return <div className="grid grid-cols-2 md:grid-cols-4 gap-6"><SkeletonCard/><SkeletonCard/></div>;
+      <div className="flex items-center gap-4 relative z-10">
+        {/* Foto Estudio */}
+        <div className={`w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-b from-[#33589e] via-[#223d72] to-[#132347] border ${isSky ? 'border-sky-400/50' : 'border-rose-400/50'} shadow-lg overflow-hidden shrink-0 relative`}>
+          {gk ? (
+            <img
+              src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+              alt={gk.name}
+              className="w-full h-full object-cover"
+              style={{ objectPosition: 'center 15%' }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400">
+              <User size={28} />
+            </div>
+          )}
+          {gk?.number && (
+            <span className="absolute bottom-0 right-0 bg-[#0a1024]/90 text-[10px] font-black px-1.5 py-0.5 rounded-tl-lg border-t border-l border-white/15 text-white">
+              #{gk.number}
+            </span>
+          )}
+        </div>
+
+        {/* Selector + Info */}
+        <div className="flex-1 min-w-0">
+          <span className={`text-[9px] font-black uppercase tracking-[0.2em] block mb-1 ${isSky ? 'text-sky-300' : 'text-rose-300'}`}>
+            {isSky ? 'Portero A' : 'Portero B'}
+          </span>
+
+          <div className="relative">
+            <select
+              value={selectedId}
+              onChange={(e) => onChange(e.target.value)}
+              className={`w-full appearance-none bg-white/[0.08] hover:bg-white/[0.12] border ${isSky ? 'border-sky-400/30 focus:border-sky-400' : 'border-rose-400/30 focus:border-rose-400'} rounded-xl pl-3.5 pr-9 py-2.5 text-sm font-extrabold text-white outline-none cursor-pointer transition-colors truncate`}
+            >
+              <option value="" className="text-slate-900">Seleccionar portero...</option>
+              {options.map(g => (
+                <option key={g.id} value={g.id} disabled={g.id === disabledId} className="text-slate-900">
+                  {g.name} ({g.team || 'Atleti'})
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+          </div>
+
+          {gk && (
+            <div className="flex flex-wrap items-center gap-2 mt-2.5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-bold text-slate-200">
+                <img src={ESCUDO_ATM_URL} alt="" className="w-3 h-3 object-contain" />
+                {gk.team || 'Academia'}
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">
+                Convocado: {stats.callUps} · Pie {gk.foot || 'Derecho'}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatRow = ({ label, val1, val2, display1, display2, suffix = '', isHigherBetter = true, bothActive = true }) => {
+  const n1 = parseFloat(val1) || 0;
+  const n2 = parseFloat(val2) || 0;
+  const isTie = n1 === n2 || !bothActive;
+  const gk1Wins = !isTie && (isHigherBetter ? n1 > n2 : n1 < n2);
+  const gk2Wins = !isTie && (isHigherBetter ? n2 > n1 : n2 < n1);
+
+  const total = n1 + n2;
+  const pct1 = total > 0 ? Math.round((n1 / total) * 100) : 50;
+  const pct2 = total > 0 ? 100 - pct1 : 50;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className={`font-black tabular-nums px-2 py-0.5 rounded-md ${
+          gk1Wins ? 'bg-sky-500/20 text-sky-300 border border-sky-400/30' : 'text-slate-300'
+        }`}>
+          {display1 !== undefined ? display1 : `${val1}${suffix}`}
+        </span>
+
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center px-2">
+          {label}
+        </span>
+
+        <span className={`font-black tabular-nums px-2 py-0.5 rounded-md ${
+          gk2Wins ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30' : 'text-slate-300'
+        }`}>
+          {display2 !== undefined ? display2 : `${val2}${suffix}`}
+        </span>
+      </div>
+
+      {/* Barra Dual Enfrentada */}
+      <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden flex gap-0.5 p-0.5 border border-white/10">
+        <div
+          className={`h-full rounded-l-full transition-all duration-500 ${total === 0 ? 'bg-slate-600/40' : gk1Wins ? 'bg-sky-400 shadow-[0_0_8px_#38bdf8]' : 'bg-sky-500/45'}`}
+          style={{ width: `${pct1}%` }}
+        />
+        <div
+          className={`h-full rounded-r-full transition-all duration-500 ${total === 0 ? 'bg-slate-600/40' : gk2Wins ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-rose-500/45'}`}
+          style={{ width: `${pct2}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// DIRECTORIO DE RIVALES VISION OS
+// ==========================================
+function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [teamFilter, setTeamFilter] = useState('Todos');
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const filteredRivals = useMemo(() => {
+    return rivals.filter(r => {
+      const matchesSearch = !searchTerm.trim() || normalizeStr(`${r.name} ${r.category || ''}`).includes(normalizeStr(searchTerm));
+      if (!matchesSearch) return false;
+
+      if (teamFilter === 'Todos') return true;
+      return matches.some(m => m.rivalId === r.id && normalizeStr(m.myTeam) === normalizeStr(teamFilter));
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [rivals, matches, searchTerm, teamFilter]);
+
+  if (isDataLoading) return <div className="grid grid-cols-2 md:grid-cols-4 gap-5"><SkeletonCard/><SkeletonCard/><SkeletonCard/><SkeletonCard/></div>;
 
   return (
     <div className="space-y-6">
-      {/* Permitimos a todos (excepto staff de solo lectura) crear rivales */}
-      {role !== 'staff' && (
-        <div className="flex justify-end mb-6">
-          <button onClick={onNew} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 dark:hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg">
-            <Plus size={16} /> Añadir Rival
-          </button>
+      {/* CABECERA VISION OS CON BUSCADOR Y BOTÓN NUEVO RIVAL */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
+            <Swords size={18} className="text-red-400" /> Directorio de Clubes · Gestión de Rivales
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Base de datos de escudos e historial de enfrentamientos · {rivals.length} registrados
+          </p>
         </div>
-      )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        {rivals.map(rival => (
-          <div key={rival.id} className={`p-6 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col items-center text-center relative group shadow-sm hover:shadow-xl transition-shadow`}>
-            
-            {/* Permitimos a todos (excepto staff) editar sus rivales */}
-            {role !== 'staff' && (
-              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onEdit(rival)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-blue-600 rounded-full shadow-md transition-colors"><Edit2 size={14} strokeWidth={3}/></button>
-                <button onClick={() => onDelete(rival.id)} className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-600 rounded-full shadow-md transition-colors"><X size={14} strokeWidth={3}/></button>
-              </div>
-            )}
-            
-            <div className="w-20 h-20 md:w-24 md:h-24 flex items-center justify-center mb-4 mt-2">
-              {rival.shieldUrl ? <img src={rival.shieldUrl} alt={rival.name} className="max-w-full max-h-full object-contain drop-shadow-md" /> : <Swords className="w-12 h-12 text-slate-300 dark:text-slate-600"/>}
-            </div>
-            <h3 className="font-black text-sm md:text-base uppercase tracking-tight text-blue-950 dark:text-white leading-tight">{rival.name}</h3>
-            {rival.category && <span className="mt-2 px-3 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] font-black rounded-lg text-slate-500 dark:text-slate-300 uppercase tracking-widest">EQUIPO {rival.category}</span>}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Buscador Cristal */}
+          <div className="relative flex-1 sm:w-60">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar club rival..."
+              className="w-full bg-white/10 border border-white/15 focus:border-sky-400/60 rounded-full pl-9 pr-4 py-2 text-xs font-semibold text-white placeholder-slate-400 outline-none backdrop-blur-md transition-colors"
+            />
           </div>
+
+          {role !== 'staff' && (
+            <button
+              onClick={onNew}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-red-600/25 shrink-0"
+            >
+              <Plus size={14} /> Añadir Rival
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* FILTRO RÁPIDO POR CATEGORÍA DE ENFRENTAMIENTO */}
+      <div className="flex flex-wrap items-center gap-2">
+        {['Todos', ...TEAMS_LIST].map(cat => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setTeamFilter(cat)}
+            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-full transition-all border ${
+              teamFilter === cat
+                ? 'bg-[#142042] dark:bg-sky-500 text-white border-blue-400/40 shadow-md'
+                : 'bg-white/80 dark:bg-slate-800/70 backdrop-blur-md border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-blue-950 dark:hover:text-white'
+            }`}
+          >
+            {cat}
+          </button>
         ))}
-        {rivals.length === 0 && <div className="col-span-full text-center py-20 text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem]">No hay rivales registrados.</div>}
+      </div>
+
+      {/* GRID COMPACTO VISION OS DE RIVALES */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+        {filteredRivals.map(rival => {
+          const rivalMatches = matches.filter(m => m.rivalId === rival.id);
+          const nextVs = [...rivalMatches].filter(m => m.date >= todayStr).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+          const lastVs = [...rivalMatches].filter(m => m.date < todayStr).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+          return (
+            <div
+              key={rival.id}
+              className="rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_30px_rgba(7,11,24,0.32)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+            >
+              {/* Barra Superior: Letra de Equipo + Botones Edición */}
+              <div className="px-3.5 pt-3.5 flex items-center justify-between gap-1 relative z-10">
+                {rival.category ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[9px] font-black uppercase tracking-widest text-sky-300">
+                    Equipo {rival.category}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                    Club
+                  </span>
+                )}
+
+                {role !== 'staff' && (
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => onEdit(rival)}
+                      className="w-6 h-6 rounded-full bg-white/8 hover:bg-sky-500/30 border border-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+                      title="Editar rival"
+                    >
+                      <Edit2 size={11} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(rival.id)}
+                      className="w-6 h-6 rounded-full bg-white/8 hover:bg-red-500/35 border border-white/15 text-slate-300 hover:text-red-200 flex items-center justify-center transition-colors"
+                      title="Eliminar rival"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Pedestal de Cristal para el Escudo */}
+              <div className="px-4 py-5 flex flex-col items-center text-center relative z-10 flex-1 justify-center">
+                <div className="w-20 h-20 rounded-2xl bg-white/[0.06] border border-white/12 flex items-center justify-center p-3 shadow-inner group-hover:scale-105 transition-transform duration-300">
+                  {rival.shieldUrl ? (
+                    <img src={rival.shieldUrl} alt={rival.name} className="w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]" />
+                  ) : (
+                    <Swords className="w-9 h-9 text-slate-400" />
+                  )}
+                </div>
+
+                <h3 className="mt-3.5 font-extrabold text-xs sm:text-sm uppercase tracking-tight text-white leading-snug line-clamp-2" title={rival.name}>
+                  {rival.name}
+                </h3>
+              </div>
+
+              {/* Pie Automático con Contexto de Enfrentamiento */}
+              <div className="px-3.5 py-2.5 bg-black/25 border-t border-white/10 flex items-center justify-center text-center relative z-10">
+                {nextVs ? (
+                  <span className="text-[9px] font-black uppercase tracking-wider text-sky-300 truncate">
+                    Próx: {formatDate(nextVs.date)} · {nextVs.myTeam}
+                  </span>
+                ) : lastVs ? (
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 truncate">
+                    Últ: {lastVs.goalsMyTeam !== '' && lastVs.goalsMyTeam !== undefined ? `ATM ${lastVs.goalsMyTeam}-${lastVs.goalsRival}` : formatDate(lastVs.date)}
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                    Sin cruces registrados
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredRivals.length === 0 && (
+          <div className={`col-span-full text-center py-16 rounded-[2rem] border ${theme.border} ${theme.card}`}>
+            <Swords className="w-10 h-10 text-slate-400 mx-auto mb-3 opacity-60" />
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+              No se encontraron rivales con este filtro
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
