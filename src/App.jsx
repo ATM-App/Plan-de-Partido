@@ -2868,62 +2868,113 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // ==========================================
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
-function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
-  
-  // PARSEADOR SEGURO PARA ORDENAR POR FECHA Y HORA EXACTAS
+function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, role, showNotification }) {
   const parseSafeDate = (d, t) => {
-    if(!d) return 0;
-    const [y, mo, day] = d.split('-');
-    const [h, mi] = (t || '00:00').split(':');
-    return new Date(y, mo - 1, day, h, mi).getTime();
+    if (!d) return 0;
+    const [y, mo, day] = d.split('-').map(Number);
+    const [h, mi] = (t || '00:00').split(':').map(Number);
+    return new Date(y, (mo || 1) - 1, day || 1, h || 0, mi || 0).getTime();
   };
 
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const todayStr = new Date().toISOString().split('T')[0];
+
   const upcomingMatches = [...matches]
     .filter(m => m.date >= todayStr)
-    .sort((a, b) => parseSafeDate(a.date, a.time) - parseSafeDate(b.date, b.time)); // ORDENADO PERFECTAMENTE
-    
-  const [weatherData, setWeatherData] = useState({ temp: '--', desc: 'Cargando...', city: 'Madrid', isRainy: false });
+    .sort((a, b) => parseSafeDate(a.date, a.time) - parseSafeDate(b.date, b.time));
+
+  const [weatherData, setWeatherData] = useState({
+    temp: '--',
+    desc: 'CARGANDO...',
+    city: 'MADRID',
+    isRainy: false,
+    isCloudy: false,
+    windGusts: 0,
+    humidity: 0,
+    precipProb: 0,
+    sunset: '--:--'
+  });
   const [countdown, setCountdown] = useState('');
 
+  // Clima Táctico en tiempo real (Open-Meteo Madrid)
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=40.4168&longitude=-3.7038&current_weather=true`);
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=40.4168&longitude=-3.7038&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m&daily=sunset,precipitation_probability_max&timezone=Europe%2FMadrid&forecast_days=1';
+        const weatherRes = await fetch(url);
         const wData = await weatherRes.json();
-        const current = wData.current_weather;
+        const cur = wData.current || {};
+        const code = cur.weather_code ?? 0;
+
         let desc = 'DESPEJADO';
         let isRainy = false;
-        if ([51,53,55,61,63,65,80,81,82,95,96,99].includes(current.weathercode)) { desc = 'LLUVIA'; isRainy = true; }
-        else if ([71,73,75,85,86].includes(current.weathercode)) { desc = 'NIEVE'; isRainy = true; }
-        else if ([1,2,3].includes(current.weathercode)) { desc = 'NUBLADO'; }
-        setWeatherData({ temp: String(Math.round(current.temperature)), desc, city: 'MADRID', isRainy });
+        let isCloudy = false;
+
+        if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)) {
+          desc = 'LLUVIA';
+          isRainy = true;
+        } else if ([71, 73, 75, 77, 85, 86].includes(code)) {
+          desc = 'NIEVE';
+          isRainy = true;
+        } else if ([45, 48].includes(code)) {
+          desc = 'NIEBLA';
+          isCloudy = true;
+        } else if ([1, 2, 3].includes(code)) {
+          desc = 'NUBLADO';
+          isCloudy = true;
+        }
+
+        const sunsetRaw = wData.daily?.sunset?.[0] || '';
+        const sunsetTime = sunsetRaw.includes('T') ? sunsetRaw.split('T')[1].substring(0, 5) : '17:55';
+
+        setWeatherData({
+          temp: cur.temperature_2m !== undefined ? String(Math.round(cur.temperature_2m)) : '--',
+          desc,
+          city: 'MADRID',
+          isRainy,
+          isCloudy,
+          windGusts: Math.round(cur.wind_gusts_10m ?? cur.wind_speed_10m ?? 0),
+          humidity: Math.round(cur.relative_humidity_2m ?? 0),
+          precipProb: Math.round(wData.daily?.precipitation_probability_max?.[0] ?? 0),
+          sunset: sunsetTime
+        });
       } catch (e) {
-        setWeatherData({ temp: '--', desc: 'ERROR', city: 'MADRID', isRainy: false });
+        setWeatherData({
+          temp: '--', desc: 'SIN SEÑAL', city: 'MADRID',
+          isRainy: false, isCloudy: false, windGusts: 0, humidity: 0, precipProb: 0, sunset: '--:--'
+        });
       }
     };
     fetchWeather();
   }, []);
 
-  // LÓGICA DE CUENTA ATRÁS EN VIVO (MÉTODO SEGURO MULTINAVEGADOR)
+  // Cuenta atrás instantánea (sin parpadeo inicial en --h --m)
+  const nextMatchObj = upcomingMatches[0] || null;
   useEffect(() => {
-    if (!upcomingMatches.length) return;
-    const nextM = upcomingMatches[0];
-    
-    const [year, month, day] = nextM.date.split('-');
-    const [hours, minutes] = (nextM.time || '00:00').split(':');
-    const mDate = new Date(year, month - 1, day, hours, minutes);
+    if (!nextMatchObj || !nextMatchObj.date) {
+      setCountdown('');
+      return;
+    }
+    const [year, month, day] = nextMatchObj.date.split('-').map(Number);
+    const [hours, minutes] = (nextMatchObj.time || '00:00').split(':').map(Number);
+    const mDate = new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0);
 
-    const timer = setInterval(() => {
-      const diff = mDate.getTime() - new Date().getTime();
-      if (diff <= 0) { setCountdown('EN JUEGO'); return; }
+    const updateClock = () => {
+      const diff = mDate.getTime() - Date.now();
+      if (diff <= 0) {
+        setCountdown('EN JUEGO');
+        return;
+      }
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
       const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const m = Math.floor((diff / 1000 / 60) % 60);
       setCountdown(`${d > 0 ? d + 'd ' : ''}${h}h ${m}m`);
-    }, 1000);
+    };
+
+    updateClock();
+    const timer = setInterval(updateClock, 30000);
     return () => clearInterval(timer);
-  }, [upcomingMatches]);
+  }, [nextMatchObj?.id, nextMatchObj?.date, nextMatchObj?.time]);
 
   const hour = new Date().getHours();
   let greeting = "BUENOS DÍAS";
@@ -2932,233 +2983,595 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
 
   const userName = currentUserData?.name ? currentUserData.name.split(' ')[0].toUpperCase() : 'ENTRENADOR';
 
-  // DETECTAR SI ES SEMANA DE PARTIDO (Próximos 7 días)
-  const nextMatchDate = upcomingMatches.length > 0 ? new Date(upcomingMatches[0].date) : null;
+  const nextMatchDate = nextMatchObj ? new Date(nextMatchObj.date) : null;
   const daysToNextMatch = nextMatchDate ? (nextMatchDate - new Date()) / (1000 * 60 * 60 * 24) : 999;
   const isGameday = daysToNextMatch <= 7;
 
+  // --- CÁLCULO AUTOMÁTICO: MURO ATLÉTICO (KPIs Globales del Departamento) ---
+  const pastMatchesAll = matches.filter(m => m.date < todayStr);
+  let totalCleanSheets = 0;
+  let totalAppearances = 0;
+  let totalGoalsConceded = 0;
+  let totalPenSaved = 0;
+  let totalPenFaced = 0;
+  let totalMatchesWithData = 0;
+
+  pastMatchesAll.forEach(m => {
+    const gkIds = m.goalkeeperIds || [];
+    const playedGkIds = gkIds.filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+    const hasTeamScore = m.goalsRival !== undefined && m.goalsRival !== '';
+
+    if (playedGkIds.length > 0 || hasTeamScore) {
+      totalMatchesWithData += 1;
+    }
+
+    if (playedGkIds.length > 0) {
+      playedGkIds.forEach(gkId => {
+        totalAppearances += 1;
+        let gEnc = 0;
+        if (m.gkGoalsConceded && m.gkGoalsConceded[gkId] !== undefined && m.gkGoalsConceded[gkId] !== '') {
+          gEnc = parseInt(m.gkGoalsConceded[gkId]) || 0;
+        } else if (playedGkIds.length === 1) {
+          gEnc = parseInt(m.goalsRival) || 0;
+        }
+        totalGoalsConceded += gEnc;
+        if (gEnc === 0) totalCleanSheets += 1;
+
+        const pS = parseInt(m.gkPenaltiesSaved?.[gkId]);
+        const pF = parseInt(m.gkPenaltiesFaced?.[gkId]);
+        if (!isNaN(pS)) totalPenSaved += pS;
+        if (!isNaN(pF)) totalPenFaced += pF;
+      });
+    } else if (hasTeamScore) {
+      totalGoalsConceded += parseInt(m.goalsRival) || 0;
+    }
+  });
+
+  const cleanSheetPct = totalAppearances > 0 ? Math.round((totalCleanSheets / totalAppearances) * 100) : 0;
+  const avgGoalsPerMatch = totalMatchesWithData > 0 ? (totalGoalsConceded / totalMatchesWithData).toFixed(2) : '0.00';
+  const penSavePct = totalPenFaced > 0 ? Math.round((totalPenSaved / totalPenFaced) * 100) : 0;
+
+  // Indicadores dinámicos del Clima Táctico
+  const needsWetGlove = weatherData.isRainy || weatherData.precipProb >= 40 || weatherData.humidity >= 75;
+  const aerialAlert = weatherData.windGusts >= 25;
+  const fastPitch = weatherData.isRainy || weatherData.humidity >= 70 || weatherData.precipProb >= 35;
+
+  const renderConditionTag = (locType) => {
+    if (locType === 'Visitante') {
+      return (
+        <span className="inline-flex items-center gap-1 text-sky-300">
+          <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+          </svg>
+          Visitante
+        </span>
+      );
+    }
+    if (locType === 'Sede') {
+      return (
+        <span className="inline-flex items-center gap-1 text-amber-300">
+          <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>
+          </svg>
+          Sede
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-emerald-300">
+        <Home size={11} className="shrink-0" /> Local
+      </span>
+    );
+  };
+
   if (isDataLoading) {
     return (
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           <SkeletonCard />
-           <div className="md:col-span-2 flex overflow-hidden gap-6"><SkeletonMatch /><SkeletonMatch className="hidden md:block" /></div>
+      <div className="space-y-6">
+        <SkeletonMatch />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8"><SkeletonCard /></div>
+          <div className="lg:col-span-4"><SkeletonCard /></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* HEADER DINÁMICO: GAMEDAY vs SALUDO NORMAL */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         {isGameday ? (
-           // MODO CINEMATOGRÁFICO: CARTEL MATCHDAY
-           <div className="md:col-span-3 bg-[#0a0f1c] rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-center relative overflow-hidden shadow-2xl border border-slate-800 group min-h-[320px]">
-             {/* Luces y Efectos de Fondo */}
-             <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-red-600/30 transition-colors duration-700"></div>
-             <div className="absolute bottom-[-50%] right-[-10%] w-[60%] h-[150%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-600/30 transition-colors duration-700"></div>
+    <div className="space-y-6">
+      {/* ========================================================= */}
+      {/* NIVEL 1 · BANNER MATCHDAY CON BOTÓN BRIEFING JORNADA      */}
+      {/* ========================================================= */}
+      {isGameday && nextMatchObj ? (
+        <div className="bg-[#0a0f1c] rounded-[2.25rem] p-7 md:p-10 flex flex-col justify-center relative overflow-hidden shadow-2xl border border-slate-800/90 group min-h-[300px]">
+          <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-red-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-red-600/30 transition-colors duration-700" />
+          <div className="absolute bottom-[-50%] right-[-10%] w-[60%] h-[150%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-600/30 transition-colors duration-700" />
 
-             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10 h-full">
-               
-               {/* 1. Información Izquierda y Botón Briefing */}
-               <div className="flex flex-col items-center md:items-start w-full md:w-1/3 text-center md:text-left">
-                  <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg mb-4 flex items-center gap-2 shadow-lg">
-                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span></span>
-                    Matchday
-                  </span>
-                  <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
-                    {upcomingMatches[0].myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br/>{rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.name || 'RIVAL'}
-                  </h2>
-                  <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">{upcomingMatches[0].league || 'Competición Oficial'}</p>
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 h-full">
+            {/* 1. Info Izquierda + Acciones (Ver Partidos & Briefing Jornada) */}
+            <div className="flex flex-col items-center md:items-start w-full md:w-5/12 text-center md:text-left">
+              <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg mb-4 flex items-center gap-2 shadow-lg">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                </span>
+                Matchday
+              </span>
+              <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
+                {nextMatchObj.myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br />
+                {rivals.find(r => r.id === nextMatchObj.rivalId)?.name || 'RIVAL'}
+              </h2>
+              <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">
+                {nextMatchObj.league || 'Competición Oficial'}
+              </p>
 
-                  <button onClick={() => setModule('partidos')} className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] border border-amber-400/50">
-                    <CalendarDays size={18} /> Ver Partidos
-                  </button>
-               </div>
-
-               {/* 2. Escudos Enfrentados Centrales */}
-               <div className="flex items-center justify-center gap-6 md:gap-8 w-full md:w-1/3">
-                  <img src={ESCUDO_ATM_URL} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-[0_0_25px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-transform" alt="Atleti"/>
-                  <span className="text-2xl md:text-3xl text-slate-500 font-black italic drop-shadow-md">VS</span>
-                  {rivals.find(r=>r.id===upcomingMatches[0].rivalId)?.shieldUrl ? (
-                     <img src={rivals.find(r=>r.id===upcomingMatches[0].rivalId).shieldUrl} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:scale-110 transition-transform" alt="Rival"/>
-                  ) : (
-                     <Swords className="w-24 h-24 md:w-32 md:h-32 text-slate-600 drop-shadow-md" />
-                  )}
-               </div>
-
-               {/* 3. Cuenta Atrás y Línea de Tiempo (HUD) Derecha */}
-               <div className="flex flex-col items-center md:items-end w-full md:w-1/3">
-                  <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/80 p-4 rounded-2xl flex flex-col items-center mb-2 shadow-inner min-w-[200px]">
-                     <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-1">Inicia en</span>
-                     <span className="text-3xl lg:text-4xl font-black text-white italic tracking-tighter tabular-nums drop-shadow-md">{countdown || '--h --m'}</span>
-                  </div>
-
-                  {/* Línea de tiempo Vertical Glassmorphism con Escudos */}
-                  {upcomingMatches.length > 1 && (
-                    <div className="w-full flex flex-col gap-3 mt-4 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-700 before:to-transparent">
-                       {upcomingMatches.slice(1, 4).map((m, i) => {
-                          const rInfo = rivals.find(r=>r.id===m.rivalId);
-                          return (
-                          <div key={m.id} className="relative flex items-center justify-between md:justify-center group">
-                             <div className="absolute left-0 md:left-1/2 w-6 h-6 rounded-full border-4 border-[#0a0f1c] bg-slate-700 group-hover:bg-red-500 group-hover:border-red-900 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
-                               <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                             </div>
-                             
-                             <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 flex flex-col md:items-end justify-center w-full">
-                                <div className="flex items-center gap-2 mb-1 justify-start md:justify-end bg-slate-800/50 border border-slate-700/50 p-2 rounded-xl backdrop-blur-sm shadow-md">
-                                   <div className="flex flex-col items-center">
-                                     <img src={ESCUDO_ATM_URL} className="w-6 h-6 object-contain drop-shadow-md" alt="Atleti" />
-                                   </div>
-                                   <span className="text-[9px] text-slate-500 font-black italic">VS</span>
-                                   <div className="flex flex-col items-center">
-                                     {rInfo?.shieldUrl ? (
-                                        <img src={rInfo.shieldUrl} className="w-6 h-6 object-contain drop-shadow-md" alt="Rival" />
-                                     ) : (
-                                        <Swords className="w-6 h-6 text-slate-500" />
-                                     )}
-                                   </div>
-                                   <div className="ml-2 pl-2 border-l border-slate-600 flex flex-col text-left">
-                                      <span className="text-white text-xs font-black uppercase truncate max-w-[120px]" title={m.myTeam || 'ATLETI'}>{m.myTeam || 'ATLETI'}</span>
-                                      <span className="text-red-400 text-[10px] font-black tracking-widest">{m.time || '--:--'}</span>
-                                   </div>
-                                </div>
-                             </div>
-                             
-                             <div className="hidden md:flex md:w-1/2 md:pl-8 text-left justify-start">
-                                <div className="flex flex-col items-start gap-1">
-                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{formatDate(m.date)}</span>
-                                  <span className="px-2 py-1 bg-white/10 backdrop-blur-md text-slate-200 text-[9px] font-black rounded uppercase border border-white/20 shadow-sm flex items-center gap-1 w-max">
-                                    <MapPin size={10} className="text-blue-400"/>
-                                    {m.field || 'Por definir'}
-                                  </span>
-                                </div>
-                             </div>
-                          </div>
-                       )})}
-                    </div>
-                  )}
-               </div>
-             </div>
-           </div>
-         ) : (
-           // SALUDO NORMAL (Si no hay partidos en 7 días)
-           <>
-             <div className="md:col-span-2 bg-blue-950 rounded-[2.5rem] p-8 flex flex-col justify-center relative overflow-hidden shadow-sm min-h-[140px]">
-               <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
-                  <Shield size={180} />
-               </div>
-               <div className="relative z-10 text-left">
-                 <h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">
-                   {greeting}, {userName}
-                 </h2>
-               </div>
-             </div>
-
-             <div className={`md:col-span-1 rounded-[2.5rem] p-6 flex items-center justify-between text-white relative overflow-hidden shadow-sm min-h-[140px] ${weatherData.isRainy ? 'bg-gradient-to-r from-slate-600 to-slate-800' : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}>
-               <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none -mr-8">
-                  {weatherData.isRainy ? <CloudRain size={120} /> : <Sun size={120} />}
-               </div>
-               <div className="flex items-center gap-4 z-10 w-full">
-                  <div className="bg-white/20 p-4 rounded-[1.5rem] backdrop-blur-sm shrink-0">
-                     {weatherData.isRainy ? <CloudRain size={36} /> : <Sun size={36} />}
-                  </div>
-                  <div className="text-left">
-                     <p className="text-[10px] font-black uppercase tracking-widest text-white/90 mb-1">{weatherData.city}</p>
-                     <div className="flex items-baseline gap-2">
-                       <span className="text-4xl font-black tracking-tighter leading-none">{weatherData.temp}º</span>
-                       <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">{weatherData.desc}</span>
-                     </div>
-                  </div>
-               </div>
-             </div>
-           </>
-         )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center shadow-sm`}>
-          <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center border border-red-100 dark:border-red-500/20 mb-4">
-            <Users size={32} className="text-red-600"/>
-          </div>
-          <h2 className="text-5xl font-black text-blue-950 dark:text-white tracking-tighter mb-2">{gks.length}</h2>
-          <p className={`text-[10px] uppercase tracking-widest ${theme.textMuted} font-black`}>Porteros Asignados</p>
-        </div>
-
-        <div className="md:col-span-2 overflow-hidden flex flex-col gap-4">
-          <div className="flex justify-between items-end px-2 mb-2">
-             <div className="text-left">
-               <h3 className="text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Calendario General</h3>
-             </div>
-             {upcomingMatches.length > 1 && <span className="text-[10px] uppercase font-black tracking-widest text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-xl">Desliza →</span>}
-          </div>
-          
-          {upcomingMatches.length > 0 ? (
-             <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-4 custom-scrollbar">
-               {upcomingMatches.map(match => {
-                  const r = rivals.find(r => r.id === match.rivalId);
-                  return (
-                    <div key={match.id} className="min-w-[290px] sm:min-w-[340px] lg:min-w-[370px] snap-start shrink-0">
-                      <MatchScoreboardCard match={match} rival={r} gks={gks} theme={theme} darkMode={darkMode} onEdit={role !== 'staff' ? onEditMatch : null} onDelete={role !== 'staff' ? onDeleteMatch : null} />
-                    </div>
-                  )
-               })}
-             </div>
-          ) : (
-            <div className={`p-6 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-slate-400 h-[250px]`}>
-              <CalendarDays size={48} className="mb-4 opacity-50" />
-              <p className="text-sm font-black uppercase tracking-widest text-slate-500">Sin partidos programados</p>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <button
+                  onClick={() => setModule('partidos')}
+                  className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 border border-amber-400/50"
+                >
+                  <CalendarDays size={16} /> Ver Partidos
+                </button>
+                <button
+                  onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)}
+                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border border-white/20 shadow-lg"
+                  title="Descargar PDF con la hoja de ruta de la jornada"
+                >
+                  <FileText size={16} className="text-sky-300" /> Briefing Jornada
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Título de control de la sección de Porteros + Selector Visual */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mt-10 mb-4 px-2">
-        <div className="text-left">
-          <h3 className={`text-xs font-black uppercase tracking-widest ${theme.textMuted}`}>Tus Porteros</h3>
-          <h4 className="text-2xl font-black italic uppercase tracking-tighter text-blue-950 dark:text-white mt-1 leading-none">Planificación del Plantel</h4>
-        </div>
-        
-        {/* Selector Visual Premium */}
-        <div className="flex bg-slate-200 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-300 dark:border-slate-700/60 shadow-inner">
-          <button 
-            onClick={() => setViewLockerRoom(true)}
-            className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${viewLockerRoom ? 'bg-blue-950 dark:bg-red-600 text-white shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
-            🚪 Vestuario 3D
-          </button>
-          <button 
-            onClick={() => setViewLockerRoom(false)}
-            className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${!viewLockerRoom ? 'bg-blue-950 dark:bg-red-600 text-white shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
-            📋 Tarjetas
-          </button>
-        </div>
-      </div>
+            {/* 2. Escudos Enfrentados Centrales */}
+            <div className="flex items-center justify-center gap-5 md:gap-7 w-full md:w-3/12">
+              <img src={ESCUDO_ATM_URL} className="w-20 h-20 md:w-28 md:h-28 object-contain drop-shadow-[0_0_25px_rgba(220,38,38,0.5)] transform hover:scale-110 transition-transform" alt="Atleti" />
+              <span className="text-2xl md:text-3xl text-slate-500 font-black italic drop-shadow-md">VS</span>
+              {rivals.find(r => r.id === nextMatchObj.rivalId)?.shieldUrl ? (
+                <img src={rivals.find(r => r.id === nextMatchObj.rivalId).shieldUrl} className="w-20 h-20 md:w-28 md:h-28 object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:scale-110 transition-transform" alt="Rival" />
+              ) : (
+                <Swords className="w-20 h-20 md:w-28 md:h-28 text-slate-600 drop-shadow-md" />
+              )}
+            </div>
 
-      {/* VISTA DEL VESTUARIO VIRTUAL O DE TARJETAS SCOUTING */}
-      {viewLockerRoom ? (
-        <VestuarioVirtual 
-          gks={gks} 
-          matches={matches}
-          onOpenPlan={onOpenLockerPlan} 
-          theme={theme}
-        />
+            {/* 3. Cuenta Atrás y Línea de Tiempo Derecha */}
+            <div className="flex flex-col items-center md:items-end w-full md:w-4/12">
+              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/80 px-5 py-3.5 rounded-2xl flex flex-col items-center mb-2 shadow-inner min-w-[190px]">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-1">Inicia en</span>
+                <span className="text-3xl lg:text-4xl font-black text-white italic tracking-tighter tabular-nums drop-shadow-md">
+                  {countdown || '--h --m'}
+                </span>
+              </div>
+
+              {upcomingMatches.length > 1 && (
+                <div className="w-full flex flex-col gap-3 mt-3 relative before:absolute before:inset-0 before:ml-3 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-700 before:to-transparent">
+                  {upcomingMatches.slice(1, 4).map((m) => {
+                    const rInfo = rivals.find(r => r.id === m.rivalId);
+                    return (
+                      <div key={m.id} className="relative flex items-center justify-between md:justify-center group">
+                        <div className="absolute left-0 md:left-1/2 w-5 h-5 rounded-full border-4 border-[#0a0f1c] bg-slate-700 group-hover:bg-red-500 transition-colors z-10 transform -translate-x-1/2 ml-3 md:ml-0 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                        </div>
+
+                        <div className="pl-9 md:pl-0 md:w-1/2 md:pr-6 flex flex-col md:items-end justify-center w-full">
+                          <div className="flex items-center gap-2 justify-start md:justify-end bg-slate-800/55 border border-slate-700/50 p-2 rounded-xl backdrop-blur-sm shadow-md">
+                            <img src={ESCUDO_ATM_URL} className="w-5 h-5 object-contain" alt="Atleti" />
+                            <span className="text-[8px] text-slate-500 font-black italic">VS</span>
+                            {rInfo?.shieldUrl ? (
+                              <img src={rInfo.shieldUrl} className="w-5 h-5 object-contain" alt="Rival" />
+                            ) : (
+                              <Swords className="w-5 h-5 text-slate-500" />
+                            )}
+                            <div className="ml-1.5 pl-2 border-l border-slate-600 flex flex-col text-left">
+                              <span className="text-white text-[11px] font-black uppercase truncate max-w-[105px]">{m.myTeam || 'ATLETI'}</span>
+                              <span className="text-red-400 text-[9px] font-black tracking-widest">{m.time || '--:--'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="hidden md:flex md:w-1/2 md:pl-6 text-left justify-start">
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{formatDate(m.date)}</span>
+                            <span className="px-2 py-0.5 bg-white/10 backdrop-blur-md text-slate-200 text-[9px] font-black rounded uppercase border border-white/15 flex items-center gap-1 max-w-[140px] truncate">
+                              <MapPin size={9} className="text-sky-400 shrink-0" />
+                              <span className="truncate">{m.field || 'Por definir'}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {gks.map(gk => (
-            <GkScoutingCard
-              key={gk.id}
-              gk={gk}
-              matches={matches}
-              role={role}
-              onSelect={() => onSelectGk ? onSelectGk(gk.id) : setModule('porteros')}
-            />
-          ))}
+        /* CABECERA VISION OS CUANDO NO HAY PARTIDO EN 7 DÍAS */
+        <div className="rounded-[2.25rem] p-7 md:p-9 bg-gradient-to-r from-[#172554] via-[#111c44] to-[#24163b] text-white border border-white/15 shadow-[0_18px_40px_rgba(10,16,41,0.3)] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+          <div className="pointer-events-none absolute -right-10 -top-10 opacity-10">
+            <Shield size={180} />
+          </div>
+          <div className="relative z-10">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-400/15 border border-sky-300/25 text-[10px] font-black uppercase tracking-widest text-sky-300 mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Centro de Alto Rendimiento
+            </span>
+            <h2 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter text-white leading-none">
+              {greeting}, {userName}
+            </h2>
+            <p className="text-xs text-slate-300/85 font-medium mt-2">
+              Control semanal de competición, condiciones de campo y rendimiento global de porteros.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 relative z-10">
+            <button
+              onClick={() => setModule('partidos')}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+            >
+              <CalendarDays size={15} /> Calendario
+            </button>
+            {upcomingMatches.length > 0 && (
+              <button
+                onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-600/25"
+              >
+                <FileText size={15} /> Briefing Jornada
+              </button>
+            )}
+          </div>
         </div>
       )}
+
+      {/* ========================================================= */}
+      {/* NIVEL 2 · CLIMA TÁCTICO (2/3) + MURO ATLÉTICO KPIs (1/3)  */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* 1. MÓDULO CLIMA TÁCTICO · MADRID (2/3 ANCHO) */}
+        <div className="lg:col-span-8 rounded-[2rem] p-6 sm:p-7 bg-gradient-to-br from-[#0284c7] via-[#2563eb] to-[#1e293b] text-white border border-white/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_18px_40px_rgba(30,58,138,0.28)] flex flex-col justify-between relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-20 -left-16 w-64 h-64 rounded-full bg-cyan-300/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 right-0 w-72 h-56 rounded-full bg-slate-950/35 blur-3xl" />
+
+          {/* Fila Superior: Icono + Temperatura + Recomendación de Guante */}
+          <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-md flex items-center justify-center shadow-inner shrink-0">
+                {weatherData.isRainy ? (
+                  <CloudRain size={32} className="text-cyan-200" />
+                ) : (
+                  <Sun size={32} className="text-amber-300" />
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.22em] text-sky-100/90">
+                  Clima Táctico · {weatherData.city}
+                </p>
+                <div className="flex items-baseline gap-2.5 mt-1">
+                  <span className="text-4xl sm:text-5xl font-black tracking-tight text-white leading-none tabular-nums">
+                    {weatherData.temp}°
+                  </span>
+                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white/95">
+                    {weatherData.desc}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Píldora Automática de Guante */}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border text-[11px] font-black uppercase tracking-wider shadow-sm ${
+              needsWetGlove
+                ? 'bg-cyan-400/25 border-cyan-200/40 text-white'
+                : 'bg-white/15 border-white/25 text-white'
+            }`}>
+              <svg className="w-4 h-4 text-cyan-200 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" />
+                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+              </svg>
+              <span>{needsWetGlove ? 'Guante de Agua' : 'Grip Seco'}</span>
+            </div>
+          </div>
+
+          {/* Fila Inferior: 3 Sub-tarjetas Tácticas */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-6 relative z-10">
+            {/* 1. Rachas de Viento */}
+            <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-100/85">Rachas Viento</span>
+                <svg className="w-4 h-4 text-amber-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+                  <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+                  <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+                </svg>
+              </div>
+              <div className="my-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-white tabular-nums">{weatherData.windGusts}</span>
+                <span className="text-xs font-bold text-sky-100/80">km/h</span>
+              </div>
+              <span className={`text-[10px] font-black uppercase tracking-wider ${aerialAlert ? 'text-amber-300' : 'text-emerald-200'}`}>
+                {aerialAlert ? '⚠ Alerta Juego Aéreo' : '✓ Juego Aéreo Estable'}
+              </span>
+            </div>
+
+            {/* 2. Humedad / Lluvia */}
+            <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-100/85">Humedad / Lluvia</span>
+                <svg className="w-4 h-4 text-cyan-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                </svg>
+              </div>
+              <div className="my-2 flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-white tabular-nums">{weatherData.humidity}%</span>
+                <span className="text-xs font-extrabold text-cyan-200 tabular-nums">· {weatherData.precipProb}%</span>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-sky-100">
+                {fastPitch ? 'Césped Rápido' : 'Bote Normal'}
+              </span>
+            </div>
+
+            {/* 3. Ocaso Solar */}
+            <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-100/85">Ocaso Solar</span>
+                <svg className="w-4 h-4 text-amber-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 10V2" /><path d="m4.93 10.93 1.41 1.41" /><path d="M2 18h2" /><path d="M20 18h2" /><path d="m19.07 10.93-1.41 1.41" /><path d="M22 22H2" /><path d="m16 6-4 4-4-4" /><path d="M16 18a4 4 0 0 0-8 0" />
+                </svg>
+              </div>
+              <div className="my-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-white tabular-nums">{weatherData.sunset}</span>
+                <span className="text-xs font-bold text-sky-100/80">h</span>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
+                Control de Focos
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. MURO ATLÉTICO · KPIs GLOBALES DEL DEPARTAMENTO (1/3 ANCHO) */}
+        <div className="lg:col-span-4 rounded-[2rem] p-6 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_18px_40px_rgba(7,11,24,0.35)] flex flex-col justify-between relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-16 -right-16 w-44 h-44 rounded-full bg-red-500/15 blur-3xl" />
+
+          <div className="flex items-center justify-between gap-2 mb-4 relative z-10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-400/30 flex items-center justify-center text-red-400 shrink-0">
+                <Shield size={17} />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-white leading-tight">Muro Atlético</h3>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Rendimiento Global</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setModule('porteros')}
+              className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-black text-sky-300 transition-colors"
+            >
+              {gks.length} GK →
+            </button>
+          </div>
+
+          <div className="space-y-2.5 relative z-10 flex-1 flex flex-col justify-center">
+            {/* KPI 1: Porterías a 0 */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-between">
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Porterías a Cero</span>
+                <span className="text-[11px] font-semibold text-emerald-300 mt-0.5 block">
+                  {cleanSheetPct}% de actuaciones imbatido
+                </span>
+              </div>
+              <span className="text-2xl font-black text-emerald-400 tabular-nums">{totalCleanSheets}</span>
+            </div>
+
+            {/* KPI 2: Promedio Goles Encajados */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-between">
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Promedio Encajado</span>
+                <span className="text-[11px] font-semibold text-slate-300 mt-0.5 block">
+                  {totalGoalsConceded} goles en {totalMatchesWithData} partidos
+                </span>
+              </div>
+              <span className="text-2xl font-black text-white tabular-nums">{avgGoalsPerMatch}</span>
+            </div>
+
+            {/* KPI 3: Efectividad en Penaltis */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-between">
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Penaltis Parados</span>
+                <span className="text-[11px] font-semibold text-cyan-300 mt-0.5 block">
+                  {totalPenFaced > 0 ? `${penSavePct}% efectividad (${totalPenSaved}/${totalPenFaced})` : 'Sin penaltis registrados'}
+                </span>
+              </div>
+              <span className="text-2xl font-black text-cyan-400 tabular-nums">{totalPenSaved}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* NIVEL 3 · CARTELERA FIJA "TU JORNADA POR CATEGORÍAS"      */}
+      {/* ========================================================= */}
+      <div className="space-y-4 pt-1">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-sky-500/15 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-sky-400">
+              <CalendarDays size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-white leading-none">
+                Tu Jornada por Categorías
+              </h3>
+              <p className={`text-[10px] font-semibold ${theme.textMuted} mt-1`}>
+                Pulsa cualquier categoría para editar convocatoria, titularidad o resultado al instante
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setModule('partidos')}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-sky-400 transition-all shadow-sm"
+          >
+            Ver calendario completo →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          {TEAMS_LIST.map((teamName) => {
+            const teamMatches = matches.filter(m => normalizeStr(m.myTeam) === normalizeStr(teamName));
+            const nextM = [...teamMatches]
+              .filter(m => m.date >= todayStr)
+              .sort((a, b) => parseSafeDate(a.date, a.time) - parseSafeDate(b.date, b.time))[0];
+            const lastM = [...teamMatches]
+              .filter(m => m.date < todayStr)
+              .sort((a, b) => parseSafeDate(b.date, b.time) - parseSafeDate(a.date, a.time))[0];
+
+            const targetMatch = nextM || lastM || null;
+            const isNext = Boolean(nextM);
+            const isToday = isNext && targetMatch?.date === todayStr;
+            const rivalObj = targetMatch ? rivals.find(r => r.id === targetMatch.rivalId) : null;
+            const convocados = targetMatch ? gks.filter(gk => targetMatch.goalkeeperIds?.includes(gk.id)) : [];
+
+            const hasScore = targetMatch && targetMatch.goalsMyTeam !== '' && targetMatch.goalsMyTeam !== undefined && targetMatch.goalsRival !== '' && targetMatch.goalsRival !== undefined;
+            const gAtm = hasScore ? parseInt(targetMatch.goalsMyTeam) : null;
+            const gRiv = hasScore ? parseInt(targetMatch.goalsRival) : null;
+
+            let resColor = 'bg-white/10 text-slate-300 border-white/15';
+            if (hasScore && !isNaN(gAtm) && !isNaN(gRiv)) {
+              if (gAtm > gRiv) resColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
+              else if (gAtm === gRiv) resColor = 'bg-sky-500/20 text-sky-300 border-sky-400/30';
+              else resColor = 'bg-rose-500/20 text-rose-300 border-rose-400/30';
+            }
+
+            return (
+              <div
+                key={teamName}
+                onClick={() => {
+                  if (targetMatch && role !== 'staff' && onEditMatch) onEditMatch(targetMatch);
+                  else setModule('partidos');
+                }}
+                className="cursor-pointer rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_32px_rgba(7,11,24,0.35)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_20px_42px_rgba(10,20,52,0.55)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative"
+              >
+                {/* Cabecera de Categoría */}
+                <div className="px-4 py-3 bg-white/[0.05] border-b border-white/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img src={ESCUDO_ATM_URL} alt="" className="w-4 h-4 object-contain shrink-0" />
+                    <span className="text-xs font-black uppercase tracking-wider text-white truncate">
+                      {teamName}
+                    </span>
+                  </div>
+
+                  {targetMatch ? (
+                    isToday ? (
+                      <span className="px-2 py-0.5 rounded-full bg-red-500/25 border border-red-400/40 text-[9px] font-black uppercase tracking-widest text-red-200 animate-pulse shrink-0">
+                        Hoy
+                      </span>
+                    ) : isNext ? (
+                      <span className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/30 text-[9px] font-black uppercase tracking-wider text-sky-300 shrink-0">
+                        Próximo {targetMatch.matchday ? `· J${targetMatch.matchday}` : ''}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-[9px] font-black uppercase tracking-wider text-amber-300 shrink-0">
+                        Descansa · Últ.
+                      </span>
+                    )
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-white/8 border border-white/10 text-[9px] font-bold uppercase text-slate-400 shrink-0">
+                      Sin agenda
+                    </span>
+                  )}
+                </div>
+
+                {/* Cuerpo Central del Partido */}
+                {targetMatch ? (
+                  <div className="p-4 flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/15 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+                      {rivalObj?.shieldUrl ? (
+                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-sm" />
+                      ) : (
+                        <Swords className="w-7 h-7 text-slate-400" />
+                      )}
+                    </div>
+
+                    <h4 className="mt-2.5 text-xs font-extrabold uppercase tracking-tight text-white line-clamp-1" title={rivalObj?.name}>
+                      {rivalObj?.name || 'Rival por definir'}
+                    </h4>
+
+                    {/* Condición Local/Visitante/Sede + Campo */}
+                    <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[10px] font-bold text-slate-300 max-w-full px-2">
+                      {renderConditionTag(targetMatch.locationType)}
+                      <span className="text-white/25">·</span>
+                      <span className="truncate max-w-[125px] text-slate-400" title={targetMatch.field}>
+                        {targetMatch.field || 'Por definir'}
+                      </span>
+                    </div>
+
+                    {/* Hora (Próximo) o Resultado (Último si descansa) */}
+                    {isNext ? (
+                      <div className="mt-3.5 px-3.5 py-1.5 rounded-xl bg-white/[0.08] border border-white/15 backdrop-blur-md flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-300 tabular-nums">{formatDate(targetMatch.date)}</span>
+                        <span className="text-white/25">·</span>
+                        <span className="text-sm font-black text-sky-300 tabular-nums">{targetMatch.time || '--:--'}</span>
+                      </div>
+                    ) : (
+                      <div className={`mt-3.5 px-3.5 py-1.5 rounded-xl border backdrop-blur-md flex items-center gap-2 ${resColor}`}>
+                        <span className="text-[10px] font-black uppercase tracking-wider">
+                          {hasScore ? `ATM ${targetMatch.goalsMyTeam} - ${targetMatch.goalsRival} RIV` : formatDate(targetMatch.date)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6 flex-1 flex flex-col items-center justify-center text-center">
+                    <CalendarDays size={26} className="text-slate-500 mb-2 opacity-60" />
+                    <p className="text-[11px] font-bold text-slate-400">Sin partidos registrados</p>
+                    <span className="mt-2 text-[10px] font-black uppercase tracking-wider text-sky-400 group-hover:underline">
+                      Ir a Partidos →
+                    </span>
+                  </div>
+                )}
+
+                {/* Footer: Porteros Convocados + Acceso Rápido Edición */}
+                <div className="px-4 py-2.5 bg-black/25 border-t border-white/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {targetMatch ? (
+                      convocados.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-2">
+                            {convocados.map(gk => {
+                              const isTit = targetMatch.gkStarter?.[gk.id] === true || String(targetMatch.gkStarter?.[gk.id]) === 'true';
+                              return (
+                                <img
+                                  key={gk.id}
+                                  src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+                                  title={`${gk.name} (${isTit ? 'TIT' : 'SUP'})`}
+                                  className={`w-7 h-7 rounded-full object-cover border-2 bg-slate-800 ${isTit ? 'border-emerald-400' : 'border-[#0f1833]'}`}
+                                  style={{ objectPosition: 'center 15%' }}
+                                  alt=""
+                                />
+                              );
+                            })}
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-400 truncate">
+                            {convocados.length} conv.
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-black text-amber-300/90 uppercase tracking-wider">
+                          ⚠ Sin convocar
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-[10px] font-medium text-slate-500">---</span>
+                    )}
+                  </div>
+
+                  {role !== 'staff' && targetMatch && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 group-hover:bg-sky-500/25 border border-white/10 group-hover:border-sky-400/35 text-[9px] font-black uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors shrink-0">
+                      <Edit2 size={10} /> Editar
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3407,12 +3820,12 @@ function GkScoutingCard({ gk, matches = [], role, onSelect, onEdit, onDelete }) 
   );
 }
 
-function ModulePorteros({ gks, matches = [], activeSeason, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role, onSelect, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
+function ModulePorteros({ gks, matches = [], activeSeason, role, onSelect, onNew, onEdit, onDelete, isDataLoading }) {
   if (isDataLoading) return <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><SkeletonCard/><SkeletonCard/></div>;
 
   return (
     <div className="space-y-6">
-      {/* Cabecera estilo visionOS */}
+      {/* Cabecera limpia estilo visionOS */}
       <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
@@ -3424,35 +3837,20 @@ function ModulePorteros({ gks, matches = [], activeSeason, viewLockerRoom, setVi
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <span className="px-3.5 py-2 rounded-full bg-sky-500/15 border border-sky-400/25 text-[11px] font-bold text-sky-300">
+            {gks.length} en Plantilla
+          </span>
+
           {activeSeason && (
             <span className="px-3.5 py-2 rounded-full bg-white/8 border border-white/15 text-[11px] font-bold text-slate-200">
               Temp. {activeSeason}
             </span>
           )}
 
-          {typeof setViewLockerRoom === 'function' && (
-            <div className="flex bg-black/25 p-1 rounded-full border border-white/10">
-              <button
-                type="button"
-                onClick={() => setViewLockerRoom(false)}
-                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${!viewLockerRoom ? 'bg-white/15 text-white shadow-sm border border-white/15' : 'text-slate-400 hover:text-white'}`}
-              >
-                📋 Tarjetas
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewLockerRoom(true)}
-                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${viewLockerRoom ? 'bg-white/15 text-white shadow-sm border border-white/15' : 'text-slate-400 hover:text-white'}`}
-              >
-                🚪 Vestuario 3D
-              </button>
-            </div>
-          )}
-
           {role === 'admin' && (
             <button
               onClick={onNew}
-              className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-red-600 border border-white/20 hover:border-red-400 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-md"
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-red-600/25"
             >
               <Plus size={14} /> Añadir Portero
             </button>
@@ -3460,34 +3858,25 @@ function ModulePorteros({ gks, matches = [], activeSeason, viewLockerRoom, setVi
         </div>
       </div>
 
-      {/* Vista Tarjetas Scouting o Vestuario 3D */}
-      {viewLockerRoom && onOpenLockerPlan ? (
-        <VestuarioVirtual
-          gks={gks}
-          matches={matches}
-          onOpenPlan={onOpenLockerPlan}
-          theme={theme}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {gks.map(gk => (
-            <GkScoutingCard
-              key={gk.id}
-              gk={gk}
-              matches={matches}
-              role={role}
-              onSelect={() => onSelect(gk.id)}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-          {gks.length === 0 && (
-            <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem]">
-              No hay porteros asignados.
-            </div>
-          )}
-        </div>
-      )}
+      {/* Grid directo de Tarjetas Scouting */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {gks.map(gk => (
+          <GkScoutingCard
+            key={gk.id}
+            gk={gk}
+            matches={matches}
+            role={role}
+            onSelect={() => onSelect(gk.id)}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+        {gks.length === 0 && (
+          <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem]">
+            No hay porteros asignados.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
