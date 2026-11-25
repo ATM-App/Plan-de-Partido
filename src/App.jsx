@@ -3605,12 +3605,14 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                   if (targetMatch && role !== 'staff' && onEditMatch) onEditMatch(targetMatch);
                   else setModule('partidos');
                 }}
-                className="cursor-pointer rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_32px_rgba(7,11,24,0.35)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_20px_42px_rgba(10,20,52,0.55)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative"
+                className="cursor-pointer rounded-[1.75rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 hover:border-sky-300/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_14px_32px_rgba(7,11,24,0.32)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.26),0_20px_42px_rgba(10,20,52,0.5)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative"
               >
                 {/* Cabecera de Categoría */}
                 <div className="px-4 py-3 bg-white/[0.05] border-b border-white/10 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <img src={ESCUDO_ATM_URL} alt="" className="w-4 h-4 object-contain shrink-0" />
+                    <div className="w-5 h-5 rounded-md bg-gradient-to-b from-white to-slate-200 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                      <img src={ESCUDO_ATM_URL} alt="" className="w-full h-full object-contain" />
+                    </div>
                     <span className="text-xs font-black uppercase tracking-wider text-white truncate">
                       {teamName}
                     </span>
@@ -3637,14 +3639,14 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                   )}
                 </div>
 
-                {/* Cuerpo Central del Partido */}
+                {/* Cuerpo Central del Partido con Medallón Perla Compacto (56x56px fijos) */}
                 {targetMatch ? (
                   <div className="p-4 flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/15 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-white via-slate-100 to-slate-200/95 border border-white/90 ring-4 ring-white/[0.08] flex items-center justify-center p-2 shadow-[0_8px_18px_rgba(0,0,0,0.32),inset_0_1px_1px_#ffffff] group-hover:scale-105 transition-transform shrink-0">
                       {rivalObj?.shieldUrl ? (
-                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-sm" />
+                        <img src={rivalObj.shieldUrl} alt={rivalObj.name} className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(15,23,42,0.28)]" />
                       ) : (
-                        <Swords className="w-7 h-7 text-slate-400" />
+                        <Swords className="w-7 h-7 text-slate-500" />
                       )}
                     </div>
 
@@ -4860,101 +4862,224 @@ function ModuleRivales({ rivals = [], matches = [], allMatches = [], role, onNew
   );
 }
 
+// ==========================================
+// MÓDULO DE AJUSTES Y USUARIOS VISION OS
+// ==========================================
 function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, onSaveProfile, onBackup, theme, darkMode }) {
   const [profileData, setProfileData] = useState(currentUserData);
+  useEffect(() => {
+    setProfileData(currentUserData);
+  }, [currentUserData?.id]);
+
   const handleImageUpload = useImageUploader((base64) => setProfileData(prev => ({ ...prev, photoUrl: base64 })));
+  const glassInput = "w-full bg-white/[0.07] hover:bg-white/[0.1] focus:bg-white/[0.12] border border-white/15 focus:border-sky-400 rounded-2xl px-4 py-3 text-sm font-semibold text-white placeholder-slate-400 outline-none transition-all";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-10">
-      <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-        <h3 className="text-xl font-black uppercase tracking-tighter mb-8 flex items-center gap-3 text-blue-950 dark:text-white"><User className="text-blue-500"/> Mi Perfil</h3>
-        <div className="flex flex-col md:flex-row gap-10 items-start">
-           <div className="flex flex-col items-center w-full md:w-auto shrink-0">
-             <label className="w-32 h-32 rounded-full border-4 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-md">
-                {profileData.photoUrl ? <img src={profileData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${profileData.photoOffsetY ?? 50}%` }} alt="Perfil" /> : <User size={48} className="text-slate-300 dark:text-slate-600" />}
-                <div className="absolute inset-0 bg-blue-950/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Upload size={24} className="text-white mb-2"/>
-                   <span className="text-[10px] text-white font-black uppercase tracking-widest">Cambiar</span>
-                </div>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-             </label>
-             {profileData.photoUrl && (
-               <div className="w-32 mt-6">
-                 <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                    <span>Ajustar Encuadre</span>
-                 </div>
-                 <input 
-                   type="range" min="0" max="100" 
-                   value={profileData.photoOffsetY ?? 50} 
-                   onChange={(e) => setProfileData({...profileData, photoOffsetY: e.target.value})} 
-                   className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                 />
-               </div>
-             )}
-           </div>
-           <div className="flex-1 w-full space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                 <FormInput label="Nombre Completo" type="text" value={profileData.name || ''} onChange={e => setProfileData({...profileData, name: e.target.value})} />
-                 <FormInput label="Email" type="email" value={profileData.email || ''} onChange={e => setProfileData({...profileData, email: e.target.value})} />
-                 <FormInput label="Usuario de Acceso" type="text" value={profileData.username || ''} onChange={e => setProfileData({...profileData, username: e.target.value})} />
-                 <FormInput label="Nueva Contraseña (Opcional)" type="password" value={profileData.newPassword || ''} onChange={e => setProfileData({...profileData, newPassword: e.target.value})} placeholder="••••••••" />
-              </div>
-              <div className="flex justify-end pt-4">
-                 <button onClick={() => {onSaveProfile(profileData); setProfileData({...profileData, newPassword: ''});}} className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-colors shadow-lg">Guardar Cambios</button>
-              </div>
-           </div>
+    <div className="max-w-5xl mx-auto space-y-6 pb-10">
+      {/* CABECERA VISION OS */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
+            <Settings size={18} className="text-sky-400" /> Centro de Configuración · Perfil y Accesos
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Credenciales personales, seguridad y administración · Atlético de Madrid
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-[10px] font-black uppercase tracking-widest text-sky-300">
+            Rol: {role === 'admin' ? 'Administrador' : role === 'staff' ? 'Cuerpo Técnico' : 'Entrenador'}
+          </span>
+          {role === 'admin' && (
+            <button
+              onClick={onBackup}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-black uppercase tracking-wider text-white transition-all"
+              title="Descargar copia de seguridad JSON"
+            >
+              <Download size={13} className="text-emerald-300" /> Backup Rápido
+            </button>
+          )}
         </div>
       </div>
 
+      {/* TARJETA 1: MI PERFIL (DEEP NAVY GLASS) */}
+      <div className="rounded-[2rem] p-6 sm:p-8 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_18px_40px_rgba(7,11,24,0.35)] relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 rounded-full bg-sky-500/10 blur-3xl" />
+
+        <div className="flex items-center gap-2.5 mb-6 pb-4 border-b border-white/10 relative z-10">
+          <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300">
+            <User size={16} />
+          </div>
+          <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">Mi Perfil Personal</h3>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start relative z-10">
+          {/* Avatar Estudio + Control de Encuadre */}
+          <div className="flex flex-col items-center shrink-0">
+            <label className="w-32 h-32 rounded-[2rem] bg-gradient-to-b from-[#33589e] via-[#223d72] to-[#132347] border-2 border-sky-300/35 ring-4 ring-white/[0.06] flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-xl">
+              {profileData.photoUrl ? (
+                <img
+                  src={profileData.photoUrl}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: `center ${profileData.photoOffsetY ?? 50}%` }}
+                  alt="Perfil"
+                />
+              ) : (
+                <User size={44} className="text-sky-200/70" />
+              )}
+              <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-xs flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Upload size={22} className="text-white mb-1.5" />
+                <span className="text-[9px] text-white font-black uppercase tracking-widest">Cambiar Foto</span>
+              </div>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+
+            {profileData.photoUrl && (
+              <div className="w-32 mt-4 bg-white/[0.05] border border-white/10 rounded-xl p-2.5">
+                <span className="block text-[8px] font-black text-slate-300 uppercase tracking-widest text-center mb-1.5">
+                  Ajustar Encuadre
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={profileData.photoOffsetY ?? 50}
+                  onChange={(e) => setProfileData({ ...profileData, photoOffsetY: e.target.value })}
+                  className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-sky-400"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Campos del Perfil */}
+          <div className="flex-1 w-full space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-300 mb-1.5 pl-1">Nombre Completo</label>
+                <input type="text" value={profileData.name || ''} onChange={e => setProfileData({ ...profileData, name: e.target.value })} className={glassInput} placeholder="Tu nombre" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-300 mb-1.5 pl-1">Email</label>
+                <input type="email" value={profileData.email || ''} onChange={e => setProfileData({ ...profileData, email: e.target.value })} className={glassInput} placeholder="correo@atleti.com" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-300 mb-1.5 pl-1">Usuario de Acceso</label>
+                <input type="text" value={profileData.username || ''} onChange={e => setProfileData({ ...profileData, username: e.target.value })} className={glassInput} placeholder="usuario" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-300 mb-1.5 pl-1">Nueva Contraseña (Opcional)</label>
+                <input type="password" value={profileData.newPassword || ''} onChange={e => setProfileData({ ...profileData, newPassword: e.target.value })} className={glassInput} placeholder="••••••••" />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => { onSaveProfile(profileData); setProfileData({ ...profileData, newPassword: '' }); }}
+                className="inline-flex items-center gap-2 px-7 py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-600/25"
+              >
+                <CheckCircle2 size={16} /> Guardar Perfil
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN EXCLUSIVA ADMINISTRADOR */}
       {role === 'admin' && (
         <>
-          <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-            <h3 className="text-xl font-black uppercase tracking-tighter mb-2 flex items-center gap-3 text-blue-950 dark:text-white"><Database className="text-purple-500"/> Copia de Seguridad</h3>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">Genera un archivo JSON con todos los datos (Porteros, Usuarios, Rivales). Guarda esto periódicamente.</p>
-            <button onClick={onBackup} className="flex items-center justify-center w-full md:w-auto gap-3 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg">
-              <Download size={18} /> Descargar Backup Completo
+          {/* TARJETA 2: COPIA DE SEGURIDAD BENTO */}
+          <div className={`rounded-[2rem] p-6 sm:p-7 border ${theme.border} ${theme.card} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5`}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                <Database size={22} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-blue-950 dark:text-white">
+                  Copia de Seguridad Integral (JSON)
+                </h3>
+                <p className={`text-xs font-medium ${theme.textMuted} mt-1 max-w-xl`}>
+                  Descarga una instantánea completa con todos los porteros, partidos, clubes rivales, informes y usuarios registrados.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={onBackup}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#142042] hover:bg-blue-900 dark:bg-sky-500 dark:hover:bg-sky-400 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md shrink-0"
+            >
+              <Download size={16} /> Exportar Backup
             </button>
           </div>
 
-          <div className={`p-8 rounded-[3rem] border ${theme.border} ${theme.card}`}>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-              <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3 text-blue-950 dark:text-white"><Key className="text-emerald-500"/> Gestión de Usuarios</h3>
-              <button onClick={onNewUser} className="w-full md:w-auto flex items-center justify-center gap-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-md">
-                <Plus size={16} /> Nuevo Usuario
+          {/* TARJETA 3: DIRECTORIO DE USUARIOS DEL SISTEMA */}
+          <div className="rounded-[2rem] p-6 sm:p-8 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_18px_40px_rgba(7,11,24,0.35)]">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+                  <Key size={17} />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">
+                    Gestión de Usuarios y Permisos
+                  </h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                    {users.length} cuentas registradas en la plataforma
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={onNewUser}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-5 py-2.5 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-red-600/25"
+              >
+                <Plus size={14} /> Nuevo Usuario
               </button>
             </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest font-black text-slate-400">
-                    <th className="pb-4 pl-4">Usuario</th>
-                    <th className="pb-4">Rol</th>
-                    <th className="pb-4 text-right pr-4">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
-                      <td className="py-4 pl-4 flex items-center gap-4">
-                        <img src={u.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 object-cover" style={{ objectPosition: `center ${u.photoOffsetY ?? 50}%` }} alt="" />
-                        <div>
-                          <div className={`font-black text-sm uppercase text-blue-950 dark:text-white leading-tight`}>{u.name || 'Sin Nombre'}</div>
-                          <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">{u.username || u.email}</div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {users.map(u => {
+                const roleBadge = u.role === 'admin'
+                  ? { label: 'Administrador', cls: 'bg-red-500/20 text-red-300 border-red-400/30' }
+                  : u.role === 'staff'
+                    ? { label: 'Cuerpo Técnico', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' }
+                    : { label: 'Entrenador', cls: 'bg-sky-500/20 text-sky-300 border-sky-400/30' };
+
+                return (
+                  <div
+                    key={u.id}
+                    className="p-4 rounded-2xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <img
+                        src={u.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`}
+                        className="w-12 h-12 rounded-2xl bg-slate-800 border border-white/15 object-cover shrink-0"
+                        style={{ objectPosition: `center ${u.photoOffsetY ?? 50}%` }}
+                        alt=""
+                      />
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-sm text-white truncate">
+                          {u.name || 'Sin Nombre'}
                         </div>
-                      </td>
-                      <td className="py-4">
-                        <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${u.role === 'admin' ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20' : u.role === 'staff' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'}`}>
-                          {u.role === 'staff' ? 'Cuerpo Técnico' : u.role}
+                        <div className="text-[11px] font-medium text-slate-400 truncate">
+                          {u.username || u.email}
+                        </div>
+                        <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${roleBadge.cls}`}>
+                          {roleBadge.label}
                         </span>
-                      </td>
-                      <td className="py-4 text-right pr-4">
-                        <button onClick={() => onEditUser(u)} className="w-8 h-8 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm"><Edit2 size={14} strokeWidth={3}/></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onEditUser(u)}
+                      className="w-9 h-9 rounded-full bg-white/10 hover:bg-sky-500/30 border border-white/15 text-slate-200 hover:text-white flex items-center justify-center transition-colors shrink-0"
+                      title="Editar usuario"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </>
@@ -6293,37 +6418,42 @@ function UserFormModal({ initialData, onClose, onSave, theme }) {
   const [formData, setFormData] = useState(initialData || { name: '', email: '', username: '', password: '123', role: 'trainer', photoUrl: '', photoOffsetY: 50 });
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, photoUrl: base64 })));
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 transition-colors";
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 dark:focus:ring-sky-500 transition-colors";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><Key className="text-emerald-500 w-8 h-8" /> {initialData ? 'Editar Usuario' : 'Crear Usuario'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b18]/80 backdrop-blur-md p-4 no-print">
+      <div className={`w-full max-w-md rounded-[2.25rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden`}>
+        <div className="px-7 py-5 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white flex justify-between items-center">
+          <h2 className="text-xl font-black italic tracking-tight uppercase flex items-center gap-2.5 text-white">
+            <Key className="text-emerald-400" size={20} /> {initialData ? 'Editar Usuario' : 'Crear Usuario'}
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-red-500/30 text-slate-300 hover:text-white rounded-full transition-colors">
+            <X size={18}/>
+          </button>
         </div>
-        <div className="p-8 space-y-5 overflow-y-auto custom-scrollbar">
-          <div className="flex flex-col items-center justify-center mb-4">
-            <label className="w-28 h-28 rounded-full border-4 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-md">
-              {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${formData.photoOffsetY ?? 50}%` }} alt="Perfil" /> : <User size={40} className="text-slate-300 dark:text-slate-600" />}
+
+        <div className="p-7 space-y-4 overflow-y-auto custom-scrollbar">
+          <div className="flex flex-col items-center justify-center mb-2">
+            <label className="w-24 h-24 rounded-[1.5rem] border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-center cursor-pointer overflow-hidden relative group shadow-md">
+              {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" style={{ objectPosition: `center ${formData.photoOffsetY ?? 50}%` }} alt="Perfil" /> : <User size={36} className="text-slate-300 dark:text-slate-600" />}
               <div className="absolute inset-0 bg-blue-950/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Upload size={20} className="text-white mb-2"/>
+                <Upload size={18} className="text-white"/>
               </div>
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
             {formData.photoUrl && (
-               <div className="w-32 mt-5">
-                 <div className="flex justify-center text-[9px] font-black tracking-widest uppercase text-slate-400 mb-2">Ajustar encuadre</div>
+               <div className="w-32 mt-3">
+                 <div className="flex justify-center text-[9px] font-black tracking-widest uppercase text-slate-400 mb-1">Ajustar encuadre</div>
                  <input type="range" min="0" max="100" value={formData.photoOffsetY ?? 50} onChange={(e) => setFormData({...formData, photoOffsetY: e.target.value})} className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
                </div>
             )}
           </div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre Completo</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: Pablo Fernández" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Usuario</label><input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Ej: pablo.f" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="usuario@atleti.com" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Contraseña</label><input type="text" name="password" value={formData.password} onChange={handleChange} placeholder="Contraseña de acceso" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 pl-1">Nombre Completo</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: Pablo Fernández" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 pl-1">Usuario</label><input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Ej: pablo.f" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 pl-1">Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="usuario@atleti.com" className={inputClass} /></div>
+          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 pl-1">Contraseña</label><input type="text" name="password" value={formData.password} onChange={handleChange} placeholder="Contraseña de acceso" className={inputClass} /></div>
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Rol del Sistema</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 pl-1">Rol del Sistema</label>
             <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
               <option value="trainer">Entrenador (Edita sus porteros)</option>
               <option value="staff">Cuerpo Técnico (Solo lectura)</option>
@@ -6331,9 +6461,10 @@ function UserFormModal({ initialData, onClose, onSave, theme }) {
             </select>
           </div>
         </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={() => onSave(formData)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-500/20">Guardar</button>
+
+        <div className="px-7 py-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50">
+          <button onClick={onClose} className="px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700">Cancelar</button>
+          <button onClick={() => onSave(formData)} className="px-7 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white transition-all shadow-lg shadow-emerald-500/25">Guardar</button>
         </div>
       </div>
     </div>
@@ -6396,19 +6527,29 @@ const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, t
   </div>
 );
 // ==========================================
-// MÓDULO DE INFORMES (Con Historial, Pestañas, Borrador, Edición y PDF)
+// MÓDULO DE INFORMES VISION OS (Con Historial Filtrable, Pestañas Cristal, Borrador, Edición y PDF)
 // ==========================================
 function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReports = [], showNotification }) {
   const [activeTab, setActiveTab] = useState('formulario'); // 'formulario' | 'historial'
   const [informeEditId, setInformeEditId] = useState(null);
-  
+  const [histTypeFilter, setHistTypeFilter] = useState('todos');
+  const [histSearch, setHistSearch] = useState('');
+
   const [tipoInforme, setTipoInforme] = useState('semestral');
   const [porteroSeleccionado, setPorteroSeleccionado] = useState('');
-  
+
   const MATCHDAY_OPTIONS = [
-    'Grupos J1', 'Grupos J2', 'Grupos J3', 'Grupos J4', 'Grupos J5', 
-    'Grupos J6', 'Grupos J7', 'Grupos J8', '1/16 final', '1/8 final', 
+    'Grupos J1', 'Grupos J2', 'Grupos J3', 'Grupos J4', 'Grupos J5',
+    'Grupos J6', 'Grupos J7', 'Grupos J8', '1/16 final', '1/8 final',
     '1/4 final', 'Semifinal', 'Final', '3º-4º puesto'
+  ];
+
+  const REPORT_TYPES_META = [
+    { id: 'partido', label: 'Partido', fullLabel: 'Informe de Partido', badge: 'bg-sky-500/20 text-sky-300 border-sky-400/30' },
+    { id: 'semestral', label: 'Semestral', fullLabel: 'Evaluación Semestral', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30' },
+    { id: 'torneo', label: 'Torneo', fullLabel: 'Informe de Torneo', badge: 'bg-amber-500/20 text-amber-300 border-amber-400/30' },
+    { id: 'flash', label: 'Flash Scouting', fullLabel: 'Scouting Flash', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' },
+    { id: 'objetivos', label: 'Objetivos', fullLabel: 'Plan de Objetivos', badge: 'bg-rose-500/20 text-rose-300 border-rose-400/30' }
   ];
 
   const initialFormState = {
@@ -6416,9 +6557,9 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
     titulo: '', contenido: '', rival: '', nota: '5',
     // Semestral
     jornadaActual: '', convocatorias: '', titular: '', minPos1: '', minPos2: '', golesEncajados: '', ausenciaLesion: '', ausenciaDisciplina: '', ausenciaDecTecnica: '', torneosAsistidos: '', torneosConvocado: '', repTecDefensivo: '3', repTecOfensivo: '3', adecuacionRecursos: '3', nivelCompetitivo: '3', constanciaRendimiento: '3', comprensionJuego: '3', implicacionEntrenamientos: '3', liderazgoGrupo: '3', destrezaGeneral: '3', concienciaObjetivos: '3', motivacionIndividual: '3', comportamientoActitudinal: '3', posicionBasica: '3', blocaje: '3', colocacion: '3', desplazamientosCaidas: '3', dominioArea: '3', reinicioJuego: '3', unoContraUno: '3', velocidadEspecifica: '3', agilidad: '3', ataque: '3', transDef: '3', defensa: '3', transOf: '3', obsTecnicoTacticas: '', sociabilidad: '3', constanciaAct: '3', disciplina: '3', actitud: '3', compromiso: '3', evolucion: '3', obsActitudinales: '', eval1Media: '', eval1Asig: '', eval1Susp: '', eval2Media: '', eval2Asig: '', eval2Susp: '', eval3Media: '', eval3Asig: '', eval3Susp: '', valoracionGeneral: 'MEDIA',
-    // Partido (Modificado para UX Ágil)
-    partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '', statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0, 
-    valParadas: '', obsParadas: '', valGoles: '', obsGoles: '', valAereo: '', obsAereo: '', valPies: '', obsPies: '', valFueraArea: '', obsFueraArea: '', val1v1: '', obs1v1: '', valABP: '', obsABP: '', valComunicacion: '', obsComunicacion: '', valMental: '', obsMental: '', 
+    // Partido
+    partidoCompeticion: '', partidoJornada: '', partidoResultado: '', partidoTitular: 'Titular', partidoMinutos: '', statParadas: 0, statGoles: 0, statSalidas: 0, statCentros: 0, statPases: 0, stat1v1: 0, statErrores: 0, statABP: 0,
+    valParadas: '', obsParadas: '', valGoles: '', obsGoles: '', valAereo: '', obsAereo: '', valPies: '', obsPies: '', valFueraArea: '', obsFueraArea: '', val1v1: '', obs1v1: '', valABP: '', obsABP: '', valComunicacion: '', obsComunicacion: '', valMental: '', obsMental: '',
     partidoCronologiaList: [], partidoVideos: '', partidoComparativa: '', valTecnicoPartido: '3', valTacticoPartido: '3', valFisicoPartido: '3', valMentalPartido: '3', planFortalezas: '', planDebilidades: '', planObjetivos: '',
     // Torneo
     ubicacionTorneo: '', hotelTorneo: '', logoTorneo: '', partidosTorneo: [], ctxNivel: '3', ctxLogistica: '3', ctxCarga: '3', ctxInstalaciones: '3', medInicial: '', medIncidencias: '', valPersonalidad: '3', valMando: '3', valConc: '3', valError: '3', valConfianza: '3', valMentalidad: '3', valActitudGol: '3', valPrimerUltimo: '3', valRitmo: '3', valMejoraBajon: '3', valEntorno: '3', val1v1: '3', valOrg: '3', valCom: '3', obsPenaltis: '', obsDecisivas: '', obsPos: '', obsImprovements: '',
@@ -6434,23 +6575,23 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
   const handleCounter = (field, delta) => setFormData(prev => ({ ...prev, [field]: Math.max(0, (parseInt(prev[field]) || 0) + delta) }));
 
   const handleCopyData = (reportId) => {
-     const report = existingReports.find(r => r.id === reportId);
-     if(report) {
-        setFormData(prev => ({
-           ...prev, titulo: report.titulo || '', fecha: report.fecha || prev.fecha, ubicacionTorneo: report.ubicacionTorneo || '',
-           hotelTorneo: report.hotelTorneo || '', logoTorneo: report.logoTorneo || '',
-           partidosTorneo: (report.partidosTorneo || []).map(m => ({ ...m, id: Date.now() + Math.random(), goalsRival: '-', minutes: '' }))
-        }));
-     }
+    const report = existingReports.find(r => r.id === reportId);
+    if (report) {
+      setFormData(prev => ({
+        ...prev, titulo: report.titulo || '', fecha: report.fecha || prev.fecha, ubicacionTorneo: report.ubicacionTorneo || '',
+        hotelTorneo: report.hotelTorneo || '', logoTorneo: report.logoTorneo || '',
+        partidosTorneo: (report.partidosTorneo || []).map(m => ({ ...m, id: Date.now() + Math.random(), goalsRival: '-', minutes: '' }))
+      }));
+    }
   };
 
   const handleImageUpload = (e) => {
-     const file = e.target.files[0];
-     if(file) {
-        const reader = new FileReader();
-        reader.onloadend = () => { setFormData(prev => ({ ...prev, logoTorneo: reader.result })); };
-        reader.readAsDataURL(file);
-     }
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => { setFormData(prev => ({ ...prev, logoTorneo: reader.result })); };
+      reader.readAsDataURL(file);
+    }
   };
 
   const addMatch = () => setFormData(prev => ({ ...prev, partidosTorneo: [...prev.partidosTorneo, { id: Date.now(), matchday: 'Grupos J1', rival: '', country: '🇪🇸 España', goalsATM: '-', goalsRival: '-', goalsConcededByGk: '-', minutes: '' }] }));
@@ -6474,7 +6615,7 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
   const handleSaveSubmit = async (e, isDraft = false) => {
     e.preventDefault();
     if (!porteroSeleccionado) { showNotification("Debes seleccionar un portero", "error"); return; }
-    
+
     const gkInfo = gks.find(g => g.id === porteroSeleccionado);
     const informeAguardar = {
       ...formData,
@@ -6488,26 +6629,35 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
     if (informeEditId) informeAguardar.id = informeEditId;
 
     const savedId = await onSave(informeAguardar);
-    
+
     if (!isDraft && savedId !== null) {
-       if (!informeAguardar.id) informeAguardar.id = savedId;
-       exportarInformePDFVectorial(gkInfo, informeAguardar, darkMode, showNotification);
+      if (!informeAguardar.id) informeAguardar.id = savedId;
+      exportarInformePDFVectorial(gkInfo, informeAguardar, darkMode, showNotification);
     }
 
     resetForm();
     setActiveTab('historial');
   };
 
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 outline-none transition-all text-sm";
-  const sectionTitleClass = "text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8 flex items-center gap-2";
-  const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 pl-1";
+  // Clases estilizadas estilo visionOS que alimentan automáticamente todos los sub-formularios
+  const inputClass = "w-full bg-white/90 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/90 dark:border-white/10 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-semibold placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-400 outline-none transition-all text-sm shadow-sm";
+  const sectionTitleClass = "text-xs font-black uppercase tracking-widest text-blue-950 dark:text-sky-300 border-b border-slate-200/80 dark:border-white/10 pb-2.5 mb-5 mt-8 flex items-center gap-2";
+  const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5 pl-1";
 
   const renderRadioGroup = (name, max, label) => (
-    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50 flex-wrap gap-2">
-      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
-      <div className="flex gap-2 w-full sm:w-auto justify-end">
+    <div className="flex items-center justify-between p-3.5 bg-white/75 dark:bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-200/70 dark:border-white/10 flex-wrap gap-2 shadow-xs">
+      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 w-full sm:w-1/2 leading-tight">{label}</span>
+      <div className="flex gap-1.5 w-full sm:w-auto justify-end">
         {Array.from({ length: max }, (_, i) => i + 1).map(num => (
-          <div key={num} onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))} className={`w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all select-none ${formData[name] === String(num) ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}>
+          <div
+            key={num}
+            onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black cursor-pointer transition-all select-none ${
+              formData[name] === String(num)
+                ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/25 scale-105'
+                : 'bg-slate-100/80 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-white/10 hover:border-sky-400'
+            }`}
+          >
             {num}
           </div>
         ))}
@@ -6517,20 +6667,24 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
 
   const renderColoredRadioGroup = (name, label) => {
     const getColorClass = (num, isSelected) => {
-      if (!isSelected) return 'bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-400';
-      if (num === 1 || num === 2) return 'bg-red-600 text-white shadow-md border-red-700';
-      if (num === 3) return 'bg-orange-500 text-white shadow-md border-orange-600';
-      if (num === 4) return 'bg-amber-400 text-blue-950 shadow-md border-amber-500';
-      if (num === 5) return 'bg-emerald-600 text-white shadow-md border-emerald-700';
+      if (!isSelected) return 'bg-slate-100/80 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200/80 dark:border-white/10 hover:border-slate-400';
+      if (num === 1 || num === 2) return 'bg-red-600 text-white shadow-md border-red-500 scale-105';
+      if (num === 3) return 'bg-orange-500 text-white shadow-md border-orange-400 scale-105';
+      if (num === 4) return 'bg-amber-400 text-blue-950 shadow-md border-amber-300 scale-105';
+      if (num === 5) return 'bg-emerald-500 text-white shadow-md border-emerald-400 scale-105';
       return '';
     };
 
     return (
-      <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50 flex-wrap gap-2">
-        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-full sm:w-1/2 leading-tight">{label}</span>
-        <div className="flex gap-2 w-full sm:w-auto justify-end">
+      <div className="flex items-center justify-between p-3.5 bg-white/75 dark:bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-200/70 dark:border-white/10 flex-wrap gap-2 shadow-xs">
+        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 w-full sm:w-1/2 leading-tight">{label}</span>
+        <div className="flex gap-1.5 w-full sm:w-auto justify-end">
           {[1, 2, 3, 4, 5].map(num => (
-            <div key={num} onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))} className={`border w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all select-none ${getColorClass(num, formData[name] === String(num))}`}>
+            <div
+              key={num}
+              onClick={() => setFormData(prev => ({ ...prev, [name]: String(num) }))}
+              className={`border w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black cursor-pointer transition-all select-none ${getColorClass(num, formData[name] === String(num))}`}
+            >
               {num}
             </div>
           ))}
@@ -6541,16 +6695,15 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
 
   const torneosPrevios = existingReports.filter(r => r.tipo === 'torneo');
 
-  // Helper UX Ágil para el informe de partido
   const cronoOptions = useMemo(() => {
-     const opts = [];
-     for(let i=1; i<=45; i++) opts.push(`1T - ${i}'`);
-     opts.push(`1T - 45+'`);
-     for(let i=46; i<=90; i++) opts.push(`2T - ${i}'`);
-     opts.push(`2T - 90+'`);
-     opts.push(`Prórroga`);
-     opts.push(`Penaltis`);
-     return opts;
+    const opts = [];
+    for (let i = 1; i <= 45; i++) opts.push(`1T - ${i}'`);
+    opts.push(`1T - 45+'`);
+    for (let i = 46; i <= 90; i++) opts.push(`2T - ${i}'`);
+    opts.push(`2T - 90+'`);
+    opts.push(`Prórroga`);
+    opts.push(`Penaltis`);
+    return opts;
   }, []);
 
   const addCronologia = () => setFormData(prev => ({ ...prev, partidoCronologiaList: [...(prev.partidoCronologiaList || []), { id: Date.now(), minuto: "1T - 1'", accion: '' }] }));
@@ -6558,181 +6711,369 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
   const updateCronologia = (id, field, value) => setFormData(prev => ({ ...prev, partidoCronologiaList: prev.partidoCronologiaList.map(c => c.id === id ? { ...c, [field]: value } : c) }));
 
   const renderPartidoField = (num, title, stateValName, stateObsName, type, options) => (
-    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-3">
-      <label className={labelClass}>{num} - {title}</label>
+    <div className="bg-white/70 dark:bg-slate-900/50 backdrop-blur-md p-5 rounded-[1.75rem] border border-slate-200/80 dark:border-white/10 shadow-xs flex flex-col gap-3">
+      <label className={labelClass}>{num} — {title}</label>
       {type === 'select' ? (
-        <select value={formData[stateValName]} onChange={handleChange} name={stateValName} className={`${inputClass} !py-2.5 font-bold`}>
+        <select value={formData[stateValName]} onChange={handleChange} name={stateValName} className={`${inputClass} !py-2.5 font-bold cursor-pointer`}>
           <option value="">- Seleccionar -</option>
           {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : (
         <div className="flex flex-wrap gap-2">
           {options.map(opt => (
-            <button 
-              type="button" 
+            <button
+              type="button"
               key={opt}
-              onClick={() => setFormData(prev => ({...prev, [stateValName]: opt}))}
-              className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-colors flex-1 min-w-[120px] ${formData[stateValName] === opt ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-400'}`}
+              onClick={() => setFormData(prev => ({ ...prev, [stateValName]: opt }))}
+              className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl border transition-all flex-1 min-w-[115px] ${
+                formData[stateValName] === opt
+                  ? 'bg-[#142042] dark:bg-sky-500 border-blue-400/40 text-white shadow-md'
+                  : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-sky-400'
+              }`}
             >
               {opt}
             </button>
           ))}
         </div>
       )}
-      <input 
-        type="text" 
-        name={stateObsName} 
-        value={formData[stateObsName]} 
-        onChange={handleChange} 
-        placeholder="Anotación adicional (opcional)..." 
-        className={`${inputClass} !py-2.5 !text-xs bg-white dark:bg-slate-900`}
+      <input
+        type="text"
+        name={stateObsName}
+        value={formData[stateObsName]}
+        onChange={handleChange}
+        placeholder="Observación táctica opcional..."
+        className={`${inputClass} !py-2.5 !text-xs`}
       />
     </div>
   );
 
+  const selectedGkPreview = gks.find(g => g.id === porteroSeleccionado) || null;
+  const draftsCount = existingReports.filter(r => r.isDraft).length;
+  const completedCount = existingReports.length - draftsCount;
+
+  const filteredReports = useMemo(() => {
+    return [...existingReports]
+      .filter(rep => {
+        if (histTypeFilter !== 'todos' && rep.tipo !== histTypeFilter) return false;
+        if (histSearch.trim()) {
+          const gk = gks.find(g => g.id === rep.gkId);
+          const haystack = `${gk?.name || rep.gkName || ''} ${rep.titulo || ''} ${rep.rival || ''} ${rep.tipo || ''}`.toLowerCase();
+          if (!haystack.includes(histSearch.toLowerCase().trim())) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion));
+  }, [existingReports, histTypeFilter, histSearch, gks]);
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto h-full overflow-y-auto custom-scrollbar">
-      
-      {/* Pestañas Superiores */}
-      <div className="flex justify-center mb-6">
-        <div className="flex bg-slate-200 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-300 dark:border-slate-700/60 shadow-inner">
-          <button onClick={() => setActiveTab('formulario')} className={`px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'formulario' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>
-            {informeEditId ? '✏️ Editando Informe' : '📝 Crear Informe'}
-          </button>
-          <button onClick={() => {setActiveTab('historial'); resetForm();}} className={`px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'historial' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>
-            📚 Historial
-          </button>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* CABECERA VISION OS + PESTAÑAS SEGMENTADAS EN CRISTAL */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
+            <FileText size={18} className="text-sky-400" /> Centro de Informes · Evaluación Técnica
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Seguimiento individual, torneos, scouting y exportación PDF · {completedCount} emitidos {draftsCount > 0 ? `· ${draftsCount} borradores` : ''}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="flex bg-black/30 p-1 rounded-full border border-white/15 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('formulario')}
+              className={`flex-1 sm:flex-initial px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${
+                activeTab === 'formulario'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              {informeEditId ? '✏️ Editando' : '📝 Nuevo Informe'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('historial'); resetForm(); }}
+              className={`flex-1 sm:flex-initial px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${
+                activeTab === 'historial'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              📚 Historial ({existingReports.length})
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* PESTAÑA HISTORIAL EN TARJETAS SCOUTING VISION OS */}
       {activeTab === 'historial' && (
-        <div className={`p-4 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm mb-12 animate-in fade-in slide-in-from-bottom-4`}>
-          <h2 className="text-xl sm:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white mb-6">Historial de Informes</h2>
-          {existingReports.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 font-bold uppercase tracking-widest">No hay informes guardados aún.</div>
+        <div className="space-y-5 mb-12 animate-in fade-in slide-in-from-bottom-4">
+          {/* Barra de Filtros y Buscador */}
+          <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {[{ id: 'todos', label: 'Todos' }, ...REPORT_TYPES_META].map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setHistTypeFilter(t.id)}
+                  className={`px-3.5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    histTypeFilter === t.id
+                      ? 'bg-[#142042] dark:bg-sky-500 text-white border-blue-400/40 shadow-md'
+                      : 'bg-white/80 dark:bg-slate-800/70 backdrop-blur-md border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-blue-950 dark:hover:text-white'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative md:w-64">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={histSearch}
+                onChange={(e) => setHistSearch(e.target.value)}
+                placeholder="Buscar por portero o rival..."
+                className="w-full bg-white/85 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200/80 dark:border-white/15 rounded-full pl-9 pr-4 py-2 text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:border-sky-400"
+              />
+            </div>
+          </div>
+
+          {filteredReports.length === 0 ? (
+            <div className={`text-center py-16 rounded-[2rem] border ${theme.border} ${theme.card}`}>
+              <FileText className="w-10 h-10 text-slate-400 mx-auto mb-3 opacity-60" />
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                No hay informes que coincidan con este filtro
+              </p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {existingReports.sort((a,b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion)).map(rep => {
-                const gk = gks.find(g => g.id === rep.gkId) || { name: 'Desconocido', photoUrl: '' };
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {filteredReports.map(rep => {
+                const gk = gks.find(g => g.id === rep.gkId) || { name: rep.gkName || 'Desconocido', photoUrl: '', team: '' };
                 const fParts = (rep.fecha || '').split('-');
-                const fStr = fParts.length === 3 ? `${fParts[2]}-${fParts[1]}-${fParts[0]}` : rep.fecha;
-                
+                const fStr = fParts.length === 3 ? `${fParts[2]}/${fParts[1]}/${fParts[0]}` : rep.fecha;
+                const meta = REPORT_TYPES_META.find(m => m.id === rep.tipo) || REPORT_TYPES_META[0];
+                const contextSub = rep.tipo === 'torneo' && rep.titulo
+                  ? rep.titulo
+                  : rep.tipo === 'partido' && rep.rival
+                    ? `vs ${rep.rival}`
+                    : (gk.team || 'Atlético de Madrid');
+
                 return (
-                  <div key={rep.id} className={`flex flex-col sm:flex-row justify-between sm:items-center p-4 rounded-2xl border ${rep.isDraft ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'} shadow-sm gap-4`}>
-                    <div className="flex items-center gap-3">
-                      <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-10 h-10 rounded-full border border-slate-300 object-cover" alt="" />
-                      <div>
-                        <div className="font-black text-sm text-blue-950 dark:text-white uppercase">{gk.name}</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{rep.tipo} • <span className="text-red-500 font-black">{fStr}</span></div>
+                  <div
+                    key={rep.id}
+                    className="rounded-[1.75rem] p-5 bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 hover:border-sky-300/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_14px_32px_rgba(7,11,24,0.32)] hover:-translate-y-0.5 transition-all flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-[#33589e] via-[#223d72] to-[#132347] border border-sky-300/35 overflow-hidden shrink-0 shadow-md">
+                        <img
+                          src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+                          className="w-full h-full object-cover"
+                          style={{ objectPosition: 'center 15%' }}
+                          alt=""
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${meta.badge}`}>
+                            {meta.label}
+                          </span>
+                          {rep.isDraft && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-[9px] font-black uppercase tracking-wider text-amber-200">
+                              Borrador
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="font-extrabold text-sm sm:text-base text-white truncate">
+                          {gk.name}
+                        </div>
+                        <div className="text-[11px] font-semibold text-slate-300 truncate mt-0.5">
+                          {contextSub} · <span className="text-sky-300 font-bold tabular-nums">{fStr}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 self-end sm:self-auto">
-                      {rep.isDraft && <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase flex items-center">Borrador</span>}
+
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {!rep.isDraft && (
-                        <button onClick={() => exportarInformePDFVectorial(gk, rep, darkMode, showNotification)} className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition-colors" title="Descargar PDF">
-                          <Download size={14} strokeWidth={3}/>
+                        <button
+                          onClick={() => exportarInformePDFVectorial(gk, rep, darkMode, showNotification)}
+                          className="w-9 h-9 rounded-full bg-sky-500/20 hover:bg-sky-500/40 border border-sky-400/35 text-sky-200 hover:text-white flex items-center justify-center transition-colors"
+                          title="Descargar PDF Oficial"
+                        >
+                          <Download size={15} />
                         </button>
                       )}
-                      <button onClick={() => handleEdit(rep)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-300 transition-colors" title="Editar">
-                        <Edit2 size={14} strokeWidth={3}/>
+                      <button
+                        onClick={() => handleEdit(rep)}
+                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 hover:text-white flex items-center justify-center transition-colors"
+                        title="Editar informe"
+                      >
+                        <Edit2 size={14} />
                       </button>
-                      <button onClick={() => onDelete(rep.id)} className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors" title="Borrar">
-                        <X size={14} strokeWidth={3}/>
+                      <button
+                        onClick={() => onDelete(rep.id)}
+                        className="w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/35 border border-red-400/25 text-red-300 hover:text-white flex items-center justify-center transition-colors"
+                        title="Eliminar informe"
+                      >
+                        <X size={15} />
                       </button>
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           )}
         </div>
       )}
 
+      {/* PESTAÑA FORMULARIO GENERADOR VISION OS */}
       {activeTab === 'formulario' && (
-        <div className={`p-4 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border ${theme.border} ${theme.card} shadow-sm mb-12 animate-in fade-in slide-in-from-bottom-4`}>
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/30 shrink-0">
-                <FileText size={24} className="text-blue-600 dark:text-blue-400" />
+        <div className={`p-5 sm:p-8 rounded-[2rem] border ${theme.border} ${theme.card} mb-12 animate-in fade-in slide-in-from-bottom-4`}>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6 pb-5 border-b border-slate-200/80 dark:border-white/10">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0 text-sky-600 dark:text-sky-400">
+                <FileText size={20} />
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white leading-none">Generador de Informes</h2>
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted} mt-1`}>Departamento de Porteros</p>
+                <h2 className="text-lg sm:text-xl font-black italic tracking-tight uppercase text-blue-950 dark:text-white leading-none">
+                  {informeEditId ? 'Edición de Informe Técnico' : 'Generador de Informes'}
+                </h2>
+                <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted} mt-1`}>
+                  Selecciona plantilla y portero para cumplimentar la evaluación
+                </p>
               </div>
             </div>
             {informeEditId && (
-               <button onClick={resetForm} className="text-xs font-bold text-red-500 hover:text-red-700 uppercase tracking-widest flex items-center gap-1">
-                 <X size={14}/> Cancelar Edición
-               </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/25 text-xs font-black text-red-600 dark:text-red-400 hover:bg-red-500/20 uppercase tracking-wider transition-colors"
+              >
+                <X size={13} /> Cancelar Edición
+              </button>
             )}
           </div>
 
           <form className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-900/20 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700/50">
+            {/* PANEL SUPERIOR: SELECTOR DE MODALIDAD + PORTERO EN CRISTAL AZUL */}
+            <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-lg space-y-5">
               <div>
-                <label className={labelClass}>Tipo de Informe</label>
-                <select value={tipoInforme} onChange={(e) => setTipoInforme(e.target.value)} className={`${inputClass} cursor-pointer font-bold text-blue-950 dark:text-blue-400`}>
-                  <option value="partido">📝 Informe de Partido (Completo)</option>
-                  <option value="semestral">📊 Informe Semestral</option>
-                  <option value="torneo">🏆 Informe de Torneo</option>
-                  <option value="flash">⚡ Informe Flash (Scouting)</option>
-                  <option value="objetivos">🎯 Seguimiento y Objetivos</option>
-                </select>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-sky-300 mb-2.5">
+                  1. Modalidad de Informe
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                  {REPORT_TYPES_META.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTipoInforme(t.id)}
+                      className={`px-3 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-wider border transition-all text-center ${
+                        tipoInforme === t.id
+                          ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white border-sky-300/50 shadow-md shadow-sky-500/25'
+                          : 'bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 border-white/10'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>1. Datos e Información de Portero *</label>
-                <select value={porteroSeleccionado} onChange={(e) => setPorteroSeleccionado(e.target.value)} className={`${inputClass} cursor-pointer font-bold`} required>
-                  <option value="">-- Seleccionar... --</option>
-                  {gks && gks.length > 0 ? gks.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()} ({g.team})</option>) : null}
-                </select>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center pt-2 border-t border-white/10">
+                <div className="md:col-span-8">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-sky-300 mb-2">
+                    2. Portero Evaluado *
+                  </label>
+                  <select
+                    value={porteroSeleccionado}
+                    onChange={(e) => setPorteroSeleccionado(e.target.value)}
+                    className="w-full bg-white/10 hover:bg-white/15 border border-white/20 focus:border-sky-400 rounded-2xl px-4 py-3 text-sm font-extrabold text-white outline-none cursor-pointer transition-colors"
+                    required
+                  >
+                    <option value="" className="text-slate-900">-- Seleccionar portero de la plantilla --</option>
+                    {gks && gks.length > 0 ? gks.map(g => (
+                      <option key={g.id} value={g.id} className="text-slate-900">
+                        {g.name.toUpperCase()} ({g.team})
+                      </option>
+                    )) : null}
+                  </select>
+                </div>
+
+                <div className="md:col-span-4">
+                  <div className="h-[52px] px-3.5 rounded-2xl bg-white/[0.06] border border-white/12 flex items-center gap-3">
+                    {selectedGkPreview ? (
+                      <>
+                        <img
+                          src={selectedGkPreview.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedGkPreview.name}`}
+                          className="w-9 h-9 rounded-xl object-cover border border-sky-400/40 shrink-0"
+                          style={{ objectPosition: 'center 15%' }}
+                          alt=""
+                        />
+                        <div className="min-w-0">
+                          <span className="block text-[11px] font-extrabold text-white truncate">{selectedGkPreview.name}</span>
+                          <span className="block text-[9px] font-bold uppercase tracking-wider text-sky-300 truncate">
+                            {selectedGkPreview.team} · #{selectedGkPreview.number || '-'}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-[11px] font-medium text-slate-400 italic">
+                        Ningún portero seleccionado
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="space-y-8 pb-10">
-              
+
               {/* ============================================================== */}
-              {/* SEGUIMIENTO DE OBJETIVOS (LISTA COMPLETA COLOREADA)            */}
+              {/* SEGUIMIENTO DE OBJETIVOS                                       */}
               {/* ============================================================== */}
               {tipoInforme === 'objetivos' && (
                 <div className="space-y-8">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div><label className={labelClass}>Fecha de Evaluación</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
-                    <div><label className={labelClass}>Título de la Planificación</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Objetivos Mes de Octubre" className={inputClass} required/></div>
+                    <div><label className={labelClass}>Título de la Planificación</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ej: Objetivos Mes de Noviembre" className={inputClass} required/></div>
                   </div>
 
-                  <div className="flex flex-wrap justify-center gap-4 bg-slate-100 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-600"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">1-2: Inc. Inconsciente</span></div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-orange-500"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">3: Inc. Consciente</span></div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-400"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">4: Comp. Consciente</span></div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-600"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">5: Comp. Inconsciente</span></div>
+                  <div className="flex flex-wrap justify-center gap-4 bg-white/70 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200/80 dark:border-white/10">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-600"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">1-2: Inc. Inconsciente</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-orange-500"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">3: Inc. Consciente</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-400"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">4: Comp. Consciente</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500"></div><span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">5: Comp. Inconsciente</span></div>
                   </div>
 
                   <div>
                     <h3 className={sectionTitleClass}>🛡️ Acciones Defensivas</h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                       {renderColoredRadioGroup('objDefBlocajeFrontal', 'Blocaje Frontales Medio y Raso')}
-                       {renderColoredRadioGroup('objDefBlocajeLatRaso', 'Blocaje lateral raso')}
-                       {renderColoredRadioGroup('objDefBlocajeLatMed', 'Blocaje lateral media altura')}
-                       {renderColoredRadioGroup('objDefDesvioRaso', 'Desvío raso')}
-                       {renderColoredRadioGroup('objDefDesvioMed', 'Desvío a Media Altura')}
-                       {renderColoredRadioGroup('objDefReduccion', 'Reducción de espacios y Posición Cruz')}
-                       {renderColoredRadioGroup('objDefApertura', 'Apertura')}
-                       {renderColoredRadioGroup('objDefReincorp', 'Reincorporaciones')}
-                       {renderColoredRadioGroup('objDefBlocajeAereo', 'Blocaje Aéreo')}
-                       {renderColoredRadioGroup('objDefDespeje', 'Despeje de Puños')}
+                      {renderColoredRadioGroup('objDefBlocajeFrontal', 'Blocaje Frontales Medio y Raso')}
+                      {renderColoredRadioGroup('objDefBlocajeLatRaso', 'Blocaje lateral raso')}
+                      {renderColoredRadioGroup('objDefBlocajeLatMed', 'Blocaje lateral media altura')}
+                      {renderColoredRadioGroup('objDefDesvioRaso', 'Desvío raso')}
+                      {renderColoredRadioGroup('objDefDesvioMed', 'Desvío a Media Altura')}
+                      {renderColoredRadioGroup('objDefReduccion', 'Reducción de espacios y Posición Cruz')}
+                      {renderColoredRadioGroup('objDefApertura', 'Apertura')}
+                      {renderColoredRadioGroup('objDefReincorp', 'Reincorporaciones')}
+                      {renderColoredRadioGroup('objDefBlocajeAereo', 'Blocaje Aéreo')}
+                      {renderColoredRadioGroup('objDefDespeje', 'Despeje de Puños')}
                     </div>
                   </div>
 
                   <div>
                     <h3 className={sectionTitleClass}>⚔️ Acciones Ofensivas</h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                       {renderColoredRadioGroup('objOfPaseManoRaso', 'Pase mano raso')}
-                       {renderColoredRadioGroup('objOfPaseManoAlto', 'Pase mano alto')}
-                       {renderColoredRadioGroup('objOfPaseManoPicado', 'Pase mano picado')}
-                       {renderColoredRadioGroup('objOfPerfilamiento', 'Perfilamiento y Controles')}
-                       {renderColoredRadioGroup('objOfPaseRasoPie', 'Pase Raso con el Pie')}
-                       {renderColoredRadioGroup('objOfPaseAltoPie', 'Pase alto con el Pie')}
-                       {renderColoredRadioGroup('objOfVoleas', 'Voleas')}
+                      {renderColoredRadioGroup('objOfPaseManoRaso', 'Pase mano raso')}
+                      {renderColoredRadioGroup('objOfPaseManoAlto', 'Pase mano alto')}
+                      {renderColoredRadioGroup('objOfPaseManoPicado', 'Pase mano picado')}
+                      {renderColoredRadioGroup('objOfPerfilamiento', 'Perfilamiento y Controles')}
+                      {renderColoredRadioGroup('objOfPaseRasoPie', 'Pase Raso con el Pie')}
+                      {renderColoredRadioGroup('objOfPaseAltoPie', 'Pase alto con el Pie')}
+                      {renderColoredRadioGroup('objOfVoleas', 'Voleas')}
                     </div>
                   </div>
 
@@ -6744,49 +7085,47 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
               )}
 
               {/* ============================================================== */}
-              {/* INFORME DE PARTIDO (MODIFICADO PARA EXPERIENCIA ÁGIL UX)       */}
+              {/* INFORME DE PARTIDO                                             */}
               {/* ============================================================== */}
               {tipoInforme === 'partido' && (
                 <div className="space-y-10">
                   <div>
                     <h3 className={sectionTitleClass}>01 y 02 — Datos del Partido y Portero</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                       <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
-                      <div><label className={labelClass}>Rival</label><input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid" className={inputClass} required/></div>
-                      <div><label className={labelClass}>Competición</label><input type="text" name="partidoCompeticion" value={formData.partidoCompeticion} onChange={handleChange} placeholder="Ej: Liga Autonómica" className={inputClass} /></div>
+                      <div><label className={labelClass}>Rival</label><input type="text" name="rival" value={formData.rival} onChange={handleChange} placeholder="Ej: Real Madrid 'A'" className={inputClass} required/></div>
+                      <div><label className={labelClass}>Competición</label><input type="text" name="partidoCompeticion" value={formData.partidoCompeticion} onChange={handleChange} placeholder="Ej: División de Honor" className={inputClass} /></div>
                       <div><label className={labelClass}>Jornada</label><input type="text" name="partidoJornada" value={formData.partidoJornada} onChange={handleChange} placeholder="Ej: 14" className={inputClass} /></div>
-                      
+
                       <div><label className={labelClass}>Resultado</label><input type="text" name="partidoResultado" value={formData.partidoResultado} onChange={handleChange} placeholder="ATM 2 - 1 RIV" className={inputClass} /></div>
-                      <div><label className={labelClass}>Nota Global (0-10)</label><input type="number" step="0.1" name="nota" value={formData.nota} onChange={handleChange} placeholder="Ej: 8.5" className={`${inputClass} font-black text-red-600`} /></div>
-                      
+                      <div><label className={labelClass}>Nota Global (0-10)</label><input type="number" step="0.1" name="nota" value={formData.nota} onChange={handleChange} placeholder="Ej: 8.5" className={`${inputClass} font-black text-red-600 dark:text-rose-400`} /></div>
+
                       <div className="col-span-2 flex gap-4">
-                         <div className="flex-1">
-                            <label className={labelClass}>Condición</label>
-                            <select name="partidoTitular" value={formData.partidoTitular} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
-                              <option value="Titular">Titular</option>
-                              <option value="Suplente">Suplente</option>
-                            </select>
-                         </div>
-                         <div className="flex-1">
-                            <label className={labelClass}>Minutos Jugados</label>
-                            <input type="number" name="partidoMinutos" value={formData.partidoMinutos} onChange={handleChange} placeholder="Ej: 90" className={inputClass} />
-                         </div>
+                        <div className="flex-1">
+                          <label className={labelClass}>Condición</label>
+                          <select name="partidoTitular" value={formData.partidoTitular} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
+                            <option value="Titular">Titular</option>
+                            <option value="Suplente">Suplente</option>
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className={labelClass}>Minutos Jugados</label>
+                          <input type="number" name="partidoMinutos" value={formData.partidoMinutos} onChange={handleChange} placeholder="Ej: 50" className={inputClass} />
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-4 mt-8">
-                       <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">⚡ Nivel 1 — Registro Rápido (En Partido)</h3>
-                    </div>
+                    <h3 className={sectionTitleClass}>⚡ Nivel 1 — Registro Rápido de Acciones</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[{ id: 'statParadas', label: 'Paradas' }, { id: 'statSalidas', label: 'Salidas' }, { id: 'statCentros', label: 'Centros' }, { id: 'statPases', label: 'Pases' }, { id: 'stat1v1', label: '1 vs 1' }, { id: 'statABP', label: 'A.B.P.' }, { id: 'statErrores', label: 'Errores' }, { id: 'statGoles', label: 'Goles Rec.' }].map(stat => (
-                        <div key={stat.id} className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-3 flex flex-col items-center border border-slate-200 dark:border-slate-700">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{stat.label}</span>
+                        <div key={stat.id} className="bg-white/75 dark:bg-slate-900/55 backdrop-blur-md rounded-2xl p-3.5 flex flex-col items-center border border-slate-200/80 dark:border-white/10 shadow-xs">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">{stat.label}</span>
                           <div className="flex items-center gap-3 w-full justify-center">
-                            <div onClick={() => handleCounter(stat.id, -1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 cursor-pointer hover:bg-red-100 hover:text-red-600 select-none shadow-sm">-</div>
-                            <span className="text-xl font-black text-blue-950 dark:text-white w-8 text-center">{formData[stat.id]}</span>
-                            <div onClick={() => handleCounter(stat.id, 1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 cursor-pointer hover:bg-emerald-100 hover:text-emerald-600 select-none shadow-sm">+</div>
+                            <button type="button" onClick={() => handleCounter(stat.id, -1)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-slate-600 dark:text-slate-300 hover:bg-red-500 hover:text-white transition-colors">-</button>
+                            <span className="text-xl font-black text-blue-950 dark:text-white w-8 text-center tabular-nums">{formData[stat.id]}</span>
+                            <button type="button" onClick={() => handleCounter(stat.id, 1)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-500 hover:text-white transition-colors">+</button>
                           </div>
                         </div>
                       ))}
@@ -6795,56 +7134,55 @@ function ModuleInformes({ gks, theme, darkMode, onSave, onDelete, existingReport
 
                   <div>
                     <h3 className={sectionTitleClass}>04 al 12 — Análisis Específico Post-Partido</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       {renderPartidoField('04', 'Paradas Relevantes', 'valParadas', 'obsParadas', 'radio', ['Sí', 'No'])}
-                       {renderPartidoField('05', 'Goles Recibidos', 'valGoles', 'obsGoles', 'select', [...Array(16).keys()])}
-                       {renderPartidoField('06', 'Juego Aéreo', 'valAereo', 'obsAereo', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
-                       {renderPartidoField('07', 'Juego con los Pies', 'valPies', 'obsPies', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
-                       {renderPartidoField('08', 'Fuera del Área', 'valFueraArea', 'obsFueraArea', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
-                       {renderPartidoField('09', '1 VS 1', 'val1v1', 'obs1v1', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
-                       {renderPartidoField('10', 'A.B.P.', 'valABP', 'obsABP', 'radio', ['Bien ejecutado', 'Mal ejecutado', 'Bien posic. barrera', 'Mal posic. barrera'])}
-                       {renderPartidoField('11', 'Comunicación / Org.', 'valComunicacion', 'obsComunicacion', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
-                       
-                       <div className="col-span-1 md:col-span-2">
-                         {renderPartidoField('12', 'Aspecto Mental', 'valMental', 'obsMental', 'radio', ['Fuerte', 'Normal', 'Débil'])}
-                       </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {renderPartidoField('04', 'Paradas Relevantes', 'valParadas', 'obsParadas', 'radio', ['Sí', 'No'])}
+                      {renderPartidoField('05', 'Goles Recibidos', 'valGoles', 'obsGoles', 'select', [...Array(16).keys()])}
+                      {renderPartidoField('06', 'Juego Aéreo', 'valAereo', 'obsAereo', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                      {renderPartidoField('07', 'Juego con los Pies', 'valPies', 'obsPies', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                      {renderPartidoField('08', 'Fuera del Área', 'valFueraArea', 'obsFueraArea', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                      {renderPartidoField('09', '1 VS 1', 'val1v1', 'obs1v1', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+                      {renderPartidoField('10', 'A.B.P.', 'valABP', 'obsABP', 'radio', ['Bien ejecutado', 'Mal ejecutado', 'Bien posic. barrera', 'Mal posic. barrera'])}
+                      {renderPartidoField('11', 'Comunicación / Org.', 'valComunicacion', 'obsComunicacion', 'radio', ['Bien ejecutado', 'Mal ejecutado'])}
+
+                      <div className="col-span-1 md:col-span-2">
+                        {renderPartidoField('12', 'Aspecto Mental', 'valMental', 'obsMental', 'radio', ['Fuerte', 'Normal', 'Débil'])}
+                      </div>
                     </div>
                   </div>
 
                   <div>
                     <h3 className={sectionTitleClass}>13 al 15 — Datos Adicionales y Cronología</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       
-                       <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-4">
-                         <label className={labelClass}>13 - Cronología de Acciones</label>
-                         <div className="space-y-3">
-                           {(formData.partidoCronologiaList || []).map((crono) => (
-                             <div key={crono.id} className="flex gap-2 items-start">
-                               <select 
-                                 value={crono.minuto} 
-                                 onChange={(e) => updateCronologia(crono.id, 'minuto', e.target.value)}
-                                 className={`${inputClass} !py-2.5 !w-32 font-bold !text-xs cursor-pointer`}
-                               >
-                                 {cronoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                               </select>
-                               <input 
-                                 type="text" 
-                                 value={crono.accion} 
-                                 onChange={(e) => updateCronologia(crono.id, 'accion', e.target.value)}
-                                 placeholder="Descripción..."
-                                 className={`${inputClass} !py-2.5 flex-1 !text-xs`}
-                               />
-                               <button type="button" onClick={() => removeCronologia(crono.id)} className="w-10 h-10 flex shrink-0 items-center justify-center bg-red-100 text-red-600 hover:bg-red-200 rounded-xl transition-colors"><X size={16}/></button>
-                             </div>
-                           ))}
-                           <button type="button" onClick={addCronologia} className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 font-bold text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm">+ Añadir Acción</button>
-                         </div>
-                       </div>
+                      <div className="bg-white/70 dark:bg-slate-900/50 backdrop-blur-md p-6 rounded-[1.75rem] border border-slate-200/80 dark:border-white/10 flex flex-col gap-4">
+                        <label className={labelClass}>13 — Cronología de Acciones</label>
+                        <div className="space-y-3">
+                          {(formData.partidoCronologiaList || []).map((crono) => (
+                            <div key={crono.id} className="flex gap-2 items-start">
+                              <select
+                                value={crono.minuto}
+                                onChange={(e) => updateCronologia(crono.id, 'minuto', e.target.value)}
+                                className={`${inputClass} !py-2.5 !w-32 font-bold !text-xs cursor-pointer`}
+                              >
+                                {cronoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                              <input
+                                type="text"
+                                value={crono.accion}
+                                onChange={(e) => updateCronologia(crono.id, 'accion', e.target.value)}
+                                placeholder="Descripción..."
+                                className={`${inputClass} !py-2.5 flex-1 !text-xs`}
+                              />
+                              <button type="button" onClick={() => removeCronologia(crono.id)} className="w-10 h-10 flex shrink-0 items-center justify-center bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-colors"><X size={16}/></button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={addCronologia} className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl text-slate-500 dark:text-slate-300 font-black text-xs uppercase tracking-widest hover:border-sky-400 hover:text-sky-500 transition-colors">+ Añadir Acción</button>
+                        </div>
+                      </div>
 
-                       <div className="flex flex-col gap-6">
-                         <div><label className={labelClass}>14 - Enlaces a Vídeos</label><textarea name="partidoVideos" value={formData.partidoVideos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="https://..." /></div>
-                         <div><label className={labelClass}>15 - Comparativa (Opcional)</label><textarea name="partidoComparativa" value={formData.partidoComparativa} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
-                       </div>
+                      <div className="flex flex-col gap-6">
+                        <div><label className={labelClass}>14 — Enlaces a Vídeos</label><textarea name="partidoVideos" value={formData.partidoVideos} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="https://..." /></div>
+                        <div><label className={labelClass}>15 — Comparativa (Opcional)</label><textarea name="partidoComparativa" value={formData.partidoComparativa} onChange={handleChange} rows="3" className={`${inputClass} resize-y`} placeholder="..." /></div>
+                      </div>
                     </div>
                   </div>
 
