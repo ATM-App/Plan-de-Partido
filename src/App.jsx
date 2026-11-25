@@ -1399,99 +1399,568 @@ const exportarInformePDFVectorial = async (gk, informe, darkMode, showNotificati
 };
 
 // ==========================================
-// GENERADOR DE BRIEFING MATCHDAY PDF
+// GENERADOR PDF "DESCARGAR JORNADA" (TARJETAS DE PARTIDO VISION OS HD)
 // ==========================================
 const exportarBriefingPDF = async (matches, rivals, gks, showNotification) => {
   try {
-    if (showNotification) showNotification("Generando Briefing Matchday...", "success");
-    const jspdfModule = await loadJsPDF();
-    const doc = new jspdfModule.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await loadCustomFonts(doc);
+    if (!matches || matches.length === 0) {
+      if (showNotification) showNotification("No hay próximos partidos programados en la jornada", "error");
+      return;
+    }
+    if (showNotification) showNotification("Generando Cartelera de Jornada en alta definición...", "success");
 
-    const safeImgLoad = (url) => new Promise(resolve => {
-        if(!url) return resolve(null);
-        const img = new Image(); img.crossOrigin = "Anonymous";
-        img.onload = () => {
-          const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-          canvas.getContext('2d').drawImage(img, 0, 0); resolve(canvas.toDataURL('image/png'));
-        };
-        img.onerror = () => resolve(null); img.src = url;
+    const jspdfModule = await loadJsPDF();
+    const doc = new jspdfModule.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    // Filtrar los partidos de la próxima jornada (ventana de 6 días desde el primer encuentro próximo)
+    const parseD = (dStr) => {
+      const [y, mo, da] = (dStr || '').split('-').map(Number);
+      return new Date(y || 2026, (mo || 1) - 1, da || 1).getTime();
+    };
+    let jornadaMatches = [...matches];
+    if (jornadaMatches.length > 4) {
+      const firstT = parseD(jornadaMatches[0].date);
+      const windowMatches = jornadaMatches.filter(m => (parseD(m.date) - firstT) <= 6 * 24 * 60 * 60 * 1000);
+      if (windowMatches.length > 0) jornadaMatches = windowMatches;
+    }
+
+    // Cargador seguro de imágenes para Canvas (evita bloqueos CORS)
+    const safeLoadCanvasImg = (url) => new Promise((resolve) => {
+      if (!url) return resolve(null);
+      const img = new Image();
+      if (!String(url).startsWith('data:')) img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const tc = document.createElement('canvas');
+          tc.width = 1; tc.height = 1;
+          tc.getContext('2d').drawImage(img, 0, 0, 1, 1);
+          tc.toDataURL('image/png');
+          resolve(img);
+        } catch (err) {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
     });
 
-    const atletiShieldB64 = await safeImgLoad(ESCUDO_ATM_URL);
+    const atmShieldImg = await safeLoadCanvasImg(ESCUDO_ATM_URL);
 
-    const pageWidth = 210; const pageHeight = 297;
-    let currentY = 0;
+    // Pre-cargar escudos rivales y fotos de porteros convocados
+    const rivalImgMap = new Map();
+    const gkImgMap = new Map();
+    await Promise.all([
+      ...jornadaMatches.map(async (m) => {
+        const r = rivals.find(rv => rv.id === m.rivalId);
+        if (r?.shieldUrl && !rivalImgMap.has(r.id)) {
+          rivalImgMap.set(r.id, await safeLoadCanvasImg(r.shieldUrl));
+        }
+      }),
+      ...(gks || []).map(async (gk) => {
+        const src = gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(gk.name || 'GK')}`;
+        gkImgMap.set(gk.id, await safeLoadCanvasImg(src));
+      })
+    ]);
 
-    const drawHeader = () => {
-        doc.setFillColor(11, 19, 43); // Deep Navy
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        doc.setFillColor(220, 38, 38);
-        doc.rect(0, 0, pageWidth, 40, 'F');
-        if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', 15, 8, 24, 24);
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(28); doc.setFont("Roboto", "bolditalic");
-        doc.text("MATCHDAY BRIEFING", 45, 22);
-        doc.setFontSize(10); doc.setFont("Roboto", "bold");
-        doc.text(`DEPARTAMENTO DE PORTEROS • ATLÉTICO DE MADRID`, 45, 28);
-        currentY = 55;
+    const fontStack = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+    const roundRectPath = (ctx, x, y, w, h, r) => {
+      const rad = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rad, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rad);
+      ctx.arcTo(x + w, y + h, x, y + h, rad);
+      ctx.arcTo(x, y + h, x, y, rad);
+      ctx.arcTo(x, y, x + w, y, rad);
+      ctx.closePath();
     };
 
-    drawHeader();
+    const drawContainedImg = (ctx, img, bx, by, bw, bh) => {
+      if (!img || !img.width || !img.height) return;
+      const scale = Math.min(bw / img.width, bh / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+    };
 
-    if (!matches || matches.length === 0) {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(14);
-        doc.text("No hay partidos programados en los próximos días.", pageWidth/2, 100, {align: 'center'});
-        doc.save('BRIEFING_MATCHDAY.pdf');
-        return;
+    const drawGkAvatarCircle = (ctx, img, fallbackName, cx, cy, r, isStarter) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = '#1e293b';
+      ctx.fill();
+      ctx.clip();
+
+      if (img && img.width && img.height) {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = Math.max(0, (img.height - side) * 0.12);
+        ctx.drawImage(img, sx, sy, side, side, cx - r, cy - r, r * 2, r * 2);
+      } else {
+        ctx.fillStyle = '#272E61';
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `900 ${Math.round(r * 0.8)}px ${fontStack}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const initials = String(fallbackName || 'GK').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+        ctx.fillText(initials, cx, cy + 1);
+      }
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = isStarter ? '#34d399' : '#ffffff';
+      ctx.stroke();
+    };
+
+    const truncateText = (ctx, text, maxW) => {
+      const str = String(text || '');
+      if (ctx.measureText(str).width <= maxW) return str;
+      let s = str;
+      while (s.length > 1 && ctx.measureText(s + '…').width > maxW) {
+        s = s.slice(0, -1);
+      }
+      return s + '…';
+    };
+
+    const wrapTwoLines = (ctx, text, maxW) => {
+      const words = String(text || '').split(/\s+/).filter(Boolean);
+      if (words.length === 0) return ['RIVAL'];
+      let line1 = '';
+      let idx = 0;
+      while (idx < words.length) {
+        const test = line1 ? `${line1} ${words[idx]}` : words[idx];
+        if (ctx.measureText(test).width <= maxW || !line1) {
+          line1 = test;
+          idx++;
+        } else {
+          break;
+        }
+      }
+      if (idx >= words.length) return [truncateText(ctx, line1, maxW)];
+      const rest = words.slice(idx).join(' ');
+      return [line1, truncateText(ctx, rest, maxW)];
+    };
+
+    const shortGkName = (full = '') => {
+      const parts = String(full).trim().split(/\s+/).filter(Boolean);
+      return parts[0] || 'Portero';
+    };
+
+    // Paginar de 4 en 4 tarjetas (Grid 2x2 idéntico a la vista de Partidos)
+    const perPage = 4;
+    const totalPages = Math.ceil(jornadaMatches.length / perPage);
+    const firstDateLabel = formatDate(jornadaMatches[0]?.date);
+    const lastDateLabel = formatDate(jornadaMatches[jornadaMatches.length - 1]?.date);
+    const dateRangeText = firstDateLabel === lastDateLabel ? firstDateLabel : `${firstDateLabel} — ${lastDateLabel}`;
+
+    for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+      if (pageIdx > 0) doc.addPage();
+
+      const W = 2376; // 297mm * 8px
+      const H = 1680; // 210mm * 8px
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // 1. Fondo visionOS luminoso con halos corporativos suaves
+      ctx.fillStyle = '#F2F5FC';
+      ctx.fillRect(0, 0, W, H);
+
+      const glow1 = ctx.createRadialGradient(350, 200, 40, 350, 200, 850);
+      glow1.addColorStop(0, 'rgba(203, 53, 36, 0.09)');
+      glow1.addColorStop(1, 'rgba(203, 53, 36, 0)');
+      ctx.fillStyle = glow1;
+      ctx.fillRect(0, 0, W, H);
+
+      const glow2 = ctx.createRadialGradient(W - 350, H - 250, 40, W - 350, H - 250, 900);
+      glow2.addColorStop(0, 'rgba(39, 46, 97, 0.11)');
+      glow2.addColorStop(1, 'rgba(39, 46, 97, 0)');
+      ctx.fillStyle = glow2;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. Cabecera Corporativa Atlético de Madrid
+      const hx = 76, hy = 54, hw = W - 152, hh = 188;
+      ctx.save();
+      ctx.shadowColor = 'rgba(25, 36, 82, 0.22)';
+      ctx.shadowBlur = 28;
+      ctx.shadowOffsetY = 10;
+      roundRectPath(ctx, hx, hy, hw, hh, 38);
+      const hGrad = ctx.createLinearGradient(hx, hy, hx + hw, hy + hh);
+      hGrad.addColorStop(0, '#B52421');
+      hGrad.addColorStop(0.48, '#272E61');
+      hGrad.addColorStop(1, '#213C8C');
+      ctx.fillStyle = hGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // Medallón Escudo ATM en Cabecera
+      roundRectPath(ctx, hx + 36, hy + 30, 128, 128, 30);
+      const pearlHead = ctx.createLinearGradient(0, hy + 30, 0, hy + 158);
+      pearlHead.addColorStop(0, '#FFFFFF');
+      pearlHead.addColorStop(1, '#E2E8F0');
+      ctx.fillStyle = pearlHead;
+      ctx.fill();
+      if (atmShieldImg) drawContainedImg(ctx, atmShieldImg, hx + 52, hy + 46, 96, 96);
+
+      // Títulos Cabecera
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `italic 900 44px ${fontStack}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('CARTELERA DE JORNADA · PLAN DE PARTIDO', hx + 192, hy + 98);
+
+      ctx.fillStyle = 'rgba(219, 234, 254, 0.9)';
+      ctx.font = `800 20px ${fontStack}`;
+      ctx.fillText('DEPARTAMENTO DE PORTEROS  ·  CLUB ATLÉTICO DE MADRID', hx + 194, hy + 140);
+
+      // Píldora Derecha con Fecha y Total de Partidos
+      const badgeW = 420, badgeH = 104;
+      const bx = hx + hw - badgeW - 36, by = hy + (hh - badgeH) / 2;
+      roundRectPath(ctx, bx, by, badgeW, badgeH, 26);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.13)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.stroke();
+
+      ctx.fillStyle = '#BAE6FD';
+      ctx.font = `900 17px ${fontStack}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`JORNADA · ${jornadaMatches.length} PARTIDOS`, bx + badgeW / 2, by + 40);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 26px ${fontStack}`;
+      ctx.fillText(dateRangeText, bx + badgeW / 2, by + 78);
+
+      // 3. Dibujar Tarjetas de Partidos (Grid 2x2 idéntico a MatchScoreboardCard)
+      const slice = jornadaMatches.slice(pageIdx * perPage, (pageIdx + 1) * perPage);
+      const cardW = 1084;
+      const cardH = 626;
+      const gapX = 56;
+      const gapY = 38;
+      const startX = 76;
+      const startY = 278;
+
+      slice.forEach((m, idx) => {
+        const col = idx % 2;
+        const row = Math.floor(idx / 2);
+        const cx = startX + col * (cardW + gapX);
+        const cy = startY + row * (cardH + gapY);
+
+        const rival = rivals.find(rv => rv.id === m.rivalId);
+        const rivalShieldImg = rival ? rivalImgMap.get(rival.id) : null;
+        const rivalDisplayName = getMatchRivalName(rival, m).toUpperCase();
+        const convocados = (gks || []).filter(gk => m.goalkeeperIds?.includes(gk.id));
+        const hasScore = String(m.goalsMyTeam ?? '').trim() !== '' && String(m.goalsRival ?? '').trim() !== '';
+
+        // Sombra exterior de la tarjeta
+        ctx.save();
+        ctx.shadowColor = 'rgba(25, 36, 82, 0.22)';
+        ctx.shadowBlur = 26;
+        ctx.shadowOffsetY = 10;
+        roundRectPath(ctx, cx, cy, cardW, cardH, 42);
+        const cGrad = ctx.createLinearGradient(cx, cy, cx + cardW, cy + cardH);
+        cGrad.addColorStop(0, '#2E428E');
+        cGrad.addColorStop(0.54, '#272E61');
+        cGrad.addColorStop(1, '#1F295C');
+        ctx.fillStyle = cGrad;
+        ctx.fill();
+        ctx.restore();
+
+        // Recorte interior de la tarjeta
+        ctx.save();
+        roundRectPath(ctx, cx, cy, cardW, cardH, 42);
+        ctx.clip();
+
+        // Brillo radial superior
+        const topGlow = ctx.createRadialGradient(cx + cardW / 2, cy, 10, cx + cardW / 2, cy, 420);
+        topGlow.addColorStop(0, 'rgba(56, 189, 248, 0.16)');
+        topGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = topGlow;
+        ctx.fillRect(cx, cy, cardW, 260);
+
+        // Barra superior de competición
+        const topBarH = 82;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(cx, cy, cardW, topBarH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + topBarH);
+        ctx.lineTo(cx + cardW, cy + topBarH);
+        ctx.stroke();
+
+        let compTextX = cx + 32;
+        if (m.matchday) {
+          const jLabel = `J${m.matchday}`;
+          ctx.font = `900 19px ${fontStack}`;
+          const jW = Math.max(58, ctx.measureText(jLabel).width + 28);
+          roundRectPath(ctx, compTextX, cy + 22, jW, 38, 12);
+          ctx.fillStyle = 'rgba(14, 165, 233, 0.25)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#7DD3FC';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(jLabel, compTextX + jW / 2, cy + 42);
+          compTextX += jW + 16;
+        }
+
+        // Etiqueta derecha Local / Visitante / Sede
+        const locType = m.locationType || 'Local';
+        const locColors = locType === 'Visitante'
+          ? { bg: 'rgba(14,165,233,0.2)', border: 'rgba(56,189,248,0.4)', text: '#7DD3FC' }
+          : locType === 'Sede'
+            ? { bg: 'rgba(245,158,11,0.2)', border: 'rgba(251,191,36,0.4)', text: '#FCD34D' }
+            : { bg: 'rgba(16,185,129,0.2)', border: 'rgba(52,211,153,0.4)', text: '#6EE7B7' };
+        ctx.font = `900 17px ${fontStack}`;
+        const locW = ctx.measureText(locType.toUpperCase()).width + 34;
+        const locX = cx + cardW - locW - 30;
+        roundRectPath(ctx, locX, cy + 23, locW, 36, 18);
+        ctx.fillStyle = locColors.bg;
+        ctx.fill();
+        ctx.strokeStyle = locColors.border;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = locColors.text;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(locType.toUpperCase(), locX + locW / 2, cy + 42);
+
+        // Nombre de Competición + Grupo
+        ctx.fillStyle = '#E2E8F0';
+        ctx.font = `800 20px ${fontStack}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        const compStr = `${m.league || 'COMPETICIÓN'}${m.group ? ` · ${m.group}` : ''}`.toUpperCase();
+        ctx.fillText(truncateText(ctx, compStr, locX - compTextX - 20), compTextX, cy + 42);
+
+        // Píldora Central de Campo + Fecha
+        const fieldStr = (m.field || 'CAMPO POR DEFINIR').toUpperCase();
+        const dateStr = formatDate(m.date);
+        ctx.font = `800 19px ${fontStack}`;
+        const cleanField = truncateText(ctx, fieldStr, 460);
+        const pillText = `${cleanField}   ·   ${dateStr}`;
+        const venuePillW = Math.min(cardW - 90, ctx.measureText(pillText).width + 78);
+        const venuePillX = cx + (cardW - venuePillW) / 2;
+        const venuePillY = cy + 104;
+
+        roundRectPath(ctx, venuePillX, venuePillY, venuePillW, 50, 25);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Punto esmeralda indicador de sede + texto
+        ctx.beginPath();
+        ctx.arc(venuePillX + 28, venuePillY + 25, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#34D399';
+        ctx.fill();
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#F1F5F9';
+        ctx.font = `800 19px ${fontStack}`;
+        ctx.fillText(cleanField, venuePillX + 46, venuePillY + 26);
+        const fieldMeasured = ctx.measureText(cleanField).width;
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillText(' · ', venuePillX + 46 + fieldMeasured, venuePillY + 26);
+        const sepMeasured = ctx.measureText(' · ').width;
+        ctx.fillStyle = '#7DD3FC';
+        ctx.font = `900 19px ${fontStack}`;
+        ctx.fillText(dateStr, venuePillX + 46 + fieldMeasured + sepMeasured, venuePillY + 26);
+
+        // BLOQUE CENTRAL: MI EQUIPO vs HORA/MARCADOR vs RIVAL
+        const medSize = 152;
+        const medY = cy + 188;
+        const leftCenterX = cx + 225;
+        const rightCenterX = cx + cardW - 225;
+        const midCenterX = cx + cardW / 2;
+
+        const drawPearlMedallion = (centerX, topY) => {
+          const mx = centerX - medSize / 2;
+          // Halo exterior cristal
+          roundRectPath(ctx, mx - 7, topY - 7, medSize + 14, medSize + 14, 38);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.fill();
+
+          // Medallón perla
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.32)';
+          ctx.shadowBlur = 18;
+          ctx.shadowOffsetY = 6;
+          roundRectPath(ctx, mx, topY, medSize, medSize, 32);
+          const pGrad = ctx.createLinearGradient(0, topY, 0, topY + medSize);
+          pGrad.addColorStop(0, '#FFFFFF');
+          pGrad.addColorStop(1, '#E2E8F0');
+          ctx.fillStyle = pGrad;
+          ctx.fill();
+          ctx.restore();
+        };
+
+        // Medallón Izquierdo (Atleti)
+        drawPearlMedallion(leftCenterX, medY);
+        if (atmShieldImg) {
+          drawContainedImg(ctx, atmShieldImg, leftCenterX - 56, medY + 20, 112, 112);
+        }
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `900 24px ${fontStack}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(truncateText(ctx, (m.myTeam || 'ATLETI').toUpperCase(), 310), leftCenterX, medY + medSize + 22);
+
+        // Cápsula Central (Hora o Resultado)
+        const boxW = 224, boxH = 104;
+        const boxX = midCenterX - boxW / 2, boxY = medY + 24;
+        roundRectPath(ctx, boxX, boxY, boxW, boxH, 28);
+        ctx.fillStyle = hasScore ? 'rgba(15, 23, 42, 0.48)' : 'rgba(255, 255, 255, 0.13)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `900 46px ${fontStack}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hasScore ? `${m.goalsMyTeam} - ${m.goalsRival}` : (m.time || '--:--'), midCenterX, boxY + boxH / 2 + 2);
+
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.85)';
+        ctx.font = `900 16px ${fontStack}`;
+        ctx.textBaseline = 'top';
+        ctx.fillText(hasScore ? 'RESULTADO' : 'HORA', midCenterX, boxY + boxH + 16);
+
+        // Medallón Derecho (Rival)
+        drawPearlMedallion(rightCenterX, medY);
+        if (rivalShieldImg) {
+          drawContainedImg(ctx, rivalShieldImg, rightCenterX - 56, medY + 20, 112, 112);
+        } else {
+          ctx.fillStyle = '#64748B';
+          ctx.font = `900 32px ${fontStack}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('VS', rightCenterX, medY + medSize / 2);
+        }
+
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = `900 22px ${fontStack}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const rivalLines = wrapTwoLines(ctx, rivalDisplayName, 320);
+        rivalLines.forEach((ln, lIdx) => {
+          ctx.fillText(ln, rightCenterX, medY + medSize + 20 + lIdx * 27);
+        });
+
+        // FOOTER INFERIOR: PORTEROS CONVOCADOS + RACHA RIVAL
+        const footH = 104;
+        const footY = cy + cardH - footH;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+        ctx.fillRect(cx, footY, cardW, footH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, footY);
+        ctx.lineTo(cx + cardW, footY);
+        ctx.stroke();
+
+        const footMidY = footY + footH / 2;
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = `900 17px ${fontStack}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PORTEROS', cx + 34, footMidY);
+
+        if (convocados.length > 0) {
+          let avX = cx + 168;
+          convocados.slice(0, 3).forEach((gk) => {
+            const isStarter = m.gkStarter?.[gk.id] === true || String(m.gkStarter?.[gk.id]) === 'true';
+            drawGkAvatarCircle(ctx, gkImgMap.get(gk.id), gk.name, avX, footMidY, 27, isStarter);
+            avX += 42;
+          });
+          const namesLabel = convocados.map(g => shortGkName(g.name)).join(' · ');
+          ctx.fillStyle = '#E2E8F0';
+          ctx.font = `800 18px ${fontStack}`;
+          ctx.textAlign = 'left';
+          ctx.fillText(truncateText(ctx, namesLabel, 340), avX + 4, footMidY + 1);
+        } else {
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = `italic 700 18px ${fontStack}`;
+          ctx.fillText('Sin convocar', cx + 152, footMidY);
+        }
+
+        // Racha Rival derecha
+        const streakArr = Array.isArray(m.streak) ? m.streak.slice(0, 5) : [];
+        let rachaRightX = cx + cardW - 34;
+        if (streakArr.length > 0) {
+          for (let sIdx = streakArr.length - 1; sIdx >= 0; sIdx--) {
+            const res = streakArr[sIdx];
+            const rCircle = 20;
+            const scx = rachaRightX - rCircle;
+            ctx.beginPath();
+            ctx.arc(scx, footMidY, rCircle, 0, Math.PI * 2);
+            ctx.fillStyle = res === 'V' ? '#10B981' : res === 'E' ? '#0EA5E9' : '#F43F5E';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `900 17px ${fontStack}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(res, scx, footMidY + 1);
+            rachaRightX -= (rCircle * 2 + 8);
+          }
+        } else {
+          ctx.fillStyle = '#64748B';
+          ctx.font = `900 18px ${fontStack}`;
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('---', rachaRightX, footMidY);
+          rachaRightX -= 42;
+        }
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = `900 17px ${fontStack}`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('RACHA', rachaRightX - 10, footMidY);
+
+        ctx.restore();
+
+        // Borde exterior cristal nítido
+        roundRectPath(ctx, cx, cy, cardW, cardH, 42);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.stroke();
+      });
+
+      // 4. Pie Institucional de Página
+      ctx.fillStyle = '#64748B';
+      ctx.font = `800 17px ${fontStack}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('CLUB ATLÉTICO DE MADRID · ACADEMIA · PLANIFICACIÓN DE JORNADA', 80, H - 30);
+      ctx.textAlign = 'right';
+      ctx.fillText(`PÁGINA ${pageIdx + 1} DE ${totalPages}`, W - 80, H - 30);
+
+      const pageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      doc.addImage(pageDataUrl, 'JPEG', 0, 0, 297, 210);
     }
 
-    for (let i = 0; i < matches.length; i++) {
-        const m = matches[i];
-        const rival = rivals.find(r => r.id === m.rivalId);
-        const rivalShield = await safeImgLoad(rival?.shieldUrl);
-
-        if (currentY > 240) { doc.addPage(); drawHeader(); }
-
-        doc.setFillColor(30, 41, 59);
-        doc.roundedRect(15, currentY, pageWidth - 30, 45, 3, 3, 'F');
-
-        doc.setFillColor(15, 23, 42);
-        doc.roundedRect(20, currentY + 5, 35, 35, 2, 2, 'F');
-        doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("Roboto", "bolditalic");
-        doc.text(m.time || '--:--', 37.5, currentY + 20, {align: 'center'});
-        doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont("Roboto", "bold");
-        doc.text(formatDate(m.date), 37.5, currentY + 28, {align: 'center'});
-
-        if (atletiShieldB64) doc.addImage(atletiShieldB64, 'PNG', 65, currentY + 10, 16, 16);
-        doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("Roboto", "bold");
-        doc.text(m.myTeam || 'ATLETI', 85, currentY + 20);
-
-        doc.setTextColor(148, 163, 184); doc.setFontSize(10); doc.text("VS", 115, currentY + 20);
-
-        if (rivalShield) doc.addImage(rivalShield, 'PNG', 130, currentY + 10, 16, 16);
-        doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("Roboto", "bold");
-        let safeRivalName = getMatchRivalName(rival, m);
-        if(doc.getTextWidth(safeRivalName) > 40) safeRivalName = safeRivalName.substring(0,20) + '...';
-        doc.text(safeRivalName, 150, currentY + 20);
-
-        doc.setTextColor(148, 163, 184); doc.setFontSize(8);
-        doc.text(`COMPETICIÓN: ${m.league || '-'} • J${m.matchday || '-'}`, 65, currentY + 35);
-        doc.setTextColor(248, 113, 113); 
-        doc.text(`CAMPO: ${m.field || 'Por definir'}`, 65, currentY + 40);
-
-        currentY += 55;
-    }
-
-    doc.setTextColor(148, 163, 184); doc.setFontSize(8);
-    doc.text("Generado automáticamente por Atleti Plan de Partido", pageWidth/2, 285, {align: 'center'});
-
-    doc.save(`BRIEFING_MATCHDAY_${formatDate(new Date().toISOString().split('T')[0]).replace(/\//g,'-')}.pdf`);
-    if (showNotification) showNotification("Briefing Descargado Exitosamente", "success");
-
+    doc.save(`JORNADA_ATM_${formatDate(jornadaMatches[0]?.date || new Date().toISOString().split('T')[0]).replace(/\//g, '-')}.pdf`);
+    if (showNotification) showNotification("Jornada descargada con éxito", "success");
   } catch (error) {
-    console.error("Error generando Briefing:", error);
-    if (showNotification) showNotification("Error exportando PDF.", "error");
+    console.error("Error descargando jornada:", error);
+    if (showNotification) showNotification("Error al descargar la jornada", "error");
   }
 };
 
@@ -3165,6 +3634,8 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
 function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, role, showNotification }) {
+  const [isQuickCloseOpen, setIsQuickCloseOpen] = useState(false);
+
   const parseSafeDate = (d, t) => {
     if (!d) return 0;
     const [y, mo, day] = d.split('-').map(Number);
@@ -3178,6 +3649,24 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
   const upcomingMatches = [...matches]
     .filter(m => m.date >= todayStr)
     .sort((a, b) => parseSafeDate(a.date, a.time) - parseSafeDate(b.date, b.time));
+
+  // Detección inteligente de partidos pasados sin marcador o sin minutos de portero registrados
+  const pendingClosureMatches = useMemo(() => {
+    const teamOrder = ["ALEVÍN A", "BENJAMÍN A", "BENJAMÍN B", "PREBENJAMÍN A"];
+    return [...matches]
+      .filter(m => {
+        if (!m.date || m.date >= todayStr) return false;
+        const hasScore = String(m.goalsMyTeam ?? '').trim() !== '' && String(m.goalsRival ?? '').trim() !== '';
+        const hasGkMinutes = (m.goalkeeperIds || []).some(id => parseInt(m.gkMinutes?.[id]) > 0);
+        return !hasScore || !hasGkMinutes;
+      })
+      .sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        const idxA = teamOrder.indexOf((a.myTeam || '').toUpperCase());
+        const idxB = teamOrder.indexOf((b.myTeam || '').toUpperCase());
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+      });
+  }, [matches, todayStr]);
 
   const [weatherData, setWeatherData] = useState({
     temp: '--',
@@ -3410,10 +3899,10 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                 </button>
                 <button
                   onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border border-white/20 shadow-lg"
-                  title="Descargar PDF con la hoja de ruta de la jornada"
+                  className="flex items-center gap-2 bg-white/12 hover:bg-white/25 backdrop-blur-xl text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border border-white/25 shadow-lg"
+                  title="Descargar PDF con las tarjetas de los partidos de la jornada"
                 >
-                  <FileText size={16} className="text-sky-300" /> Briefing Jornada
+                  <Download size={16} className="text-sky-300" /> Descargar Jornada
                 </button>
               </div>
             </div>
@@ -3518,12 +4007,60 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
             {upcomingMatches.length > 0 && (
               <button
                 onClick={() => exportarBriefingPDF(upcomingMatches, rivals, gks, showNotification)}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-600/25"
+                className="flex items-center gap-2 bg-[#CB3524] hover:bg-red-500 text-white px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-600/25"
               >
-                <FileText size={15} /> Briefing Jornada
+                <Download size={15} /> Descargar Jornada
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* BANNER INTELIGENTE · CIERRE DE JORNADA EXPRÉS (AUTO)      */}
+      {/* ========================================================= */}
+      {role !== 'staff' && pendingClosureMatches.length > 0 && (
+        <div className="rounded-[1.75rem] p-4 sm:px-6 sm:py-4.5 bg-gradient-to-r from-[#272E61] via-[#2B3D8C] to-[#A62622] text-white border border-amber-300/35 shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_14px_34px_rgba(39,46,97,0.28)] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 relative overflow-hidden">
+          <div className="pointer-events-none absolute -left-10 top-1/2 -translate-y-1/2 w-44 h-44 rounded-full bg-amber-400/20 blur-3xl" />
+
+          <div className="flex items-start sm:items-center gap-3.5 relative z-10 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-amber-300 shrink-0 shadow-inner">
+              <Zap size={22} className="animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
+                  Cierre de Jornada Exprés
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/45 text-[9px] font-black uppercase tracking-widest text-amber-200">
+                  {pendingClosureMatches.length} {pendingClosureMatches.length === 1 ? 'partido pendiente' : 'partidos pendientes'}
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-blue-100/90 mt-0.5">
+                Rellena marcadores, titularidades, minutos y goles encajados en una sola ventana sin abrir partido por partido.
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {pendingClosureMatches.slice(0, 4).map(pm => (
+                  <span key={pm.id} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/12 border border-white/20 text-[9px] font-extrabold uppercase tracking-wider text-white">
+                    {pm.myTeam} · {formatDate(pm.date)}
+                  </span>
+                ))}
+                {pendingClosureMatches.length > 4 && (
+                  <span className="text-[10px] font-black text-amber-200 pl-1">
+                    +{pendingClosureMatches.length - 4} más
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsQuickCloseOpen(true)}
+            className="w-full lg:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-[0_8px_22px_rgba(245,158,11,0.35)] hover:scale-[1.02] transition-all shrink-0 relative z-10 cursor-pointer"
+          >
+            <Zap size={15} /> Completar en 30s <ArrowRight size={14} />
+          </button>
         </div>
       )}
 
@@ -3891,6 +4428,512 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
         theme={theme}
         onSelectGk={onSelectGk}
       />
+
+      {/* MODAL UNIFICADO: CIERRE DE JORNADA EXPRÉS */}
+      {isQuickCloseOpen && (
+        <QuickMatchdayCloseModal
+          pendingMatches={pendingClosureMatches}
+          rivals={rivals}
+          gks={gks}
+          theme={theme}
+          onClose={() => setIsQuickCloseOpen(false)}
+          showNotification={showNotification}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// MODAL UNIFICADO: CIERRE DE JORNADA EXPRÉS EN 30 SEGUNDOS
+// ==========================================
+function QuickMatchdayCloseModal({ pendingMatches = [], rivals = [], gks = [], theme, onClose, showNotification }) {
+  const [saving, setSaving] = useState(false);
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  const getMatchDuration = (teamName) => {
+    const t = normalizeStr(teamName);
+    if (t.includes('prebenjamin')) return 40;
+    if (t.includes('benjamin')) return 50;
+    if (t.includes('alevin')) return 50;
+    if (t.includes('infantil')) return 70;
+    if (t.includes('cadete')) return 80;
+    return 90;
+  };
+
+  // Inicializar borradores con porteros pre-asignados de su categoría si estaban vacíos
+  const [drafts, setDrafts] = useState(() => {
+    const init = {};
+    pendingMatches.forEach((m) => {
+      const teamGks = gks
+        .filter(g => normalizeStr(g.team) === normalizeStr(m.myTeam))
+        .sort((a, b) => (parseInt(a.number) || 99) - (parseInt(b.number) || 99));
+
+      const existingIds = Array.isArray(m.goalkeeperIds) && m.goalkeeperIds.length > 0
+        ? [...m.goalkeeperIds]
+        : teamGks.map(g => g.id);
+
+      const starterMap = { ...(m.gkStarter || {}) };
+      const hasAnyStarter = existingIds.some(id => starterMap[id] === true || String(starterMap[id]) === 'true');
+      if (!hasAnyStarter && existingIds.length > 0) {
+        existingIds.forEach((id, idx) => { starterMap[id] = idx === 0; });
+      } else {
+        existingIds.forEach((id) => { starterMap[id] = starterMap[id] === true || String(starterMap[id]) === 'true'; });
+      }
+
+      init[m.id] = {
+        goalsMyTeam: m.goalsMyTeam !== undefined && m.goalsMyTeam !== null ? String(m.goalsMyTeam) : '',
+        goalsRival: m.goalsRival !== undefined && m.goalsRival !== null ? String(m.goalsRival) : '',
+        goalkeeperIds: existingIds,
+        gkStarter: starterMap,
+        gkMinutes: { ...(m.gkMinutes || {}) },
+        gkGoalsConceded: { ...(m.gkGoalsConceded || {}) }
+      };
+    });
+    return init;
+  });
+
+  const updateScore = (matchId, field, value) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur) return prev;
+      const next = { ...cur, [field]: value };
+
+      // Si es Goles Rival = 0, rellenar automáticamente 0 en G.E. de los porteros con minutos
+      if (field === 'goalsRival' && value !== '') {
+        const gRiv = parseInt(value);
+        const activeGks = cur.goalkeeperIds.filter(id => parseInt(cur.gkMinutes?.[id]) > 0);
+        const nextConceded = { ...cur.gkGoalsConceded };
+        if (gRiv === 0) {
+          cur.goalkeeperIds.forEach(id => { nextConceded[id] = '0'; });
+          next.gkGoalsConceded = nextConceded;
+        } else if (!isNaN(gRiv) && activeGks.length === 1) {
+          nextConceded[activeGks[0]] = String(gRiv);
+          next.gkGoalsConceded = nextConceded;
+        }
+      }
+      return { ...prev, [matchId]: next };
+    });
+  };
+
+  const toggleGkCalled = (matchId, gkId) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur) return prev;
+      const exists = cur.goalkeeperIds.includes(gkId);
+      const nextIds = exists
+        ? cur.goalkeeperIds.filter(id => id !== gkId)
+        : [...cur.goalkeeperIds, gkId];
+      return {
+        ...prev,
+        [matchId]: { ...cur, goalkeeperIds: nextIds }
+      };
+    });
+  };
+
+  const toggleStarter = (matchId, gkId) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [matchId]: {
+          ...cur,
+          gkStarter: { ...cur.gkStarter, [gkId]: !cur.gkStarter?.[gkId] }
+        }
+      };
+    });
+  };
+
+  const updateGkField = (matchId, mapName, gkId, val) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [matchId]: {
+          ...cur,
+          [mapName]: { ...(cur[mapName] || {}), [gkId]: val }
+        }
+      };
+    });
+  };
+
+  // Botón rápido 50% / 50% (reparte automáticamente minutos mitad y mitad + TIT/SUP)
+  const applySplitMinutes = (matchId, totalDuration) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur || cur.goalkeeperIds.length === 0) return prev;
+      const ids = cur.goalkeeperIds;
+      const share = Math.round(totalDuration / ids.length);
+      const nextMins = { ...cur.gkMinutes };
+      const nextStarter = { ...cur.gkStarter };
+      const nextConceded = { ...cur.gkGoalsConceded };
+
+      ids.forEach((id, idx) => {
+        nextMins[id] = String(idx === ids.length - 1 ? totalDuration - share * (ids.length - 1) : share);
+        nextStarter[id] = idx === 0;
+        if (cur.goalsRival === '0' && (nextConceded[id] === undefined || nextConceded[id] === '')) {
+          nextConceded[id] = '0';
+        }
+      });
+
+      return {
+        ...prev,
+        [matchId]: { ...cur, gkMinutes: nextMins, gkStarter: nextStarter, gkGoalsConceded: nextConceded }
+      };
+    });
+  };
+
+  // Botón rápido 100% al Titular
+  const applyFullMatchToStarter = (matchId, totalDuration) => {
+    setDrafts(prev => {
+      const cur = prev[matchId];
+      if (!cur || cur.goalkeeperIds.length === 0) return prev;
+      const ids = cur.goalkeeperIds;
+      const starterId = ids.find(id => cur.gkStarter?.[id]) || ids[0];
+      const nextMins = { ...cur.gkMinutes };
+      const nextStarter = { ...cur.gkStarter };
+      const nextConceded = { ...cur.gkGoalsConceded };
+
+      ids.forEach((id) => {
+        const isTit = id === starterId;
+        nextStarter[id] = isTit;
+        nextMins[id] = isTit ? String(totalDuration) : '0';
+        if (isTit && cur.goalsRival !== '') {
+          nextConceded[id] = String(cur.goalsRival);
+        } else if (!isTit) {
+          nextConceded[id] = '0';
+        }
+      });
+
+      return {
+        ...prev,
+        [matchId]: { ...cur, gkMinutes: nextMins, gkStarter: nextStarter, gkGoalsConceded: nextConceded }
+      };
+    });
+  };
+
+  const handleSaveAll = async () => {
+    if (!db) return;
+    setSaving(true);
+    try {
+      const ops = [];
+      pendingMatches.forEach((m) => {
+        const d = drafts[m.id];
+        if (!d) return;
+        const hasScore = d.goalsMyTeam.trim() !== '' || d.goalsRival.trim() !== '';
+        const playedIds = d.goalkeeperIds.filter(id => parseInt(d.gkMinutes?.[id]) > 0);
+        if (!hasScore && playedIds.length === 0) return;
+
+        // Autocompletar Goles Encajados si hay 0 goles rivales o jugó un único portero
+        const finalConceded = { ...d.gkGoalsConceded };
+        if (d.goalsRival.trim() !== '') {
+          const gRiv = parseInt(d.goalsRival) || 0;
+          if (gRiv === 0) {
+            playedIds.forEach(id => {
+              if (finalConceded[id] === undefined || finalConceded[id] === '') finalConceded[id] = '0';
+            });
+          } else if (playedIds.length === 1 && (finalConceded[playedIds[0]] === undefined || finalConceded[playedIds[0]] === '')) {
+            finalConceded[playedIds[0]] = String(gRiv);
+          }
+        }
+
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.id);
+        ops.push(setDoc(matchRef, {
+          goalsMyTeam: d.goalsMyTeam.trim(),
+          goalsRival: d.goalsRival.trim(),
+          goalkeeperIds: d.goalkeeperIds,
+          gkStarter: d.gkStarter,
+          gkMinutes: d.gkMinutes,
+          gkGoalsConceded: finalConceded
+        }, { merge: true }));
+      });
+
+      if (ops.length === 0) {
+        if (showNotification) showNotification("Rellena al menos un resultado o minutos para guardar", "error");
+        setSaving(false);
+        return;
+      }
+
+      await Promise.all(ops);
+      if (showNotification) showNotification(`¡Cierre completado! ${ops.length} ${ops.length === 1 ? 'partido actualizado' : 'partidos actualizados'}`);
+      onClose();
+    } catch (err) {
+      console.error("Error guardando cierre exprés:", err);
+      if (showNotification) showNotification("Error al guardar el cierre de jornada", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1430]/80 backdrop-blur-md p-3 sm:p-5 no-print animate-in fade-in duration-200">
+      <div className={`w-full max-w-5xl rounded-[2.25rem] border ${theme.border} bg-[#f4f6fc] dark:bg-[#192554] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden`}>
+        {/* Cabecera Corporativa visionOS */}
+        <div className="px-6 sm:px-8 py-5 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-amber-300 shrink-0">
+              <Zap size={20} />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-xl font-black italic tracking-tight uppercase text-white leading-none">
+                Cierre de Jornada Exprés
+              </h2>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-200/80 mt-1">
+                Resultados, titularidades, minutos y goles encajados en una sola pantalla
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-white/10 hover:bg-red-500/35 text-white/80 hover:text-white flex items-center justify-center transition-colors shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Lista Unificada de Partidos Pendientes */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+          {pendingMatches.map((m) => {
+            const d = drafts[m.id] || { goalsMyTeam: '', goalsRival: '', goalkeeperIds: [], gkStarter: {}, gkMinutes: {}, gkGoalsConceded: {} };
+            const rival = rivals.find(r => r.id === m.rivalId);
+            const fullDuration = getMatchDuration(m.myTeam);
+            const halfDuration = Math.round(fullDuration / 2);
+
+            const teamGks = gks.filter(g => normalizeStr(g.team) === normalizeStr(m.myTeam));
+            const extraCalledGks = gks.filter(g => d.goalkeeperIds.includes(g.id) && !teamGks.some(tg => tg.id === g.id));
+            const candidateGks = [...teamGks, ...extraCalledGks].sort(
+              (a, b) => (parseInt(a.number) || 99) - (parseInt(b.number) || 99)
+            );
+
+            return (
+              <div
+                key={m.id}
+                className="rounded-[1.75rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-white/20 shadow-lg overflow-hidden"
+              >
+                {/* Sub-barra Superior: Categoría + Atajos de Reparto de Minutos en 1 Clic */}
+                <div className="px-4 sm:px-5 py-2.5 bg-white/[0.06] border-b border-white/12 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-md bg-white p-0.5 flex items-center justify-center shrink-0">
+                      <img src={ESCUDO_ATM_URL} alt="" className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-wider text-white">
+                      {m.myTeam}
+                    </span>
+                    <span className="text-white/30">·</span>
+                    <span className="text-[11px] font-bold text-sky-300 tabular-nums">
+                      {formatDate(m.date)} {m.matchday ? `· J${m.matchday}` : ''}
+                    </span>
+                  </div>
+
+                  {/* Botones de Reparto Rápido */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => applySplitMinutes(m.id, fullDuration)}
+                      className="px-2.5 py-1 rounded-full bg-sky-500/20 hover:bg-sky-500/35 border border-sky-400/35 text-[10px] font-black uppercase tracking-wider text-sky-200 hover:text-white transition-colors cursor-pointer"
+                      title="Asignar mitad de partido a cada portero convocado"
+                    >
+                      ⚡ 50/50 ({halfDuration}'/{halfDuration}')
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyFullMatchToStarter(m.id, fullDuration)}
+                      className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-black uppercase tracking-wider text-blue-100 hover:text-white transition-colors cursor-pointer"
+                      title="Asignar el partido completo al portero titular"
+                    >
+                      ⚡ Completo ({fullDuration}' TIT)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cuerpo en 2 Columnas: Marcador Izquierda + Porteros Derecha */}
+                <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+                  {/* 1. MARCADOR DEL ENCUENTRO (5/12) */}
+                  <div className="lg:col-span-5 flex items-center justify-between gap-2 bg-black/20 border border-white/10 rounded-2xl p-3.5">
+                    <div className="flex flex-col items-center text-center w-20 shrink-0">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-b from-white to-slate-200 p-1.5 flex items-center justify-center shadow-md">
+                        <img src={ESCUDO_ATM_URL} alt="ATM" className="w-full h-full object-contain" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-tight text-white mt-1.5 line-clamp-1">
+                        {m.myTeam}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-blue-200/70 text-center mb-1">ATM</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="-"
+                          value={d.goalsMyTeam}
+                          onChange={(e) => updateScore(m.id, 'goalsMyTeam', e.target.value)}
+                          className="w-14 h-12 rounded-xl bg-white/15 focus:bg-white/25 border border-white/25 focus:border-sky-300 text-center text-xl font-black text-white placeholder-white/40 outline-none tabular-nums"
+                        />
+                      </div>
+                      <span className="text-lg font-black text-white/40 pt-3">-</span>
+                      <div>
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-rose-300 text-center mb-1">RIV</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="-"
+                          value={d.goalsRival}
+                          onChange={(e) => updateScore(m.id, 'goalsRival', e.target.value)}
+                          className="w-14 h-12 rounded-xl bg-rose-500/20 focus:bg-rose-500/30 border border-rose-400/40 focus:border-rose-300 text-center text-xl font-black text-rose-200 placeholder-rose-200/40 outline-none tabular-nums"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center text-center w-24 shrink-0">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-b from-white to-slate-200 p-1.5 flex items-center justify-center shadow-md">
+                        {rival?.shieldUrl ? (
+                          <img src={rival.shieldUrl} alt="Rival" className="w-full h-full object-contain" />
+                        ) : (
+                          <Swords size={18} className="text-slate-500" />
+                        )}
+                      </div>
+                      <span className="text-[9px] font-extrabold uppercase tracking-tight text-blue-100 mt-1.5 line-clamp-2 leading-tight" title={getMatchRivalName(rival, m)}>
+                        {getMatchRivalName(rival, m)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. RENDIMIENTO DE PORTEROS DE LA CATEGORÍA (7/12) */}
+                  <div className="lg:col-span-7 space-y-2.5">
+                    {candidateGks.length > 0 ? (
+                      candidateGks.map((gk) => {
+                        const isCalled = d.goalkeeperIds.includes(gk.id);
+                        const isTit = Boolean(d.gkStarter?.[gk.id]);
+                        const minsVal = d.gkMinutes?.[gk.id] !== undefined ? d.gkMinutes[gk.id] : '';
+                        const geVal = d.gkGoalsConceded?.[gk.id] !== undefined ? d.gkGoalsConceded[gk.id] : '';
+
+                        return (
+                          <div
+                            key={gk.id}
+                            className={`rounded-2xl px-3.5 py-2.5 border transition-all flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 ${
+                              isCalled
+                                ? 'bg-white/[0.09] border-white/20'
+                                : 'bg-black/15 border-white/5 opacity-55'
+                            }`}
+                          >
+                            {/* Avatar + Check Convocado + Nombre */}
+                            <div
+                              onClick={() => toggleGkCalled(m.id, gk.id)}
+                              className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
+                              title="Pulsar para activar/desactivar de la convocatoria"
+                            >
+                              <div className="relative shrink-0">
+                                <img
+                                  src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+                                  alt={gk.name}
+                                  className="w-10 h-10 rounded-xl object-cover border border-white/25 bg-slate-800"
+                                  style={{ objectPosition: 'center 15%' }}
+                                />
+                                {isCalled && (
+                                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border border-[#272E61] flex items-center justify-center">
+                                    <CheckCircle2 size={10} className="text-white" />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="block text-xs font-extrabold text-white truncate">
+                                  {gk.name}
+                                </span>
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-blue-200/70">
+                                  {isCalled ? 'Convocado' : 'No convocado'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Controles en línea: TIT/SUP + Minutos + Goles Encajados */}
+                            {isCalled && (
+                              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStarter(m.id, gk.id)}
+                                  className={`px-3 h-9 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                                    isTit
+                                      ? 'bg-emerald-500/25 text-emerald-200 border-emerald-400/50 shadow-sm'
+                                      : 'bg-amber-500/20 text-amber-200 border-amber-400/40'
+                                  }`}
+                                  title="Cambiar entre Titular y Suplente"
+                                >
+                                  {isTit ? 'TIT' : 'SUP'}
+                                </button>
+
+                                <div className="flex items-center gap-1 bg-black/25 border border-white/15 rounded-xl px-2.5 h-9">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={minsVal}
+                                    onChange={(e) => updateGkField(m.id, 'gkMinutes', gk.id, e.target.value)}
+                                    className="w-10 bg-transparent text-center text-xs font-black text-white placeholder-white/35 outline-none tabular-nums"
+                                  />
+                                  <span className="text-[9px] font-black uppercase text-sky-300">min</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-400/35 rounded-xl px-2.5 h-9" title="Goles encajados por este portero">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={geVal}
+                                    onChange={(e) => updateGkField(m.id, 'gkGoalsConceded', gk.id, e.target.value)}
+                                    className="w-8 bg-transparent text-center text-xs font-black text-rose-200 placeholder-rose-200/40 outline-none tabular-nums"
+                                  />
+                                  <span className="text-[9px] font-black uppercase text-rose-300">G.E.</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-blue-200/75 italic px-2">
+                        No hay porteros asignados a {m.myTeam}.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pie del Modal con Guardado en Lote */}
+        <div className="px-6 sm:px-8 py-4 bg-white dark:bg-[#141E46] border-t border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <span className="text-[11px] font-bold text-slate-500 dark:text-blue-200/75">
+            Tip: usa <strong className="text-[#272E61] dark:text-sky-300">⚡ 50/50</strong> para repartir minutos e indicar titular/suplente en 1 clic.
+          </span>
+
+          <div className="flex items-center gap-3 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 dark:text-blue-200 hover:text-[#272E61] dark:hover:text-white transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-gradient-to-r from-[#CB3524] to-[#E02424] hover:from-[#b52c1d] hover:to-[#CB3524] text-white shadow-lg shadow-[#CB3524]/30 transition-all disabled:opacity-60 cursor-pointer"
+            >
+              <CheckCircle2 size={16} />
+              {saving ? 'Guardando...' : 'Guardar Cierre Exprés'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
