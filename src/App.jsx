@@ -100,6 +100,60 @@ const formatDate = (dateStr) => {
   return `${d}/${m}/${y}`;
 };
 
+// --- SISTEMA CLUB MATRIZ + LETRA DE EQUIPO POR PARTIDO ---
+const parseClubAndLetter = (rawName = '', rawCategory = '') => {
+  let name = String(rawName || '').trim();
+  let cat = String(rawCategory || '').replace(/^equipo\s+/i, '').replace(/['"“”‘’´`()]/g, '').trim().toUpperCase();
+
+  let extractedLetter = '';
+
+  // 1. Detectar letra final entre comillas o paréntesis: 'A', "B", (C), 'FEM'...
+  const quotedMatch = name.match(/\s*['"“”‘’´`(]\s*([A-ZÑ0-9]{1,4}|FEM|FUND\.?)\s*['"“”‘’´`)]\s*$/i);
+  if (quotedMatch) {
+    extractedLetter = quotedMatch[1].toUpperCase();
+    name = name.slice(0, quotedMatch.index).trim();
+  } else {
+    // 2. Detectar letra suelta A-H al final tras palabra sin puntos (ej: "RSD ALCALA B")
+    const plainMatch = name.match(/^(.*[A-ZÁÉÍÓÚÜÑ]{2,})\s+(?:-\s*)?([A-H])$/i);
+    if (plainMatch) {
+      extractedLetter = plainMatch[2].toUpperCase();
+      name = plainMatch[1].trim();
+    }
+  }
+
+  return {
+    baseName: name,
+    letter: cat || extractedLetter
+  };
+};
+
+const normalizeClubKey = (str = '') =>
+  String(str || '')
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\./g, "")
+    .replace(/['"“”‘’´`()-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getMatchRivalName = (rival, match) => {
+  if (!rival) return match?.rivalName || 'Rival';
+  const { baseName, letter: embeddedLetter } = parseClubAndLetter(rival.name, rival.category);
+  const matchLetterRaw = match?.rivalLetter !== undefined && match?.rivalLetter !== null ? String(match.rivalLetter).trim() : '';
+
+  let finalLetter = '';
+  if (matchLetterRaw === 'NONE') {
+    finalLetter = '';
+  } else if (matchLetterRaw !== '') {
+    finalLetter = matchLetterRaw.replace(/['"“”‘’´`()]/g, '').trim().toUpperCase();
+  } else {
+    finalLetter = embeddedLetter;
+  }
+
+  return finalLetter ? `${baseName} '${finalLetter}'` : baseName;
+};
+
 const useImageUploader = (onBase64Ready) => {
   return (e) => {
     const file = e.target.files[0];
@@ -499,7 +553,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont("Roboto", "bold");
-      doc.text((rivalPdf?.name || 'RIVAL').toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
+      doc.text(getMatchRivalName(rivalPdf, nextMatchPdf).toUpperCase(), leftCX + 41, shieldY + 42, { align: 'center', maxWidth: 45 });
 
       // Match Stats Bottom Left (SOLO SI ES ALEVÍN A)
       if (gk.team && gk.team.toUpperCase().includes('ALEVÍN A')) {
@@ -845,7 +899,7 @@ const exportarPDFVectorial = async (gk, matches, rivals, activeSeason, showNotif
         
         doc.setTextColor(...p.textMain);
         doc.setFont("Roboto", "bold");
-        doc.text(rival?.name?.toUpperCase() || 'DESCONOCIDO', 110, tY + 6, { maxWidth: 60 });
+        doc.text(rival ? getMatchRivalName(rival, m).toUpperCase() : 'DESCONOCIDO', 110, tY + 6, { maxWidth: 60 });
         
         doc.setTextColor(...p.textMuted);
         doc.setFont("Roboto", "normal");
@@ -1417,7 +1471,7 @@ const exportarBriefingPDF = async (matches, rivals, gks, showNotification) => {
 
         if (rivalShield) doc.addImage(rivalShield, 'PNG', 130, currentY + 10, 16, 16);
         doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("Roboto", "bold");
-        let safeRivalName = rival?.name || 'RIVAL';
+        let safeRivalName = getMatchRivalName(rival, m);
         if(doc.getTextWidth(safeRivalName) > 40) safeRivalName = safeRivalName.substring(0,20) + '...';
         doc.text(safeRivalName, 150, currentY + 20);
 
@@ -1951,6 +2005,101 @@ export default function App() {
     } catch (e) { showNotification("Error al eliminar", "error"); }
   };
 
+  const handleUnifyRivals = async () => {
+    if (!db) return;
+    const groups = new Map();
+
+    visibleRivals.forEach(r => {
+      const { baseName } = parseClubAndLetter(r.name, r.category);
+      const key = normalizeClubKey(baseName || r.name);
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+
+    let duplicateClubsCount = 0;
+    let clubsWithEmbeddedLetter = 0;
+
+    groups.forEach((list) => {
+      if (list.length > 1) duplicateClubsCount += (list.length - 1);
+      list.forEach(r => {
+        const { baseName, letter } = parseClubAndLetter(r.name, r.category);
+        if (letter || r.category || r.name.trim() !== baseName) {
+          clubsWithEmbeddedLetter += 1;
+        }
+      });
+    });
+
+    if (duplicateClubsCount === 0 && clubsWithEmbeddedLetter === 0) {
+      showNotification("Todos los clubes ya están unificados y limpios");
+      return;
+    }
+
+    const confirmMsg = `Se van a fusionar ${duplicateClubsCount} clubes repetidos y a trasladar las letras (A, B, C...) de ${clubsWithEmbeddedLetter} fichas directamente a sus partidos correspondientes, dejando un único club y escudo por entidad.\n\n¿Deseas continuar?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const ops = [];
+
+      groups.forEach((list) => {
+        const sorted = [...list].sort((a, b) => {
+          const aHasShield = a.shieldUrl ? 1 : 0;
+          const bHasShield = b.shieldUrl ? 1 : 0;
+          if (bHasShield !== aHasShield) return bHasShield - aHasShield;
+          return (b.name || '').length - (a.name || '').length;
+        });
+
+        const master = sorted[0];
+        const { baseName: masterBaseName } = parseClubAndLetter(master.name, master.category);
+        const cleanMasterName = (masterBaseName || master.name || '').trim();
+
+        const creators = new Set(list.map(x => x.createdBy || ''));
+        const unifiedCreatedBy = (creators.has('') || creators.size > 1) ? '' : (master.createdBy || '');
+
+        list.forEach(r => {
+          const { letter: extractedLetter } = parseClubAndLetter(r.name, r.category);
+          const relatedMatches = matches.filter(m => m.rivalId === r.id);
+
+          relatedMatches.forEach(m => {
+            const currentLetter = m.rivalLetter !== undefined && m.rivalLetter !== null ? String(m.rivalLetter).trim() : '';
+            const nextLetter = currentLetter !== '' ? currentLetter : (extractedLetter || '');
+
+            if (m.rivalId !== master.id || (nextLetter && m.rivalLetter !== nextLetter)) {
+              const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.id);
+              ops.push(setDoc(matchRef, { rivalId: master.id, rivalLetter: nextLetter }, { merge: true }));
+            }
+          });
+
+          const relatedReports = informesList.filter(inf => inf.rivalId === r.id && r.id !== master.id);
+          relatedReports.forEach(inf => {
+            const infRef = doc(db, 'artifacts', appId, 'public', 'data', 'informes', inf.id);
+            ops.push(setDoc(infRef, { rivalId: master.id }, { merge: true }));
+          });
+        });
+
+        if (master.name !== cleanMasterName || master.category || (master.createdBy || '') !== unifiedCreatedBy) {
+          const masterRef = doc(db, 'artifacts', appId, 'public', 'data', 'rivals', master.id);
+          ops.push(setDoc(masterRef, {
+            name: cleanMasterName,
+            category: '',
+            createdBy: unifiedCreatedBy
+          }, { merge: true }));
+        }
+
+        sorted.slice(1).forEach(dup => {
+          const dupRef = doc(db, 'artifacts', appId, 'public', 'data', 'rivals', dup.id);
+          ops.push(deleteDoc(dupRef));
+        });
+      });
+
+      await Promise.all(ops);
+      showNotification("¡Clubes unificados y letras asignadas a cada partido!");
+    } catch (err) {
+      console.error("Error unificando rivales:", err);
+      showNotification("Error al unificar clubes", "error");
+    }
+  };
+
   const downloadBackup = () => {
     const backupData = { goalkeepers, users: usersList, rivals, matches, date: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -2079,7 +2228,7 @@ export default function App() {
         />
       );
       case 'partidos': return <ModulePartidos matches={currentSeasonMatches} rivals={visibleRivals} gks={visibleGoalkeepers} role={role} onNew={() => { setEditingMatch(null); setIsMatchFormOpen(true); }} onEdit={(match) => { setEditingMatch(match); setIsMatchFormOpen(true); }} onDelete={(id) => handleDeleteDoc('matches', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
-      case 'rivales': return <ModuleRivales rivals={visibleRivals} matches={currentSeasonMatches} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
+      case 'rivales': return <ModuleRivales rivals={visibleRivals} matches={currentSeasonMatches} allMatches={matches} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} onUnify={handleUnifyRivals} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
       case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} matches={currentSeasonMatches} activeSeason={activeSeason} theme={theme} darkMode={darkMode} />;
       case 'ajustes': return <ModuleAjustes users={usersList} currentUserData={currentUserData} role={role} onNewUser={() => {setEditingUser(null); setIsUserFormOpen(true);}} onEditUser={(u) => {setEditingUser(u); setIsUserFormOpen(true);}} onSaveProfile={handleSaveProfile} onBackup={downloadBackup} theme={theme} darkMode={darkMode} />;
       case 'informes': return <ModuleInformes gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} existingReports={informesList} onSave={async (data) => { const id = await handleSaveDoc('informes', data, !data.id, data.isDraft ? "Borrador guardado" : "Informe finalizado"); if (id && !data.id) data.id = id; return id; }} onDelete={(id) => handleDeleteDoc('informes', id)} showNotification={showNotification} />;
@@ -2595,8 +2744,8 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
               <Swords className="w-7 h-7 text-slate-400" />
             )}
           </div>
-          <span className="mt-2 text-[11px] font-extrabold uppercase tracking-tight text-slate-100 leading-tight line-clamp-2" title={rival?.name}>
-            {rival?.name || 'Rival'}
+          <span className="mt-2 text-[11px] font-extrabold uppercase tracking-tight text-slate-100 leading-tight line-clamp-2" title={getMatchRivalName(rival, match)}>
+            {getMatchRivalName(rival, match)}
           </span>
         </div>
       </div>
@@ -3098,7 +3247,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
               </span>
               <h2 className="text-3xl lg:text-4xl xl:text-5xl font-black uppercase italic tracking-tighter text-white leading-none drop-shadow-lg mb-2">
                 {nextMatchObj.myTeam || 'ATLETI'} <span className="text-red-500 text-2xl lg:text-4xl mx-1">VS</span><br />
-                {rivals.find(r => r.id === nextMatchObj.rivalId)?.name || 'RIVAL'}
+                {getMatchRivalName(rivals.find(r => r.id === nextMatchObj.rivalId), nextMatchObj)}
               </h2>
               <p className="text-slate-400 font-bold text-xs lg:text-sm tracking-widest uppercase mb-6">
                 {nextMatchObj.league || 'Competición Oficial'}
@@ -3488,8 +3637,8 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                       )}
                     </div>
 
-                    <h4 className="mt-2.5 text-xs font-extrabold uppercase tracking-tight text-white line-clamp-1" title={rivalObj?.name}>
-                      {rivalObj?.name || 'Rival por definir'}
+                    <h4 className="mt-2.5 text-xs font-extrabold uppercase tracking-tight text-white line-clamp-1" title={rivalObj ? getMatchRivalName(rivalObj, targetMatch) : 'Rival por definir'}>
+                      {rivalObj ? getMatchRivalName(rivalObj, targetMatch) : 'Rival por definir'}
                     </h4>
 
                     {/* Condición Local/Visitante/Sede + Campo */}
@@ -4482,14 +4631,31 @@ const StatRow = ({ label, val1, val2, display1, display2, suffix = '', isHigherB
 };
 
 // ==========================================
-// DIRECTORIO DE RIVALES VISION OS
+// DIRECTORIO DE RIVALES VISION OS (CLUB MATRIZ + ESCUDO ÚNICO)
 // ==========================================
-function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
+function ModuleRivales({ rivals = [], matches = [], allMatches = [], role, onNew, onEdit, onDelete, onUnify, theme, darkMode, isDataLoading }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [teamFilter, setTeamFilter] = useState('Todos');
 
   const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Detectar si existen clubes repetidos o con letra incrustada pendientes de limpiar
+  const pendingCleanCount = useMemo(() => {
+    const seenKeys = new Map();
+    let count = 0;
+    rivals.forEach(r => {
+      const { baseName, letter } = parseClubAndLetter(r.name, r.category);
+      const key = normalizeClubKey(baseName || r.name);
+      if (seenKeys.has(key)) {
+        count += 1;
+      } else {
+        seenKeys.set(key, true);
+        if (letter || r.category) count += 1;
+      }
+    });
+    return count;
+  }, [rivals]);
 
   const filteredRivals = useMemo(() => {
     return rivals.filter(r => {
@@ -4505,36 +4671,48 @@ function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelet
 
   return (
     <div className="space-y-6">
-      {/* CABECERA VISION OS CON BUSCADOR Y BOTÓN NUEVO RIVAL */}
+      {/* CABECERA VISION OS CON BUSCADOR, BOTÓN UNIFICAR Y AÑADIR CLUB */}
       <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
-            <Swords size={18} className="text-red-400" /> Directorio de Clubes · Gestión de Rivales
+            <Swords size={18} className="text-red-400" /> Directorio de Clubes · Escudo Único
           </h2>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
-            Base de datos de escudos e historial de enfrentamientos · {rivals.length} registrados
+            Un solo club por escudo · La letra (A, B, C...) se asigna en cada partido · {rivals.length} clubes
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           {/* Buscador Cristal */}
-          <div className="relative flex-1 sm:w-60">
+          <div className="relative flex-1 sm:w-56">
             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar club rival..."
+              placeholder="Buscar club..."
               className="w-full bg-white/10 border border-white/15 focus:border-sky-400/60 rounded-full pl-9 pr-4 py-2 text-xs font-semibold text-white placeholder-slate-400 outline-none backdrop-blur-md transition-colors"
             />
           </div>
+
+          {/* Botón Unificar Duplicados / Limpiar Letras */}
+          {role !== 'staff' && onUnify && pendingCleanCount > 0 && (
+            <button
+              type="button"
+              onClick={onUnify}
+              className="flex items-center justify-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/40 text-amber-200 px-3.5 py-2 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shrink-0"
+              title="Fusionar clubes repetidos y mover letras A/B/C a sus partidos"
+            >
+              <Zap size={13} className="text-amber-300" /> Unificar Clubes ({pendingCleanCount})
+            </button>
+          )}
 
           {role !== 'staff' && (
             <button
               onClick={onNew}
               className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-red-600/25 shrink-0"
             >
-              <Plus size={14} /> Añadir Rival
+              <Plus size={14} /> Añadir Club
             </button>
           )}
         </div>
@@ -4558,43 +4736,64 @@ function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelet
         ))}
       </div>
 
-      {/* GRID COMPACTO VISION OS DE RIVALES */}
+      {/* GRID COMPACTO VISION OS DE CLUBES */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
         {filteredRivals.map(rival => {
           const rivalMatches = matches.filter(m => m.rivalId === rival.id);
           const nextVs = [...rivalMatches].filter(m => m.date >= todayStr).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
           const lastVs = [...rivalMatches].filter(m => m.date < todayStr).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
 
+          const { baseName, letter: embeddedLetter } = parseClubAndLetter(rival.name, rival.category);
+
+          // Recopilar automáticamente todas las letras (A, B, C...) contra las que hemos jugado de este club
+          const lettersSet = new Set();
+          if (embeddedLetter) lettersSet.add(embeddedLetter);
+          (allMatches.length ? allMatches : matches)
+            .filter(m => m.rivalId === rival.id)
+            .forEach(m => {
+              if (m.rivalLetter && m.rivalLetter !== 'NONE') {
+                lettersSet.add(String(m.rivalLetter).trim().toUpperCase());
+              }
+            });
+          const lettersPlayed = Array.from(lettersSet).sort();
+
+          const nextLetter = nextVs?.rivalLetter && nextVs.rivalLetter !== 'NONE' ? `'${nextVs.rivalLetter}'` : (embeddedLetter ? `'${embeddedLetter}'` : '');
+          const lastLetter = lastVs?.rivalLetter && lastVs.rivalLetter !== 'NONE' ? `'${lastVs.rivalLetter}'` : (embeddedLetter ? `'${embeddedLetter}'` : '');
+
           return (
             <div
               key={rival.id}
               className="rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_30px_rgba(7,11,24,0.32)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
             >
-              {/* Barra Superior: Letra de Equipo + Botones Edición */}
+              {/* Barra Superior: Equipos enfrentados + Botones Edición */}
               <div className="px-3.5 pt-3.5 flex items-center justify-between gap-1 relative z-10">
-                {rival.category ? (
-                  <span className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[9px] font-black uppercase tracking-widest text-sky-300">
-                    Equipo {rival.category}
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                    Club
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-1 min-w-0">
+                  {lettersPlayed.length > 0 ? (
+                    lettersPlayed.slice(0, 3).map(ltr => (
+                      <span key={ltr} className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-[9px] font-black uppercase tracking-wider text-sky-300">
+                        Eq. {ltr}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                      Club
+                    </span>
+                  )}
+                </div>
 
                 {role !== 'staff' && (
-                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
                     <button
                       onClick={() => onEdit(rival)}
                       className="w-6 h-6 rounded-full bg-white/8 hover:bg-sky-500/30 border border-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
-                      title="Editar rival"
+                      title="Editar club"
                     >
                       <Edit2 size={11} />
                     </button>
                     <button
                       onClick={() => onDelete(rival.id)}
                       className="w-6 h-6 rounded-full bg-white/8 hover:bg-red-500/35 border border-white/15 text-slate-300 hover:text-red-200 flex items-center justify-center transition-colors"
-                      title="Eliminar rival"
+                      title="Eliminar club"
                     >
                       <X size={12} />
                     </button>
@@ -4606,14 +4805,14 @@ function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelet
               <div className="px-4 py-5 flex flex-col items-center text-center relative z-10 flex-1 justify-center">
                 <div className="w-20 h-20 rounded-2xl bg-white/[0.06] border border-white/12 flex items-center justify-center p-3 shadow-inner group-hover:scale-105 transition-transform duration-300">
                   {rival.shieldUrl ? (
-                    <img src={rival.shieldUrl} alt={rival.name} className="w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]" />
+                    <img src={rival.shieldUrl} alt={baseName || rival.name} className="w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]" />
                   ) : (
                     <Swords className="w-9 h-9 text-slate-400" />
                   )}
                 </div>
 
-                <h3 className="mt-3.5 font-extrabold text-xs sm:text-sm uppercase tracking-tight text-white leading-snug line-clamp-2" title={rival.name}>
-                  {rival.name}
+                <h3 className="mt-3.5 font-extrabold text-xs sm:text-sm uppercase tracking-tight text-white leading-snug line-clamp-2" title={baseName || rival.name}>
+                  {baseName || rival.name}
                 </h3>
               </div>
 
@@ -4621,15 +4820,15 @@ function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelet
               <div className="px-3.5 py-2.5 bg-black/25 border-t border-white/10 flex items-center justify-center text-center relative z-10">
                 {nextVs ? (
                   <span className="text-[9px] font-black uppercase tracking-wider text-sky-300 truncate">
-                    Próx: {formatDate(nextVs.date)} · {nextVs.myTeam}
+                    Próx: {formatDate(nextVs.date)} {nextLetter && `vs ${nextLetter}`} · {nextVs.myTeam}
                   </span>
                 ) : lastVs ? (
                   <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 truncate">
-                    Últ: {lastVs.goalsMyTeam !== '' && lastVs.goalsMyTeam !== undefined ? `ATM ${lastVs.goalsMyTeam}-${lastVs.goalsRival}` : formatDate(lastVs.date)}
+                    Últ {lastLetter}: {lastVs.goalsMyTeam !== '' && lastVs.goalsMyTeam !== undefined ? `ATM ${lastVs.goalsMyTeam}-${lastVs.goalsRival}` : formatDate(lastVs.date)}
                   </span>
                 ) : (
                   <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                    Sin cruces registrados
+                    Escudo disponible
                   </span>
                 )}
               </div>
@@ -4641,7 +4840,7 @@ function ModuleRivales({ rivals = [], matches = [], role, onNew, onEdit, onDelet
           <div className={`col-span-full text-center py-16 rounded-[2rem] border ${theme.border} ${theme.card}`}>
             <Swords className="w-10 h-10 text-slate-400 mx-auto mb-3 opacity-60" />
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-              No se encontraron rivales con este filtro
+              No se encontraron clubes con este filtro
             </p>
           </div>
         )}
@@ -5068,7 +5267,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                       <Swords className="w-16 h-16 sm:w-20 sm:h-20 text-slate-500" />
                     )}
                     <span className="font-black text-[11px] sm:text-xs text-white uppercase text-center mt-3 tracking-wide max-w-[140px]">
-                      {nextMatchRival?.name || 'Rival'}
+                      {getMatchRivalName(nextMatchRival, nextMatch)}
                     </span>
                   </div>
                 </div>
@@ -5463,17 +5662,57 @@ function TechDecisionModal({ initialData, onClose, onSave, theme }) {
 
 function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, darkMode, activeSeason }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialData || { 
-    date: '', time: '', field: '', rivalId: '', goalkeeperIds: [], 
-    gkMinutes: {}, gkGoalsConceded: {}, gkStarter: {}, 
-    streak: [], goalsMyTeam: '', goalsRival: '', goalsScored: '', 
-    season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0] 
-  });
-  
+
+  const initialRivalObj = initialData?.rivalId ? rivals.find(r => r.id === initialData.rivalId) : null;
+  const inferredInitialLetter = initialData?.rivalLetter !== undefined
+    ? initialData.rivalLetter
+    : (initialRivalObj ? (parseClubAndLetter(initialRivalObj.name, initialRivalObj.category).letter || 'NONE') : 'A');
+
+  const [formData, setFormData] = useState(() => ({
+    date: '', time: '', field: '', locationType: 'Local', rivalId: '', rivalLetter: 'A', goalkeeperIds: [],
+    gkMinutes: {}, gkGoalsConceded: {}, gkStarter: {}, gkPenaltiesSaved: {}, gkPenaltiesFaced: {},
+    streak: [], goalsMyTeam: '', goalsRival: '', goalsScored: '',
+    season: activeSeason || '2026/27', league: '', group: '', matchday: '', myTeam: TEAMS_LIST[0],
+    ...(initialData || {}),
+    rivalLetter: inferredInitialLetter
+  }));
+
   const [isCustomField, setIsCustomField] = useState(initialData?.field ? !['CD ATM Alcalá de Henares', 'CD Cerro Del Espino Majadahonda'].includes(initialData.field) : false);
-  
+
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  
+
+  const sortedRivals = useMemo(() => {
+    const keyCounts = new Map();
+    rivals.forEach(r => {
+      const k = normalizeClubKey(parseClubAndLetter(r.name, r.category).baseName);
+      keyCounts.set(k, (keyCounts.get(k) || 0) + 1);
+    });
+    return [...rivals]
+      .map(r => {
+        const { baseName, letter } = parseClubAndLetter(r.name, r.category);
+        const isDup = (keyCounts.get(normalizeClubKey(baseName)) || 0) > 1;
+        return {
+          ...r,
+          displayLabel: isDup && letter ? `${baseName} (${letter})` : (baseName || r.name)
+        };
+      })
+      .sort((a, b) => a.displayLabel.localeCompare(b.displayLabel));
+  }, [rivals]);
+
+  const selectedRivalObj = rivals.find(r => r.id === formData.rivalId) || null;
+  const quickLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+  const handleRivalSelect = (e) => {
+    const newRivalId = e.target.value;
+    const rObj = rivals.find(r => r.id === newRivalId);
+    const embedded = rObj ? parseClubAndLetter(rObj.name, rObj.category).letter : '';
+    setFormData(prev => ({
+      ...prev,
+      rivalId: newRivalId,
+      rivalLetter: embedded || (prev.rivalLetter || 'A')
+    }));
+  };
+
   const toggleGk = (id) => {
     setFormData(prev => {
       const isSelected = prev.goalkeeperIds.includes(id);
@@ -5484,33 +5723,38 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
     });
   };
 
-  const addStreak = (res) => { if (formData.streak.length >= 5) return; setFormData(prev => ({ ...prev, streak: [...(prev.streak || []), res] })); };
+  const addStreak = (res) => { if ((formData.streak || []).length >= 5) return; setFormData(prev => ({ ...prev, streak: [...(prev.streak || []), res] })); };
   const clearStreak = () => setFormData(prev => ({ ...prev, streak: [] }));
 
   const handleSubmit = () => {
-    if(!formData.date || !formData.rivalId) return alert("Fecha y Rival son obligatorios"); 
+    if (!formData.date || !formData.rivalId) return alert("Fecha y Club Rival son obligatorios");
     onSave({ ...formData, id: initialData?.id });
   };
 
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 transition-colors";
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-800 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-sky-500 transition-colors";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-2xl rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><CalendarDays className="text-red-500" /> {initialData ? 'Editar Partido' : 'Nuevo Partido'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors"><X size={20}/></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b18]/80 backdrop-blur-md p-4 no-print">
+      <div className={`w-full max-w-2xl rounded-[2.25rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden`}>
+        {/* Cabecera visionOS */}
+        <div className="px-7 py-5 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white flex justify-between items-center">
+          <h2 className="text-xl font-black italic tracking-tight uppercase flex items-center gap-2.5 text-white">
+            <CalendarDays className="text-red-400" size={22} /> {initialData ? 'Editar Partido' : 'Nuevo Partido'}
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-red-500/30 text-slate-300 hover:text-white rounded-full transition-colors">
+            <X size={18}/>
+          </button>
         </div>
         
-        <div className="flex px-8 pt-8 pb-4">
+        <div className="flex px-8 pt-6 pb-3">
           {['Contexto', 'Fecha & Lugar', 'Rival & Resultados'].map((title, idx) => (
-             <div key={idx} className={`flex-1 text-center text-[10px] font-black uppercase tracking-widest pb-3 border-b-4 rounded-b-sm ${step === idx + 1 ? 'border-red-600 text-red-600' : 'border-slate-100 dark:border-slate-700 text-slate-400'}`}>
+             <div key={idx} onClick={() => setStep(idx + 1)} className={`cursor-pointer flex-1 text-center text-[10px] font-black uppercase tracking-widest pb-3 border-b-4 rounded-b-sm transition-colors ${step === idx + 1 ? 'border-red-600 text-red-600 dark:text-red-400' : 'border-slate-100 dark:border-slate-700 text-slate-400 hover:text-slate-600'}`}>
                 <span className="hidden sm:inline">{title}</span><span className="sm:hidden">Paso {idx+1}</span>
              </div>
           ))}
         </div>
 
-        <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="p-7 overflow-y-auto flex-1 custom-scrollbar">
           {step === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-right-4">
               <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Temporada</label><input type="text" name="season" value={formData.season} onChange={handleChange} className={inputClass} placeholder="Ej: 2026/27" /></div>
@@ -5520,7 +5764,7 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
 
           {step === 2 && (
             <div className="grid grid-cols-1 gap-5 animate-in fade-in slide-in-from-right-4">
-              <div className="mb-5">
+              <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Mi Equipo</label>
                 <select name="myTeam" value={formData.myTeam} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
                   {TEAMS_LIST.map(team => <option key={team} value={team}>{team}</option>)}
@@ -5531,10 +5775,44 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Fecha *</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} required/></div>
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Hora</label><input type="time" name="time" value={formData.time} onChange={handleChange} className={`${inputClass} [color-scheme:light] dark:[color-scheme:dark]`} /></div>
               </div>
+
+              {/* Condición Local / Visitante / Sede */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Condición del Encuentro</label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {['Local', 'Visitante', 'Sede'].map(cond => (
+                    <button
+                      key={cond}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, locationType: cond }))}
+                      className={`py-2.5 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all ${
+                        (formData.locationType || 'Local') === cond
+                          ? 'bg-[#142042] dark:bg-sky-500 text-white border-blue-400/40 shadow-md'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-400'
+                      }`}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Campo</label>
                 {!isCustomField ? (
-                  <select name="field" value={formData.field} onChange={(e) => { if (e.target.value === 'Otro') { setIsCustomField(true); setFormData({...formData, field: ''}); } else { handleChange(e); } }} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}>
+                  <select
+                    name="field"
+                    value={formData.field}
+                    onChange={(e) => {
+                      if (e.target.value === 'Otro') {
+                        setIsCustomField(true);
+                        setFormData({ ...formData, field: '' });
+                      } else {
+                        setFormData({ ...formData, field: e.target.value, locationType: formData.locationType || 'Local' });
+                      }
+                    }}
+                    className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`}
+                  >
                     <option value="">-- Selecciona campo --</option>
                     <option value="CD ATM Alcalá de Henares">CD ATM Alcalá de Henares</option>
                     <option value="CD Cerro Del Espino Majadahonda">CD Cerro Del Espino Majadahonda</option>
@@ -5551,24 +5829,94 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
           )}
 
           {step === 3 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Seleccionar Rival *</label>
-                  <select name="rivalId" value={formData.rivalId} onChange={handleChange} className={`${inputClass} font-bold text-blue-950 dark:text-white cursor-pointer`} required>
-                    <option value="">-- Elige un rival --</option>
-                    {rivals.map(r => <option key={r.id} value={r.id}>{r.name} {r.category && `(${r.category})`}</option>)}
-                  </select>
-                  
-                  {/* CAMPO CONDICIONAL SOLO PARA ALEVÍN A */}
-                  {formData.myTeam && formData.myTeam.toUpperCase().includes('ALEVÍN A') && (
-                    <div className="mt-6 animate-in fade-in slide-in-from-top-2">
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 mb-2 pl-2">Goles Totales Rival (Solo Alevín A)</label>
-                      <input type="number" name="goalsScored" value={formData.goalsScored} onChange={handleChange} className={`${inputClass} bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/50 focus:ring-amber-500`} placeholder="Ej: 45" />
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+              {/* BLOQUE CLUB MATRIZ + SELECTOR RÁPIDO DE LETRA */}
+              <div className="p-5 rounded-[1.75rem] bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                  <div className="md:col-span-8">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-1">Club Rival *</label>
+                    <select name="rivalId" value={formData.rivalId} onChange={handleRivalSelect} className={`${inputClass} !bg-white dark:!bg-slate-800 font-bold text-blue-950 dark:text-white cursor-pointer`} required>
+                      <option value="">-- Elige el club rival --</option>
+                      {sortedRivals.map(r => (
+                        <option key={r.id} value={r.id}>{r.displayLabel}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Vista previa en vivo con escudo */}
+                  <div className="md:col-span-4">
+                    <div className="h-[48px] px-3.5 rounded-2xl bg-[#142042] text-white border border-blue-400/25 flex items-center gap-2.5 shadow-inner overflow-hidden">
+                      {selectedRivalObj?.shieldUrl ? (
+                        <img src={selectedRivalObj.shieldUrl} alt="" className="w-7 h-7 object-contain shrink-0" />
+                      ) : (
+                        <Swords size={18} className="text-slate-400 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-sky-300">Enfrentamiento</span>
+                        <span className="block text-[11px] font-extrabold uppercase truncate">
+                          {selectedRivalObj ? getMatchRivalName(selectedRivalObj, formData) : 'Selecciona club'}
+                        </span>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-                
+
+                {/* Selector de Letra del Equipo Rival */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-1">
+                    Equipo / Letra del Rival al que nos enfrentamos
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {quickLetters.map(ltr => {
+                      const isActive = String(formData.rivalLetter || '').toUpperCase() === ltr;
+                      return (
+                        <button
+                          key={ltr}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, rivalLetter: ltr }))}
+                          className={`w-10 h-10 rounded-xl font-black text-xs uppercase transition-all border ${
+                            isActive
+                              ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-600/25 scale-105'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-red-400'
+                          }`}
+                        >
+                          {ltr}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, rivalLetter: 'NONE' }))}
+                      className={`px-3.5 h-10 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all border ${
+                        formData.rivalLetter === 'NONE' || formData.rivalLetter === ''
+                          ? 'bg-[#142042] dark:bg-sky-500 text-white border-blue-400/40 shadow-md'
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                      }`}
+                    >
+                      Sin letra
+                    </button>
+
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="Otra (H, Fem...)"
+                      value={
+                        formData.rivalLetter &&
+                        formData.rivalLetter !== 'NONE' &&
+                        !quickLetters.includes(String(formData.rivalLetter).toUpperCase())
+                          ? formData.rivalLetter
+                          : ''
+                      }
+                      onChange={(e) => setFormData(prev => ({ ...prev, rivalLetter: e.target.value.toUpperCase() || 'NONE' }))}
+                      className="w-28 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 text-xs font-black uppercase text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* RESULTADO FINAL Y GOLES ALEVÍN A */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Resultado Final (Opcional)</label>
                   <div className="flex items-center gap-4">
@@ -5577,6 +5925,13 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                      <input type="number" name="goalsRival" value={formData.goalsRival} onChange={handleChange} className={`${inputClass} text-center font-black text-xl text-red-500 bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/50 focus:ring-red-500`} placeholder="RIV" />
                   </div>
                 </div>
+
+                {formData.myTeam && formData.myTeam.toUpperCase().includes('ALEVÍN A') && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 mb-2 pl-2">Goles Totales Rival (Solo Alevín A)</label>
+                    <input type="number" name="goalsScored" value={formData.goalsScored} onChange={handleChange} className={`${inputClass} bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/50 focus:ring-amber-500`} placeholder="Ej: 45" />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -5615,13 +5970,12 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
                            <span className={`text-xs font-black uppercase truncate flex-1 ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>{gk.name}</span>
                          </div>
                          
-                         {/* Casillas de Rendimiento en Partido (Solo si está convocado) */}
                          {isSelected && (
                            <div className="w-full mt-2 pt-3 border-t border-blue-200 dark:border-blue-800/50 grid grid-cols-5 gap-2">
                              <div>
                                <label className="text-[8px] uppercase font-black tracking-widest text-slate-500 block mb-1 text-center truncate">Cond.</label>
                                <select 
-                                 value={formData.gkStarter?.[gk.id] ? 'true' : 'false'} 
+                                 value={formData.gkStarter?.[gk.id] === true || String(formData.gkStarter?.[gk.id]) === 'true' ? 'true' : 'false'} 
                                  onChange={(e) => setFormData(prev => ({...prev, gkStarter: {...(prev.gkStarter || {}), [gk.id]: e.target.value === 'true'}}))} 
                                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-1 py-2 text-center text-[10px] font-bold text-blue-950 dark:text-white outline-none focus:border-blue-500 cursor-pointer"
                                  onClick={(e) => e.stopPropagation()}
@@ -5681,17 +6035,17 @@ function MatchFormModal({ initialData, rivals, gks, onClose, onSave, theme, dark
           )}
         </div>
 
-        <div className={`p-6 md:p-8 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
+        <div className="px-7 py-5 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
           {step > 1 ? (
-             <button onClick={() => setStep(step - 1)} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-500 hover:text-blue-950 dark:text-slate-400 dark:hover:text-white flex items-center gap-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700"><ArrowLeft size={16} strokeWidth={3}/> Atrás</button>
+             <button onClick={() => setStep(step - 1)} className="px-6 py-3 rounded-2xl font-black text-xs uppercase text-slate-500 hover:text-blue-950 dark:text-slate-400 dark:hover:text-white flex items-center gap-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700"><ArrowLeft size={16} strokeWidth={3}/> Atrás</button>
           ) : (
-             <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase text-slate-400 hover:text-red-500">Cancelar</button>
+             <button onClick={onClose} className="px-6 py-3 rounded-2xl font-black text-xs uppercase text-slate-400 hover:text-red-500">Cancelar</button>
           )}
 
           {step < 3 ? (
-             <button onClick={() => setStep(step + 1)} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-blue-950 hover:bg-blue-900 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 flex items-center gap-2 shadow-lg">Siguiente <ArrowRight size={16} strokeWidth={3}/></button>
+             <button onClick={() => setStep(step + 1)} className="px-8 py-3 rounded-2xl font-black text-xs uppercase bg-[#142042] hover:bg-blue-900 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 flex items-center gap-2 shadow-lg">Siguiente <ArrowRight size={16} strokeWidth={3}/></button>
           ) : (
-             <button onClick={handleSubmit} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 shadow-lg shadow-red-900/20"><CheckCircle2 size={18} strokeWidth={3}/> Guardar</button>
+             <button onClick={handleSubmit} className="px-8 py-3 rounded-2xl font-black text-xs uppercase bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white flex items-center gap-2 shadow-lg shadow-red-600/25"><CheckCircle2 size={18} strokeWidth={3}/> Guardar Partido</button>
           )}
         </div>
       </div>
@@ -5837,33 +6191,85 @@ function GkFormModal({ initialData, users, onClose, onSave, theme, darkMode }) {
 }
 
 function RivalFormModal({ initialData, onClose, onSave, theme }) {
-  const [formData, setFormData] = useState(initialData || { name: '', category: '', shieldUrl: '' });
+  const initialBaseName = initialData ? (parseClubAndLetter(initialData.name, initialData.category).baseName || initialData.name) : '';
+  const [formData, setFormData] = useState({
+    ...(initialData || {}),
+    name: initialBaseName,
+    category: '',
+    shieldUrl: initialData?.shieldUrl || ''
+  });
+
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleImageUpload = useImageUploader((base64) => setFormData(prev => ({ ...prev, shieldUrl: base64 })));
-  const handleSubmit = () => { if(!formData.name) return alert("Nombre obligatorio"); onSave({ ...formData, id: initialData?.id }); }
-  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 transition-colors";
+
+  const handleSubmit = () => {
+    if (!formData.name || !formData.name.trim()) return alert("El nombre del club es obligatorio");
+    const { baseName } = parseClubAndLetter(formData.name, '');
+    onSave({
+      ...formData,
+      name: (baseName || formData.name).trim(),
+      category: '',
+      id: initialData?.id
+    });
+  };
+
+  const inputClass = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 outline-none font-bold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-900 dark:focus:ring-sky-500 transition-colors";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/80 backdrop-blur-md p-4 no-print">
-      <div className={`w-full max-w-md rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh]`}>
-        <div className={`p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center`}>
-          <h2 className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-blue-950 dark:text-white"><Swords className="text-red-500 w-8 h-8" /> {initialData ? 'Editar Rival' : 'Añadir Rival'}</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-500 rounded-full transition-colors shadow-sm"><X size={20}/></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b18]/80 backdrop-blur-md p-4 no-print">
+      <div className={`w-full max-w-md rounded-[2.25rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden`}>
+        <div className="px-7 py-5 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white flex justify-between items-center">
+          <h2 className="text-xl font-black italic tracking-tight uppercase flex items-center gap-2.5 text-white">
+            <Swords className="text-red-400" size={22} /> {initialData ? 'Editar Club Rival' : 'Añadir Club Rival'}
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-red-500/30 text-slate-300 hover:text-white rounded-full transition-colors">
+            <X size={18}/>
+          </button>
         </div>
-        <div className="p-8 space-y-5 overflow-y-auto custom-scrollbar">
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Nombre del Club</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej: RSD ALCALÁ" className={inputClass} /></div>
-          <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Letra Equipo (Opcional)</label><input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Ej: A" className={inputClass} /></div>
+
+        <div className="p-7 space-y-5 overflow-y-auto custom-scrollbar">
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">Escudo del Club</label>
-            <label className="flex flex-col items-center justify-center w-full h-36 border-4 border-slate-100 dark:border-slate-700 border-dashed rounded-[2rem] cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors bg-white dark:bg-slate-800 shadow-sm">
-              {formData.shieldUrl ? <img src={formData.shieldUrl} className="h-full p-4 object-contain" alt="shield" /> : <div className="text-slate-400 dark:text-slate-500 flex flex-col items-center"><Upload className="mb-2 w-8 h-8"/><span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Subir Escudo</span></div>}
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-1">
+              Nombre del Club Matriz *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Ej: A.D. ALCORCÓN, RAYO VALLECANO..."
+              className={inputClass}
+            />
+            <p className="text-[10px] font-medium text-slate-400 mt-2 pl-1 leading-relaxed">
+              Crea el club una única vez sin letra. La letra del equipo (<strong className="text-slate-600 dark:text-slate-300">A, B, C...</strong>) se selecciona al crear cada partido.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-1">
+              Escudo Oficial del Club
+            </label>
+            <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-[1.75rem] cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors bg-slate-50/50 dark:bg-slate-900/30">
+              {formData.shieldUrl ? (
+                <img src={formData.shieldUrl} className="h-full p-4 object-contain drop-shadow-md" alt="Escudo" />
+              ) : (
+                <div className="text-slate-400 dark:text-slate-500 flex flex-col items-center">
+                  <Upload className="mb-2 w-7 h-7"/>
+                  <span className="text-[10px] uppercase font-black tracking-widest">Subir Escudo</span>
+                </div>
+              )}
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
           </div>
         </div>
-        <div className={`p-8 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-[3rem]`}>
-          <button onClick={onClose} className="px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors shadow-sm border border-slate-200 dark:border-slate-700">Cancelar</button>
-          <button onClick={handleSubmit} className="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg shadow-blue-900/20">Guardar</button>
+
+        <div className="px-7 py-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50">
+          <button onClick={onClose} className="px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 bg-white dark:bg-slate-800 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700">
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} className="px-7 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white transition-all shadow-lg shadow-red-600/25">
+            Guardar Club
+          </button>
         </div>
       </div>
     </div>
