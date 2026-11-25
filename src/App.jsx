@@ -2011,9 +2011,12 @@ export default function App() {
   const renderModule = () => {
     if (selectedGkId && currentModule === 'reporte_detalle') {
       return (
-        <div className="space-y-4 pb-16 md:pb-0">
-          <button onClick={() => setCurrentModule('porteros')} className="no-print text-sm font-bold text-slate-500 hover:text-blue-950 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 mb-2 transition-colors uppercase tracking-widest">
-            ← Volver a la lista
+        <div className="space-y-5 pb-16 md:pb-0">
+          <button
+            onClick={() => setCurrentModule('porteros')}
+            className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 text-xs font-black text-slate-600 hover:text-blue-950 dark:text-slate-300 dark:hover:text-white shadow-sm hover:-translate-x-0.5 transition-all uppercase tracking-widest"
+          >
+            <ArrowLeft size={14} /> Volver a porteros
           </button>
           <DashboardView 
              gk={selectedGk} 
@@ -3762,7 +3765,7 @@ function ModuleAjustes({ users, currentUserData, role, onNewUser, onEditUser, on
   );
 }
 
-// --- VISTA DETALLADA DEL PORTERO (DASHBOARD) ---
+// --- VISTA DETALLADA DEL PORTERO (DASHBOARD VISION OS) ---
 function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTechDec, onEditStats, onEditMatchPlan, activeSeason, isDataLoading, exportTrigger, resetExportTrigger, showNotification, role }) {
   
   useEffect(() => {
@@ -3780,21 +3783,23 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const gkMatches = matches.filter(m => m.goalkeeperIds?.includes(gk.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
   const nextMatch = gkMatches.filter(m => m.date >= todayStr)[0];
   const nextMatchRival = nextMatch ? rivals.find(r => r.id === nextMatch.rivalId) : null;
+  const enlaceRFFM = (nextMatch && typeof ENLACES_RFFM !== 'undefined') ? ENLACES_RFFM[nextMatch.myTeam] : null;
+  const convocadosNext = nextMatch ? (allGks && allGks.length ? allGks : [gk]).filter(g => nextMatch.goalkeeperIds?.includes(g.id)) : [];
 
   const getGkState = (formScore) => {
-    if (formScore >= 8.0) return { text: 'EN FORMA', icon: '🟢', color: 'text-emerald-500 dark:text-emerald-400' };
-    if (formScore >= 5.0) return { text: 'REGULAR', icon: '🟠', color: 'text-orange-500 dark:text-orange-400' };
-    return { text: 'BAJO', icon: '🔴', color: 'text-red-500 dark:text-red-400' };
+    if (formScore >= 8.0) return { text: 'EN FORMA', dot: 'bg-emerald-400 shadow-[0_0_12px_#34d399]', pill: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', color: 'text-emerald-500 dark:text-emerald-400' };
+    if (formScore >= 5.0) return { text: 'REGULAR', dot: 'bg-amber-400 shadow-[0_0_12px_#fbbf24]', pill: 'bg-amber-500/15 text-amber-300 border-amber-400/30', color: 'text-amber-500 dark:text-amber-400' };
+    return { text: 'BAJO', dot: 'bg-red-500 shadow-[0_0_12px_#ef4444]', pill: 'bg-red-500/15 text-red-300 border-red-400/30', color: 'text-red-500 dark:text-red-400' };
   };
   const gkState = getGkState(gk.form || 5);
 
   const getTrend = (perfData) => {
-    if (!perfData || perfData.length < 2) return { text: 'ESTABLE →', color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' };
+    if (!perfData || perfData.length < 2) return { text: 'ESTABLE →', color: 'text-slate-500 dark:text-slate-300', bg: 'bg-slate-500/10 border border-slate-400/20' };
     const last = perfData[perfData.length - 1].goals;
     const prev = perfData[perfData.length - 2].goals;
-    if (last < prev) return { text: 'EN MEJORA ↗', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-100 dark:border-emerald-500/20' };
-    if (last > prev) return { text: 'EN DECLIVE ↘', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-400/10 border border-red-100 dark:border-red-500/20' };
-    return { text: 'ESTABLE →', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-400/10 border border-blue-100 dark:border-blue-500/20' };
+    if (last < prev) return { text: 'EN MEJORA ↗', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/25' };
+    if (last > prev) return { text: 'EN DECLIVE ↘', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10 border border-red-500/25' };
+    return { text: 'ESTABLE →', color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-500/10 border border-sky-500/25' };
   };
   const gkTrend = getTrend(gk.performanceData);
 
@@ -3826,12 +3831,10 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
   pastGkMatches.forEach(m => {
       dConvocatorias += 1;
-      
       const minsJugados = parseInt(m.gkMinutes?.[gk.id]);
       
       if (!isNaN(minsJugados) && minsJugados > 0) {
           dMins += minsJugados;
-          
           const isTitular = m.gkStarter?.[gk.id] === true || String(m.gkStarter?.[gk.id]) === 'true';
           if (isTitular) dStarts += 1; else dSubs += 1;
           
@@ -3877,7 +3880,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
   const cleanSheetsPercent = finalPlayedMatches > 0 ? Math.min(100, Math.round((finalCleanSheets / safePlayedMatches) * 100)) : 0;
   const penaltiesPercent = finalPenaltiesFaced > 0 ? Math.round((finalPenaltiesSaved / finalPenaltiesFaced) * 100) : 0;
 
-  // --- NUEVO: ESTADO EN EL ÚLTIMO PARTIDO ---
+  // Estado en el último partido
   const lastPlayedMatch = [...pastGkMatches].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   let lastMatchCond = null;
   if (lastPlayedMatch) {
@@ -3887,236 +3890,440 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
       else lastMatchCond = isTit ? 'TITULAR' : 'SUPLENTE';
   }
 
+  // Edad y nacionalidad
+  const parsedBirth = parseInt(gk.birthYear);
+  const computedAge = (!isNaN(parsedBirth) && parsedBirth > 1950)
+    ? (new Date().getFullYear() - parsedBirth)
+    : (gk.age || null);
+  const natLower = normalizeStr(gk.nationality);
+  const isSpain = !natLower || natLower.includes('espan');
+
   return (
-    <div className="flex flex-col gap-8 relative">
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12">
-        {/* TARJETA PERFIL */}
-        <div className={`xl:col-span-4 rounded-[3rem] border ${theme.border} ${theme.card} overflow-hidden flex relative min-h-[380px] shadow-sm`}>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 dark:bg-red-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          
-          <div className={`w-2/5 ${darkMode ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700/50' : 'bg-gradient-to-br from-slate-200 to-slate-300 border-slate-200'} relative flex flex-col justify-end border-r overflow-hidden`}>
-            <div className="absolute inset-0 z-10">
-              <img 
-                src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} 
-                alt={gk.name} 
-                className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" 
-                style={{ objectPosition: 'center 15%', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} 
+    <div className="flex flex-col gap-6 relative">
+      {/* FILA SUPERIOR HERO: PERFIL VISION OS + PRÓXIMO PARTIDO */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 print:grid-cols-12">
+        
+        {/* 1. TARJETA DE IDENTIDAD DEL PORTERO (DEEP NAVY GLASS) */}
+        <div className="xl:col-span-5 rounded-[2rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_20px_45px_rgba(7,11,24,0.35)] p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between">
+          {/* Halos de luz y dorsal de agua */}
+          <div className="pointer-events-none absolute -top-20 -right-16 w-56 h-56 rounded-full bg-sky-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-20 -left-16 w-56 h-56 rounded-full bg-red-600/10 blur-3xl" />
+          <span className="pointer-events-none select-none absolute right-5 top-3 text-8xl font-black italic text-white/[0.04]">
+            {gk.number}
+          </span>
+
+          {/* Cabecera Foto + Identidad */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 relative z-10">
+            <div className="w-28 h-32 sm:w-32 sm:h-36 rounded-2xl bg-gradient-to-b from-[#33589e] via-[#223d72] to-[#132347] border border-sky-300/35 shadow-[0_12px_28px_rgba(0,0,0,0.45)] overflow-hidden shrink-0 relative">
+              <img
+                src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+                alt={gk.name}
+                className="w-full h-full object-cover"
+                style={{ objectPosition: 'center 15%' }}
                 crossOrigin="anonymous"
               />
+              {gk.number && (
+                <span className="absolute bottom-0 right-0 bg-[#0a1024]/90 backdrop-blur-md text-xs font-black text-sky-300 px-2.5 py-1 rounded-tl-xl border-t border-l border-white/15">
+                  #{gk.number}
+                </span>
+              )}
             </div>
-            <span className="absolute top-12 right-4 md:right-6 text-transparent text-8xl md:text-9xl font-black italic transform -skew-x-6 z-20 pointer-events-none select-none drop-shadow-xl" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.2)' : '2px rgba(15, 23, 42, 0.1)' }}>
-              {gk.number}
-            </span>
-            <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${darkMode ? 'from-slate-900' : 'from-white'} to-transparent z-10 pointer-events-none`}></div>
-            <div className="relative z-20 text-center pb-6 px-2">
-              <span className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter text-transparent break-words leading-none" style={{ WebkitTextStroke: darkMode ? '1.5px rgba(255, 255, 255, 0.95)' : '1.5px rgba(23, 37, 84, 0.95)' }}>{gk.name}</span>
-              <p className="text-[11px] font-black text-red-600 dark:text-red-500 uppercase tracking-[0.3em] mt-2 drop-shadow-sm">{gk.team || 'Atlético de Madrid'}</p>
-            </div>
-          </div>
-          
-          <div className="w-3/5 p-6 md:p-8 flex flex-col justify-between z-10">
-            <div>
-              <div className="mt-2 space-y-4">
-                <ProfileRow label="Equipo" value={gk.team || 'Atlético de Madrid'} theme={theme} />
-                <ProfileRow label="Competición" value={`${gk.league || '--'} ${gk.group ? `(${gk.group})` : ''}`} theme={theme} />
-                <ProfileRow label="Pie Domin." value={gk.foot || 'Derecho'} theme={theme} />
-                <ProfileRow label="Mano Domin." value={gk.hand || 'Derecha'} theme={theme} />
-              </div>
-            </div>
-            <div className={`mt-6 p-5 rounded-[2rem] ${darkMode ? 'bg-slate-900/80' : 'bg-slate-50 border border-slate-100'} flex items-center justify-between shadow-inner`}>
-              <div>
-                <p className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}>Forma</p>
-                <div className="flex items-end gap-1"><span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">{gk.form || '5.0'}</span><span className={`text-xs mb-1 font-bold ${theme.textMuted}`}>/10</span></div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex gap-1.5">{gk.lastMatches?.map((m, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full ${m === 'W' ? 'bg-emerald-500' : m === 'D' ? 'bg-blue-500' : 'bg-red-500'} shadow-sm`}></div>)}</div>
-                {/* ETIQUETA NUEVA DE ÚLTIMO PARTIDO */}
-                {lastMatchCond && (
-                  <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${
-                    lastMatchCond === 'TITULAR' 
-                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' 
-                      : lastMatchCond === 'SUPLENTE' 
-                        ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800'
-                        : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                  }`}>
-                    Últ. Partido: {lastMatchCond}
+
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300/90 mb-1">
+                <img src={ESCUDO_ATM_URL} alt="" className="w-3.5 h-3.5 object-contain" />
+                Ficha Oficial
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight break-words">
+                {gk.name}
+              </h2>
+
+              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap text-xs text-slate-300 font-medium mt-1.5">
+                {isSpain ? (
+                  <svg className="w-4 h-3 rounded-[2px] shrink-0 shadow-sm" viewBox="0 0 16 12">
+                    <rect width="16" height="3" y="0" fill="#c60b1e" />
+                    <rect width="16" height="6" y="3" fill="#ffc400" />
+                    <rect width="16" height="3" y="9" fill="#c60b1e" />
+                  </svg>
+                ) : (
+                  <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-slate-200">
+                    {gk.nationality?.substring(0, 3)}
                   </span>
                 )}
+                <span>Portero{computedAge ? ` · ${computedAge} años` : ''}</span>
               </div>
+
+              {/* Etiquetas limpias sin solapamiento */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-3.5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-400/30 text-[11px] font-bold text-red-200">
+                  {gk.team || 'Atlético de Madrid'}
+                </span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-slate-200">
+                  {gk.league || 'Competición'}{gk.group ? ` · ${gk.group}` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Atributos Físicos / Técnicos en Cristal */}
+          <div className="grid grid-cols-2 gap-3 my-5 relative z-10">
+            <div className="p-3 rounded-2xl bg-white/[0.05] border border-white/10 backdrop-blur-md">
+              <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Pie Dominante</span>
+              <span className="block text-sm font-bold text-white mt-0.5">{gk.foot || 'Derecho'}</span>
+            </div>
+            <div className="p-3 rounded-2xl bg-white/[0.05] border border-white/10 backdrop-blur-md">
+              <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Mano Dominante</span>
+              <span className="block text-sm font-bold text-white mt-0.5">{gk.hand || 'Derecha'}</span>
+            </div>
+          </div>
+
+          {/* Barra Inferior: Forma + Último Partido */}
+          <div className="p-4 rounded-2xl bg-white/[0.07] border border-white/15 backdrop-blur-xl flex flex-wrap items-center justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Forma Actual</p>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-3xl font-black text-sky-400 leading-none">{gk.form || '5.0'}</span>
+                  <span className="text-xs font-bold text-slate-400">/10</span>
+                </div>
+              </div>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${gkState.pill}`}>
+                <span className={`w-2 h-2 rounded-full ${gkState.dot}`} />
+                {gkState.text}
+              </span>
+            </div>
+
+            <div className="flex flex-col items-end gap-1.5">
+              {gk.lastMatches && gk.lastMatches.length > 0 && (
+                <div className="flex gap-1.5">
+                  {gk.lastMatches.map((m, i) => (
+                    <div key={i} className={`w-3 h-3 rounded-full ${m === 'W' ? 'bg-emerald-400' : m === 'D' ? 'bg-sky-400' : 'bg-red-400'}`} />
+                  ))}
+                </div>
+              )}
+              {lastMatchCond && (
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                  lastMatchCond === 'TITULAR'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                    : lastMatchCond === 'SUPLENTE'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-400/30'
+                      : 'bg-white/10 text-slate-300 border-white/15'
+                }`}>
+                  Últ. Partido: {lastMatchCond}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* WIDGET DINÁMICO DE PRÓXIMO PARTIDO */}
-        <div className={`xl:col-span-8 h-full`}>
+        {/* 2. WIDGET DE PRÓXIMO PARTIDO (VISION OS MATCHDAY GLASS) */}
+        <div className="xl:col-span-7 h-full">
           {nextMatch ? (
-             <MatchScoreboardCard match={nextMatch} rival={nextMatchRival} gks={[gk]} theme={theme} darkMode={darkMode} />
+            <div className="h-full rounded-[2rem] bg-gradient-to-br from-[#142042] via-[#0e1730] to-[#090e20] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_20px_45px_rgba(7,11,24,0.35)] overflow-hidden flex flex-col justify-between relative">
+              <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-blue-500/15 blur-3xl" />
+
+              {/* Cabecera Competición */}
+              <div className="bg-white/[0.05] border-b border-white/10 px-5 py-3.5 flex flex-wrap items-center justify-center gap-2 relative z-10">
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] text-sky-300 text-center">
+                  {nextMatch.league || 'Competición por definir'} {nextMatch.group && `· ${nextMatch.group}`} {nextMatch.matchday && `· JORNADA ${nextMatch.matchday}`}
+                </span>
+                <span className="bg-white/10 border border-white/15 text-slate-200 text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase">
+                  {nextMatch.season || activeSeason}
+                </span>
+                {enlaceRFFM && enlaceRFFM !== "" && !enlaceRFFM.includes("AQUI_URL") && (
+                  <a
+                    href={enlaceRFFM}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-amber-400/20 hover:bg-amber-400/35 border border-amber-400/40 p-1.5 rounded-full transition-colors flex items-center justify-center"
+                    title="Ver clasificación en RFFM"
+                  >
+                    <Trophy size={13} className="text-amber-300" />
+                  </a>
+                )}
+              </div>
+
+              {/* Cuerpo Central Enfrentamiento */}
+              <div className="px-6 py-6 flex-1 flex flex-col justify-center relative z-10">
+                <div className="flex flex-col items-center mb-5">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/25 text-emerald-300 text-[11px] font-black uppercase tracking-wider">
+                    <MapPin size={13} />
+                    <span className="truncate max-w-[230px]">{nextMatch.field || 'Campo por definir'}</span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 mt-1.5 tracking-wider">{formatDate(nextMatch.date)}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 sm:px-6">
+                  {/* Escudo Atleti */}
+                  <div className="flex flex-col items-center flex-1">
+                    <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
+                    <span className="font-black text-[11px] sm:text-xs text-white uppercase text-center mt-3 tracking-wide">
+                      {nextMatch.myTeam || 'Atleti'}
+                    </span>
+                  </div>
+
+                  {/* Hora / Marcador Cristal */}
+                  <div className="flex flex-col items-center px-2">
+                    <div className="px-5 py-3 sm:px-7 sm:py-3.5 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+                      <span className="text-2xl sm:text-3xl font-black text-white tracking-widest">
+                        {nextMatch.time || '--:--'}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400 mt-2">Hora</span>
+                  </div>
+
+                  {/* Escudo Rival */}
+                  <div className="flex flex-col items-center flex-1">
+                    {nextMatchRival?.shieldUrl ? (
+                      <img src={nextMatchRival.shieldUrl} alt="Rival" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+                    ) : (
+                      <Swords className="w-16 h-16 sm:w-20 sm:h-20 text-slate-500" />
+                    )}
+                    <span className="font-black text-[11px] sm:text-xs text-white uppercase text-center mt-3 tracking-wide max-w-[140px]">
+                      {nextMatchRival?.name || 'Rival'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Convocatoria y Racha */}
+              <div className="bg-black/25 border-t border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Convocatoria</span>
+                  <div className="flex -space-x-2.5">
+                    {convocadosNext.map(convGk => (
+                      <img
+                        key={convGk.id}
+                        src={convGk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${convGk.name}`}
+                        title={convGk.name}
+                        className={`w-9 h-9 rounded-full object-cover border-2 ${convGk.id === gk.id ? 'border-sky-400 ring-2 ring-sky-400/30' : 'border-slate-800'} bg-slate-800`}
+                        style={{ objectPosition: 'center 15%' }}
+                        alt=""
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Racha Rival</span>
+                  <StreakDisplay streak={nextMatch.streak} />
+                </div>
+              </div>
+            </div>
           ) : (
-            <div className={`h-full p-8 rounded-[3rem] border ${theme.border} ${theme.card} flex flex-col items-center justify-center text-slate-400 dark:text-slate-500`}>
-              <CalendarDays size={56} className="mb-4 opacity-50" />
-              <p className="text-base font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Sin partidos inminentes</p>
-              <p className="text-xs mt-2 font-medium">Este portero no está en ninguna convocatoria próxima.</p>
+            <div className="h-full min-h-[320px] rounded-[2rem] bg-gradient-to-br from-[#142042] via-[#0e1730] to-[#090e20] text-white border border-blue-400/20 shadow-[0_20px_45px_rgba(7,11,24,0.3)] p-8 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+                <CalendarDays size={32} className="text-sky-400/80" />
+              </div>
+              <p className="text-sm font-black uppercase tracking-widest text-white">Sin partidos inminentes</p>
+              <p className="text-xs text-slate-400 mt-1.5 max-w-xs">Este portero no figura en ninguna convocatoria futura por ahora.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ESTADÍSTICAS GRID */}
-      <div>
-        <div className="flex justify-between items-center mb-6 ml-2 group">
-          <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-slate-300">Estadísticas Temporada {activeSeason}</h3>
+      {/* SECCIÓN ESTADÍSTICAS BENTO VISION OS */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap justify-between items-center gap-3 px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-sky-500/15 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-sky-400">
+              <Activity size={16} />
+            </div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-white">
+              Estadísticas Temporada {activeSeason}
+            </h3>
+          </div>
+
           {role !== 'staff' && (
-            <div className="flex items-center gap-3">
-              <span className="hidden md:inline-block px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-lg shadow-sm">Calculado del Calendario</span>
-              <button onClick={onEditStats} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-white hover:bg-emerald-600 hover:border-emerald-500 transition-all shadow-sm no-print opacity-100" title="Editar Estado de Forma">
-                <Edit2 size={16} strokeWidth={3} />
+            <div className="flex items-center gap-2.5">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-full">
+                <Zap size={12} /> Calculado del Calendario
+              </span>
+              <button
+                onClick={onEditStats}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-blue-950 hover:text-white dark:hover:bg-sky-500 transition-all shadow-sm text-[10px] font-black uppercase tracking-wider no-print"
+                title="Editar Estado de Forma"
+              >
+                <Edit2 size={12} /> Editar Forma
               </button>
             </div>
           )}
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 print:grid-cols-4">
-          <StatCard title="Minutos Jugados" value={finalMinutes} subtitle="min. jugados" color="stroke-blue-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Titular" value={finalStarts} subtitle={`${finalStarts} / ${finalTeamMatches}`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Partidos Suplente" value={finalSubs} subtitle={`${finalSubs} / ${finalTeamMatches}`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
-          <StatCard title="Goles Encajados" value={finalGoals} subtitle={`Promedio: ${finalPlayedMatches ? (finalGoals / finalPlayedMatches).toFixed(2) : 0}`} color="stroke-red-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Porterías a Cero" value={finalCleanSheets} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} theme={theme} darkMode={darkMode} />
-          <StatCard title="Penaltis Parados" value={finalPenaltiesSaved} subtitle={`de ${finalPenaltiesFaced} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} theme={theme} darkMode={darkMode} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:grid-cols-4">
+          <StatCard title="Minutos Jugados" value={finalMinutes} subtitle="min. jugados" color="stroke-sky-500" percent={minsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Titular" value={finalStarts} subtitle={`${finalStarts} de ${finalTeamMatches} partidos`} color="stroke-indigo-500" percent={startsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Partidos Suplente" value={finalSubs} subtitle={`${finalSubs} de ${finalTeamMatches} partidos`} color="stroke-violet-500" percent={subsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Goles Encajados" value={finalGoals} subtitle={`Promedio: ${finalPlayedMatches ? (finalGoals / finalPlayedMatches).toFixed(2) : '0.00'}`} color="stroke-rose-500" percent={goalsPercent} theme={theme} darkMode={darkMode} />
+          <StatCard title="Porterías a Cero" value={finalCleanSheets} subtitle="Ratio clean sheets" color="stroke-emerald-500" percent={cleanSheetsPercent} showPercentInside={true} theme={theme} darkMode={darkMode} />
+          <StatCard title="Penaltis Parados" value={finalPenaltiesSaved} subtitle={`de ${finalPenaltiesFaced} penaltis`} color="stroke-cyan-500" percent={penaltiesPercent} showPercentInside={finalPenaltiesFaced > 0} theme={theme} darkMode={darkMode} />
           
-          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center relative overflow-hidden shadow-sm`}>
-             <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
-             <div className="space-y-3 flex-1 flex flex-col justify-center">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{finalConvocatorias}/{finalTeamMatches}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">{finalTeamMatches > 0 ? Math.round((finalConvocatorias / finalTeamMatches) * 100) : 0}%</span>
-                  </div>
+          {/* Tarjeta 7: Datos Globales */}
+          <div className={`p-5 rounded-[1.75rem] border ${theme.border} ${theme.card} flex flex-col justify-between relative overflow-hidden`}>
+            <h4 className={`text-[10px] uppercase tracking-widest font-black ${theme.textMuted} mb-3`}>Datos Globales</h4>
+            <div className="space-y-2.5 flex-1 flex flex-col justify-center">
+              <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-white/10 pb-2">
+                <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Convocatorias</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black text-blue-950 dark:text-white">{finalConvocatorias}/{finalTeamMatches}</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400">{finalTeamMatches > 0 ? Math.round((finalConvocatorias / finalTeamMatches) * 100) : 0}%</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{finalPlayedMatches}/{finalTeamMatches}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">{finalTeamMatches > 0 ? Math.round((finalPlayedMatches / finalTeamMatches) * 100) : 0}%</span>
-                  </div>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-white/10 pb-2">
+                <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Jugados</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black text-blue-950 dark:text-white">{finalPlayedMatches}/{finalTeamMatches}</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">{finalTeamMatches > 0 ? Math.round((finalPlayedMatches / finalTeamMatches) * 100) : 0}%</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Min. Totales Equipo</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-950 dark:text-white">{finalMinutes}/{finalTeamMinutes}</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">{finalTeamMinutes > 0 ? Math.round((finalMinutes / finalTeamMinutes) * 100) : 0}%</span>
-                  </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className={`text-[10px] font-bold ${theme.textMuted} uppercase`}>Min. Equipo</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black text-blue-950 dark:text-white">{finalMinutes}/{finalTeamMinutes}</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400">{finalTeamMinutes > 0 ? Math.round((finalMinutes / finalTeamMinutes) * 100) : 0}%</span>
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
 
-          <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm`}>
-             <span className="text-4xl md:text-5xl mb-2 md:mb-3 drop-shadow-md">{gkState.icon}</span>
-             <span className={`text-[10px] font-black uppercase tracking-widest ${gkState.color}`}>{gkState.text}</span>
+          {/* Tarjeta 8: Semáforo de Rendimiento VisionOS */}
+          <div className={`p-5 rounded-[1.75rem] border ${theme.border} ${theme.card} flex flex-col justify-center items-center text-center relative overflow-hidden`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5 border ${
+              (gk.form || 5) >= 8 ? 'bg-emerald-500/15 border-emerald-500/30' : (gk.form || 5) >= 5 ? 'bg-amber-500/15 border-amber-500/30' : 'bg-red-500/15 border-red-500/30'
+            }`}>
+              <div className={`w-5 h-5 rounded-full ${gkState.dot}`} />
+            </div>
+            <span className={`text-xs font-black uppercase tracking-widest ${gkState.color}`}>{gkState.text}</span>
+            <span className={`text-[10px] font-semibold ${theme.textMuted} mt-1`}>Valoración {gk.form || '5.0'} / 10</span>
           </div>
         </div>
       </div>
 
-      {/* PLAN DE PARTIDO */}
-      <div className={`rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm relative overflow-hidden group`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 dark:bg-blue-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+      {/* PLAN DE PARTIDO (PANEL CRISTAL AZUL PROFUNDO VISION OS) */}
+      <div className="rounded-[2rem] bg-gradient-to-r from-[#142042] via-[#101936] to-[#171533] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_20px_45px_rgba(10,16,41,0.28)] p-6 sm:p-8 flex flex-col relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 right-10 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl" />
         
-        <div className="flex justify-between items-center mb-8 relative z-10">
-          <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white flex items-center gap-2">
-            <Target size={18} className="text-blue-500"/> Plan de Partido
-          </h3>
+        <div className="flex justify-between items-center mb-6 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300">
+              <Target size={18} />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">Plan de Partido</h3>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Directrices tácticas individuales</p>
+            </div>
+          </div>
           {role !== 'staff' && (
-            <button onClick={onEditMatchPlan} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Plan de Partido">
-              <Edit2 size={16} strokeWidth={3} />
+            <button
+              onClick={onEditMatchPlan}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-white transition-all no-print"
+              title="Editar Plan de Partido"
+            >
+              <Edit2 size={13} /> Editar Plan
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 relative z-10">
-          <MatchPlanBox title="Objetivo Defensivo" icon={<Shield size={18} className="text-red-500"/>} content={gk.matchPlan?.defensive} darkMode={darkMode} />
-          <MatchPlanBox title="Objetivo Ofensivo" icon={<Swords size={18} className="text-emerald-500"/>} content={gk.matchPlan?.offensive} darkMode={darkMode} />
-          <MatchPlanBox title="Objetivo Táctico" icon={<GitCompare size={18} className="text-blue-500"/>} content={gk.matchPlan?.tactical} darkMode={darkMode} />
-          <MatchPlanBox title="Aspectos Claves" icon={<Goal size={18} className="text-yellow-500"/>} content={gk.matchPlan?.keyAspects} darkMode={darkMode} />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 relative z-10">
+          <MatchPlanBox title="Objetivo Defensivo" icon={<Shield size={16} className="text-rose-400"/>} content={gk.matchPlan?.defensive} />
+          <MatchPlanBox title="Objetivo Ofensivo" icon={<Swords size={16} className="text-emerald-400"/>} content={gk.matchPlan?.offensive} />
+          <MatchPlanBox title="Objetivo Táctico" icon={<GitCompare size={16} className="text-sky-400"/>} content={gk.matchPlan?.tactical} />
+          <MatchPlanBox title="Aspectos Claves" icon={<Goal size={16} className="text-amber-400"/>} content={gk.matchPlan?.keyAspects} />
         </div>
       </div>
 
-      {/* GRÁFICOS (RADAR Y LÍNEA) Y DECISIÓN DE TITULARIDAD */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:grid-cols-12 print:break-inside-avoid">
+      {/* GRÁFICOS ANALÍTICOS Y DECISIÓN TÉCNICA */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 print:grid-cols-12 print:break-inside-avoid">
         
         {/* RADAR: HABILIDADES */}
-        <div className={`xl:col-span-3 rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col items-center justify-center shadow-sm`}>
-           <h3 className="text-xs font-black uppercase tracking-widest mb-4 w-full text-center text-blue-950 dark:text-white">Perfil Técnico</h3>
-           <div className="w-full h-[240px] -mt-4">
-             <ResponsiveContainer width="100%" height="100%">
-               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={gk.skills || DUMMY_GOALKEEPER.skills}>
-                 <PolarGrid stroke={darkMode ? '#334155' : '#cbd5e1'} />
-                 <PolarAngleAxis dataKey="subject" tick={{ fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '900' }} />
-                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                 <Radar name={gk.name} dataKey="A" stroke="#ef4444" fill="#ef4444" fillOpacity={0.5} strokeWidth={2} />
-                 <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '16px' }} />
-               </RadarChart>
-             </ResponsiveContainer>
-           </div>
+        <div className={`xl:col-span-3 rounded-[2rem] border ${theme.border} ${theme.card} p-6 sm:p-7 flex flex-col items-center justify-center`}>
+          <h3 className="text-xs font-black uppercase tracking-widest mb-3 w-full text-center text-blue-950 dark:text-white">Perfil Técnico</h3>
+          <div className="w-full h-[230px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={gk.skills || DUMMY_GOALKEEPER.skills}>
+                <PolarGrid stroke={darkMode ? 'rgba(148,163,184,0.2)' : '#cbd5e1'} />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: darkMode ? '#cbd5e1' : '#475569', fontSize: 10, fontWeight: '800' }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar name={gk.name} dataKey="A" stroke="#0284c7" fill="#38bdf8" fillOpacity={0.35} strokeWidth={2.5} />
+                <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#0f172a' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '14px' }} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* LÍNEA: EVOLUCIÓN Y TENDENCIA */}
-        <div className={`xl:col-span-6 rounded-[3rem] border ${theme.border} ${theme.card} p-8 flex flex-col shadow-sm`}>
-          <div className="flex justify-between items-center mb-8">
-             <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white">Evolución (Últimos 5)</h3>
-             <span className={`text-[10px] font-black px-4 py-1.5 rounded-xl ${gkTrend.bg} ${gkTrend.color}`}>{gkTrend.text}</span>
+        <div className={`xl:col-span-6 rounded-[2rem] border ${theme.border} ${theme.card} p-6 sm:p-7 flex flex-col`}>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xs font-black uppercase tracking-widest text-blue-950 dark:text-white">Evolución (Últimos 5)</h3>
+            <span className={`text-[10px] font-black px-3.5 py-1 rounded-full ${gkTrend.bg} ${gkTrend.color}`}>{gkTrend.text}</span>
           </div>
-          <div className="flex-1 min-h-[200px] w-full">
+          <div className="flex-1 min-h-[195px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={gk.performanceData || DUMMY_GOALKEEPER.performanceData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#334155' : '#f1f5f9'} vertical={false} />
-                <XAxis dataKey="match" stroke={darkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} fontWeight="bold" />
-                <YAxis stroke={darkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} domain={[0, 'auto']} fontWeight="bold" />
-                <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '16px', color: darkMode ? '#fff' : '#000' }} itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}/>
-                <Line type="monotone" dataKey="goals" name="Goles Encajados" stroke="#ef4444" strokeWidth={4} dot={{ r: 5, strokeWidth: 2 }} activeDot={{ r: 7 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? 'rgba(148,163,184,0.15)' : '#e2e8f0'} vertical={false} />
+                <XAxis dataKey="match" stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} axisLine={false} fontWeight="bold" />
+                <YAxis stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} axisLine={false} domain={[0, 'auto']} fontWeight="bold" />
+                <RechartsTooltip contentStyle={{ backgroundColor: darkMode ? '#0f172a' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', borderRadius: '14px', color: darkMode ? '#fff' : '#0f172a' }} itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}/>
+                <Line type="monotone" dataKey="goals" name="Goles Encajados" stroke="#ef4444" strokeWidth={3.5} dot={{ r: 4.5, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6.5 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-center gap-8 mt-6">
-            <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-sm"></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Goles Encajados</span></div>
+          <div className="flex justify-center gap-6 mt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Goles Encajados</span>
+            </div>
           </div>
         </div>
 
-        {/* RECOMENDACIÓN TÉCNICA (MANUAL) */}
-        <div className={`xl:col-span-3 rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 p-8 flex flex-col relative overflow-hidden shadow-sm dark:shadow-md group`}>
-           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
-           <div className="flex justify-between items-center mb-6 relative z-10">
-             <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-2">
-               <BarChart2 size={18}/> Decisión
-             </h3>
-             {role !== 'staff' && (
-               <button onClick={onEditTechDec} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-blue-600 transition-all shadow-sm no-print opacity-100" title="Editar Decisión">
-                 <Edit2 size={14} strokeWidth={3} />
-               </button>
-             )}
-           </div>
-           
-           <div className="flex-1 flex flex-col justify-center">
-              <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] mb-5 relative z-10 shadow-inner">
-                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest block mb-1">Recomendación</span>
-                 <span className="text-xl font-black italic tracking-tighter text-blue-950 dark:text-white leading-tight uppercase">{recommendation.title}</span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium relative z-10"><strong className="text-slate-800 dark:text-slate-200 block mb-1">Motivo:</strong> {recommendation.reason}</p>
-           </div>
+        {/* RECOMENDACIÓN TÉCNICA (TARJETA CRISTAL OSCURA DESTACADA) */}
+        <div className="xl:col-span-3 rounded-[2rem] bg-gradient-to-br from-[#1b1635] via-[#121936] to-[#0b1024] text-white border border-red-400/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_18px_40px_rgba(10,16,41,0.3)] p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-12 -right-12 w-36 h-36 bg-red-500/20 rounded-full blur-2xl" />
+          
+          <div className="flex justify-between items-center mb-4 relative z-10">
+            <h3 className="text-xs font-black uppercase tracking-widest text-red-300 flex items-center gap-2">
+              <BarChart2 size={16} /> Decisión Técnica
+            </h3>
+            {role !== 'staff' && (
+              <button
+                onClick={onEditTechDec}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 hover:text-white transition-all no-print"
+                title="Editar Decisión"
+              >
+                <Edit2 size={13} />
+              </button>
+            )}
+          </div>
+          
+          <div className="flex-1 flex flex-col justify-center relative z-10">
+            <div className="bg-white/[0.07] border border-white/15 backdrop-blur-md p-4 rounded-2xl mb-4">
+              <span className="text-[9px] text-red-300/90 uppercase font-black tracking-widest block mb-1">Recomendación</span>
+              <span className="text-lg font-black italic tracking-tight text-white leading-snug uppercase block">
+                {recommendation.title}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed font-medium">
+              <strong className="text-white block mb-1 uppercase text-[10px] tracking-wider">Justificación:</strong>
+              {recommendation.reason}
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const MatchPlanBox = ({ title, icon, content, darkMode }) => (
-  <div className={`bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/50 p-5 rounded-[2rem] shadow-inner flex flex-col h-full`}>
-     <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+const MatchPlanBox = ({ title, icon, content }) => (
+  <div className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/12 p-5 rounded-2xl backdrop-blur-md transition-all flex flex-col h-full">
+    <div className="flex items-center gap-2.5 mb-3 border-b border-white/10 pb-2.5">
+      <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
         {icon}
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{title}</span>
-     </div>
-     <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">
-       {content || <span className="text-slate-400 italic">No definido...</span>}
-     </p>
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-200">{title}</span>
+    </div>
+    <p className="text-xs font-medium text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">
+      {content || <span className="text-slate-500 italic">No definido...</span>}
+    </p>
   </div>
 );
 
@@ -4758,26 +4965,26 @@ const ProfileRow = ({ label, value, theme }) => (
 );
 
 const StatCard = ({ title, value, subtitle, color, percent, showPercentInside, theme, darkMode }) => (
-  <div className={`p-4 md:p-5 rounded-[2rem] border ${theme.border} ${theme.card} flex flex-col justify-between relative overflow-hidden shadow-sm`}>
-    <div className="flex justify-between items-start mb-3 relative z-10">
-      <h4 className={`text-[9px] uppercase tracking-widest font-black ${theme.textMuted} w-2/3 leading-tight`}>{title}</h4>
-      <div className="w-10 h-10 relative flex-shrink-0">
+  <div className={`p-5 rounded-[1.75rem] border ${theme.border} ${theme.card} hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden`}>
+    <div className="flex justify-between items-start gap-2 mb-3 relative z-10">
+      <h4 className={`text-[10px] uppercase tracking-widest font-extrabold ${theme.textMuted} leading-snug`}>{title}</h4>
+      <div className="w-11 h-11 relative flex-shrink-0">
         <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-          <path className={darkMode ? "stroke-slate-700" : "stroke-slate-100"} strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path className={darkMode ? "stroke-slate-700/70" : "stroke-slate-200/80"} strokeWidth="3.8" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
           {percent > 0 && (
-            <path className={`${color}`} strokeWidth="4" fill="none" strokeDasharray={`${percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path className={`${color}`} strokeWidth="3.8" strokeLinecap="round" fill="none" strokeDasharray={`${percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
           )}
         </svg>
         {showPercentInside && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-[9px] font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{percent}%</span>
+            <span className={`text-[9px] font-black ${darkMode ? 'text-slate-100' : 'text-slate-700'}`}>{percent}%</span>
           </div>
         )}
       </div>
     </div>
     <div className="relative z-10">
-      <p className="text-2xl font-black tracking-tighter mb-1 text-blue-950 dark:text-white leading-none">{value}</p>
-      <p className={`text-[8px] font-bold uppercase tracking-widest ${theme.textMuted} truncate mt-1`}>{subtitle}</p>
+      <p className="text-3xl font-extrabold tracking-tight text-blue-950 dark:text-white leading-none">{value}</p>
+      <p className={`text-[10px] font-semibold ${theme.textMuted} truncate mt-1.5`}>{subtitle}</p>
     </div>
   </div>
 );
