@@ -1932,7 +1932,7 @@ const exportarBriefingPDF = async (matches, rivals, gks, showNotification) => {
         ctx.font = `900 17px ${fontStack}`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        ctx.fillText('RACHA', rachaRightX - 10, footMidY);
+        ctx.fillText('RACHA RIVAL', rachaRightX - 10, footMidY);
 
         ctx.restore();
 
@@ -3393,7 +3393,7 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Racha</span>
+          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Racha Rival</span>
           <StreakDisplay streak={match.streak} />
         </div>
       </div>
