@@ -5103,7 +5103,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
         
         {/* 1. TARJETA DE IDENTIDAD DEL PORTERO (DEEP NAVY GLASS) */}
         <div className="xl:col-span-5 rounded-[2rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_20px_45px_rgba(7,11,24,0.35)] p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between">
-          {/* Halos de luz y dorsal de agua */}
           <div className="pointer-events-none absolute -top-20 -right-16 w-56 h-56 rounded-full bg-sky-500/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-20 -left-16 w-56 h-56 rounded-full bg-red-600/10 blur-3xl" />
           <span className="pointer-events-none select-none absolute right-5 top-3 text-8xl font-black italic text-white/[0.04]">
@@ -5151,7 +5150,6 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 <span>Portero{computedAge ? ` · ${computedAge} años` : ''}</span>
               </div>
 
-              {/* Etiquetas limpias sin solapamiento */}
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-3.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-400/30 text-[11px] font-bold text-red-200">
                   {gk.team || 'Atlético de Madrid'}
@@ -5217,8 +5215,8 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
         {/* 2. WIDGET DE PRÓXIMO PARTIDO (VISION OS MATCHDAY GLASS) */}
         <div className="xl:col-span-7 h-full">
           {nextMatch ? (
-            <div className="h-full rounded-[2rem] bg-gradient-to-br from-[#142042] via-[#0e1730] to-[#090e20] text-white border border-blue-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_20px_45px_rgba(7,11,24,0.35)] overflow-hidden flex flex-col justify-between relative">
-              <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-blue-500/15 blur-3xl" />
+            <div className="h-full rounded-[2rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_20px_45px_rgba(7,11,24,0.35)] overflow-hidden flex flex-col justify-between relative">
+              <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-sky-400/15 blur-3xl" />
 
               {/* Cabecera Competición */}
               <div className="bg-white/[0.05] border-b border-white/10 px-5 py-3.5 flex flex-wrap items-center justify-center gap-2 relative z-10">
@@ -5248,11 +5246,11 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                     <MapPin size={13} />
                     <span className="truncate max-w-[230px]">{nextMatch.field || 'Campo por definir'}</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-300 mt-1.5 tracking-wider">{formatDate(nextMatch.date)}</span>
+                  <span className="text-xs font-bold text-slate-200 mt-1.5 tracking-wider">{formatDate(nextMatch.date)}</span>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 sm:px-6">
-                  {/* Escudo Atleti */}
+                  {/* Escudo Atleti con Medallón Perla */}
                   <div className="flex flex-col items-center flex-1">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-[1.5rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3 border border-white/90 ring-4 ring-white/[0.08] shadow-[0_10px_25px_rgba(0,0,0,0.4)] flex items-center justify-center">
                       <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_2px_5px_rgba(15,23,42,0.25)]" />
@@ -5264,7 +5262,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
 
                   {/* Hora / Marcador Cristal */}
                   <div className="flex flex-col items-center px-2">
-                    <div className="px-5 py-3 sm:px-7 sm:py-3.5 rounded-2xl bg-white/12 border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)]">
+                    <div className="px-5 py-3 sm:px-7 sm:py-3.5 rounded-2xl bg-white/[0.12] border border-white/20 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)]">
                       <span className="text-2xl sm:text-3xl font-black text-white tracking-widest">
                         {nextMatch.time || '--:--'}
                       </span>
@@ -5272,7 +5270,7 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                     <span className="text-[9px] font-black uppercase tracking-[0.25em] text-sky-200/80 mt-2">Hora</span>
                   </div>
 
-                  {/* Escudo Rival */}
+                  {/* Escudo Rival con Medallón Perla */}
                   <div className="flex flex-col items-center flex-1">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-[1.5rem] bg-gradient-to-b from-white via-slate-100 to-slate-200/95 p-3 border border-white/90 ring-4 ring-white/[0.08] shadow-[0_10px_25px_rgba(0,0,0,0.4)] flex items-center justify-center">
                       {nextMatchRival?.shieldUrl ? (
@@ -5286,11 +5284,12 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                     </span>
                   </div>
                 </div>
+              </div>
 
               {/* Footer Convocatoria y Racha */}
               <div className="bg-black/25 border-t border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Convocatoria</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Convocatoria</span>
                   <div className="flex -space-x-2.5">
                     {convocadosNext.map(convGk => (
                       <img
@@ -5306,18 +5305,18 @@ function DashboardView({ gk, allGks, matches, rivals, theme, darkMode, onEditTec
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Racha Rival</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Racha Rival</span>
                   <StreakDisplay streak={nextMatch.streak} />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="h-full min-h-[320px] rounded-[2rem] bg-gradient-to-br from-[#142042] via-[#0e1730] to-[#090e20] text-white border border-blue-400/20 shadow-[0_20px_45px_rgba(7,11,24,0.3)] p-8 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-                <CalendarDays size={32} className="text-sky-400/80" />
+            <div className="h-full min-h-[320px] rounded-[2rem] bg-gradient-to-br from-[#1d3168] via-[#15244d] to-[#0e1938] text-white border border-sky-300/25 shadow-[0_20px_45px_rgba(7,11,24,0.3)] p-8 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4">
+                <CalendarDays size={32} className="text-sky-300" />
               </div>
               <p className="text-sm font-black uppercase tracking-widest text-white">Sin partidos inminentes</p>
-              <p className="text-xs text-slate-400 mt-1.5 max-w-xs">Este portero no figura en ninguna convocatoria futura por ahora.</p>
+              <p className="text-xs text-slate-300 mt-1.5 max-w-xs">Este portero no figura en ninguna convocatoria futura por ahora.</p>
             </div>
           )}
         </div>
