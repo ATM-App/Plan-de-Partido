@@ -2440,114 +2440,196 @@ const BottomNavItem = ({ icon, label, active, onClick }) => (
 );
 
 const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layout = 'grid' }) => {
-  const convocados = gks.filter(gk => match.goalkeeperIds?.includes(gk.id));
+  const convocados = (gks || []).filter(gk => match.goalkeeperIds?.includes(gk.id));
   const enlaceRFFM = typeof ENLACES_RFFM !== 'undefined' ? ENLACES_RFFM[match.myTeam] : null;
-  
+
+  const hasScore = match.goalsMyTeam !== undefined && match.goalsMyTeam !== '' && match.goalsRival !== undefined && match.goalsRival !== '';
+  const gAtm = parseInt(match.goalsMyTeam);
+  const gRiv = parseInt(match.goalsRival);
+
+  let outcomeBadge = null;
+  if (hasScore && !isNaN(gAtm) && !isNaN(gRiv)) {
+    if (gAtm > gRiv) outcomeBadge = { text: 'VICTORIA', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' };
+    else if (gAtm === gRiv) outcomeBadge = { text: 'EMPATE', cls: 'bg-sky-500/20 text-sky-300 border-sky-400/30' };
+    else outcomeBadge = { text: 'DERROTA', cls: 'bg-rose-500/20 text-rose-300 border-rose-400/30' };
+  }
+
+  const renderVenueIcon = () => {
+    if (match.locationType === 'Visitante') {
+      return (
+        <svg className="w-3 h-3 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+        </svg>
+      );
+    }
+    if (match.locationType === 'Sede') {
+      return (
+        <svg className="w-3 h-3 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>
+        </svg>
+      );
+    }
+    if (match.locationType === 'Local') {
+      return <Home size={12} className="text-emerald-400 shrink-0" />;
+    }
+    return <MapPin size={12} className="text-emerald-400 shrink-0" />;
+  };
+
   return (
-    <div className={`rounded-[3rem] border ${theme.border} bg-white dark:bg-slate-800 shadow-sm dark:shadow-md overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
-      <div className="absolute inset-0 bg-gradient-to-b from-blue-900/5 dark:from-blue-900/20 to-transparent pointer-events-none" />
+    <div className={`rounded-[1.75rem] bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] text-white border border-blue-400/20 hover:border-sky-400/45 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_14px_34px_rgba(7,11,24,0.35)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_20px_42px_rgba(10,20,52,0.55)] hover:-translate-y-1 transition-all duration-300 overflow-hidden relative flex flex-col group ${layout === 'wide' ? 'md:col-span-2' : ''}`}>
+      {/* Brillo ambiental superior */}
+      <div className="pointer-events-none absolute -top-14 left-1/2 -translate-x-1/2 w-48 h-28 rounded-full bg-sky-500/10 blur-2xl group-hover:bg-sky-500/20 transition-colors duration-500" />
 
-      {/* BARRA DE COMPETICIÓN CON TROFEO RFFM */}
-      <div className="bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700/80 py-3 px-4 relative z-10 flex flex-wrap items-center justify-center gap-2">
-        <span className="text-[10px] md:text-xs font-black uppercase text-blue-950 dark:text-blue-400 tracking-[0.15em] text-center">
-          {match.league || 'Competición por definir'} {match.group && ` • ${match.group}`} {match.matchday && ` • JORNADA ${match.matchday}`}
-        </span>
-        <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-lg font-black uppercase">{match.season || '2026/27'}</span>
-        
-        {enlaceRFFM && enlaceRFFM !== "" && !enlaceRFFM.includes("AQUI_URL") && (
-          <a 
-            href={enlaceRFFM} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="ml-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-500/20 dark:hover:bg-amber-500/40 border border-amber-300 dark:border-amber-500/50 p-1.5 rounded-lg transition-colors shadow-sm cursor-pointer flex items-center justify-center animate-in fade-in"
-            title="Ver clasificación en RFFM"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Trophy size={14} className="text-amber-600 dark:text-amber-400" />
-          </a>
-        )}
-      </div>
-
-      {/* Cabecera con FECHA, LUGAR y RESULTADOS (Cuadrados Rojos) */}
-      <div className="flex justify-between items-start px-6 pt-5 pb-0 relative z-10">
-        <div className="w-12 h-12 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-xl flex items-center justify-center shadow-md shrink-0">
-          <span className="text-xl font-black text-blue-950 dark:text-white">{match.goalsMyTeam !== undefined && match.goalsMyTeam !== '' ? match.goalsMyTeam : '-'}</span>
-        </div>
-        
-        <div className="text-center flex-1 px-2">
-          <div className="flex justify-center items-center gap-1 text-emerald-600 dark:text-emerald-400 mb-1">
-            <MapPin size={16} />
-            <span className="text-xs md:text-sm uppercase font-black tracking-widest truncate max-w-[150px]">{match.field || 'Campo por definir'}</span>
-          </div>
-          <p className="text-slate-800 dark:text-white text-sm font-bold tracking-wide">{formatDate(match.date)}</p>
-        </div>
-        
-        <div className="w-12 h-12 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-xl flex items-center justify-center shadow-md shrink-0">
-          <span className="text-xl font-black text-red-600">{match.goalsRival !== undefined && match.goalsRival !== '' ? match.goalsRival : '-'}</span>
-        </div>
-      </div>
-
-      {/* Escudos y Hora */}
-      <div className="flex items-center justify-between px-6 md:px-12 py-6 relative z-10 border-b border-slate-100 dark:border-slate-700/50">
-        <div className="flex flex-col items-center flex-1">
-          <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-transform group-hover:scale-105" />
-          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase break-words whitespace-normal px-2 w-full max-w-[120px]">{match.myTeam || 'Atleti'}</span>
-        </div>
-
-        <div className="flex flex-col items-center px-4 md:px-8">
-          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-5 py-3 md:px-8 md:py-4 rounded-[2rem] shadow-inner backdrop-blur-md">
-             <span className="text-xl md:text-3xl font-black text-blue-950 dark:text-white tracking-widest">{match.time || '--:--'}</span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-[0.2em]">Hora</span>
-        </div>
-
-        <div className="flex flex-col items-center flex-1">
-          {rival?.shieldUrl ? (
-             <img src={rival.shieldUrl} className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-sm transition-transform group-hover:scale-105" alt="Rival"/>
-          ) : (
-             <Swords className="w-16 h-16 md:w-24 md:h-24 text-slate-300 dark:text-slate-600" />
+      {/* CABECERA COMPACTA: COMPETICIÓN + ACCIONES */}
+      <div className="px-4 py-2.5 bg-white/[0.04] border-b border-white/10 flex items-center justify-between gap-2 relative z-10">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {match.matchday && (
+            <span className="px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 text-[9px] font-black text-sky-300 uppercase shrink-0">
+              J{match.matchday}
+            </span>
           )}
-          <span className="text-blue-950 dark:text-white font-black mt-4 text-[10px] md:text-xs text-center drop-shadow-sm uppercase break-words whitespace-normal px-2 w-full max-w-[120px]">
-             {rival?.name || 'Rival'}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 truncate" title={`${match.league || ''} ${match.group || ''}`}>
+            {match.league || 'Competición'}{match.group ? ` · ${match.group}` : ''}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {enlaceRFFM && enlaceRFFM !== "" && !enlaceRFFM.includes("AQUI_URL") && (
+            <a
+              href={enlaceRFFM}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-6 h-6 rounded-full bg-amber-400/15 hover:bg-amber-400/30 border border-amber-400/35 flex items-center justify-center transition-colors"
+              title="Ver clasificación en RFFM"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Trophy size={11} className="text-amber-300" />
+            </a>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(match); }}
+              className="w-6 h-6 rounded-full bg-white/8 hover:bg-sky-500/30 border border-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+              title="Editar partido"
+            >
+              <Edit2 size={11} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(match.id); }}
+              className="w-6 h-6 rounded-full bg-white/8 hover:bg-red-500/35 border border-white/15 text-slate-300 hover:text-red-200 flex items-center justify-center transition-colors"
+              title="Eliminar partido"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* PÍLDORA DE CAMPO Y FECHA */}
+      <div className="px-4 pt-3.5 pb-1 flex justify-center relative z-10">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.06] border border-white/10 max-w-full">
+          {renderVenueIcon()}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-200 truncate max-w-[155px]" title={match.field}>
+            {match.field || 'Campo por definir'}
+          </span>
+          <span className="text-white/25 text-[10px]">·</span>
+          <span className="text-[10px] font-extrabold text-sky-300 shrink-0 tabular-nums">
+            {formatDate(match.date)}
           </span>
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center relative z-10 mt-auto gap-4 md:gap-0 rounded-b-[3rem]">
-        <div className="flex flex-col items-center md:items-start w-full md:w-auto">
-           <span className="text-[10px] md:text-xs font-black uppercase text-slate-400 mb-2 tracking-widest">Convocatoria</span>
-           {convocados.length > 0 ? (
-             <div className="flex -space-x-3">
-               {convocados.map(gk => (
-                 <img key={gk.id} src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} title={gk.name} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white dark:border-slate-800 object-cover shadow-sm bg-slate-200 dark:bg-slate-700" style={{ objectPosition: 'center 15%' }} alt=""/>
-               ))}
-             </div>
-           ) : (
-             <span className="text-[10px] text-slate-400 font-bold italic">Sin asignar</span>
-           )}
+      {/* ENFRENTAMIENTO CENTRAL (3 COLUMNAS EQUILIBRADAS) */}
+      <div className="px-4 py-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 relative z-10 flex-1">
+        {/* Mi Equipo */}
+        <div className="flex flex-col items-center text-center min-w-0">
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+            <img src={ESCUDO_ATM_URL} alt="Atleti" className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
+          </div>
+          <span className="mt-2 text-[11px] font-black uppercase tracking-tight text-white leading-tight line-clamp-2">
+            {match.myTeam || 'ATLETI'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-4 md:gap-8 justify-center w-full md:w-auto">
-           <div className="flex flex-col items-center md:items-end">
-              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Racha Rival</span>
-              <StreakDisplay streak={match.streak} />
-           </div>
+        {/* Marcador o Hora */}
+        <div className="flex flex-col items-center px-1">
+          {hasScore ? (
+            <>
+              <div className="px-3.5 py-2 rounded-2xl bg-black/35 border border-white/15 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] flex items-center gap-2">
+                <span className="text-xl font-black text-white tabular-nums leading-none">{match.goalsMyTeam}</span>
+                <span className="text-xs font-bold text-slate-500">-</span>
+                <span className="text-xl font-black text-rose-400 tabular-nums leading-none">{match.goalsRival}</span>
+              </div>
+              {outcomeBadge ? (
+                <span className={`mt-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${outcomeBadge.cls}`}>
+                  {outcomeBadge.text}
+                </span>
+              ) : (
+                <span className="mt-1.5 text-[8px] font-bold uppercase tracking-widest text-slate-400">Final</span>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="px-3.5 py-2 rounded-2xl bg-white/[0.08] border border-white/15 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.22)]">
+                <span className="text-lg sm:text-xl font-black text-white tracking-wider tabular-nums leading-none">
+                  {match.time || '--:--'}
+                </span>
+              </div>
+              <span className="mt-1.5 text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">
+                Hora
+              </span>
+            </>
+          )}
+        </div>
 
-           {(onEdit || onDelete) && (
-             <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3 md:pl-4 ml-1 md:ml-2">
-               {onEdit && (
-                 <button onClick={() => onEdit(match)} className="p-2 text-slate-400 hover:text-blue-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl transition-colors">
-                   <Edit2 size={16}/>
-                 </button>
-               )}
-               {onDelete && (
-                 <button onClick={() => onDelete(match.id)} className="p-2 text-slate-400 hover:text-red-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl transition-colors">
-                   <X size={16}/>
-                 </button>
-               )}
-             </div>
-           )}
+        {/* Rival */}
+        <div className="flex flex-col items-center text-center min-w-0">
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center p-2 shadow-inner group-hover:scale-105 transition-transform">
+            {rival?.shieldUrl ? (
+              <img src={rival.shieldUrl} className="w-full h-full object-contain drop-shadow-sm" alt="Rival" />
+            ) : (
+              <Swords className="w-7 h-7 text-slate-400" />
+            )}
+          </div>
+          <span className="mt-2 text-[11px] font-extrabold uppercase tracking-tight text-slate-100 leading-tight line-clamp-2" title={rival?.name}>
+            {rival?.name || 'Rival'}
+          </span>
+        </div>
+      </div>
+
+      {/* FOOTER COMPACTO: CONVOCATORIA + RACHA RIVAL */}
+      <div className="px-4 py-2.5 bg-black/25 border-t border-white/10 flex items-center justify-between gap-2 relative z-10 mt-auto">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Porteros</span>
+          {convocados.length > 0 ? (
+            <div className="flex -space-x-2">
+              {convocados.map(gk => {
+                const isStarter = match.gkStarter?.[gk.id] === true || String(match.gkStarter?.[gk.id]) === 'true';
+                const mins = match.gkMinutes?.[gk.id];
+                return (
+                  <img
+                    key={gk.id}
+                    src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+                    title={`${gk.name}${mins ? ` · ${mins} min` : ''}`}
+                    className={`w-7 h-7 rounded-full object-cover border-2 bg-slate-800 ${isStarter ? 'border-emerald-400' : 'border-[#0f1833]'}`}
+                    style={{ objectPosition: 'center 15%' }}
+                    alt=""
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <span className="text-[10px] text-slate-500 font-semibold italic">Sin asignar</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Racha</span>
+          <StreakDisplay streak={match.streak} />
         </div>
       </div>
     </div>
@@ -2555,12 +2637,12 @@ const MatchScoreboardCard = ({ match, rival, gks, onEdit, onDelete, theme, layou
 };
 
 const StreakDisplay = ({ streak }) => {
-  if (!streak || streak.length === 0) return <span className="text-sm font-black text-slate-300 dark:text-slate-600">---</span>;
+  if (!streak || streak.length === 0) return <span className="text-[10px] font-black text-slate-500">---</span>;
   return (
-    <div className="flex gap-1.5 justify-end mt-1">
+    <div className="flex gap-1 items-center">
       {streak.map((res, i) => (
-        <div key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white shadow-sm ${res === 'V' ? 'bg-emerald-500' : res === 'E' ? 'bg-blue-500' : 'bg-red-500'}`}>
-          <span className="leading-none pt-[1px]">{res}</span>
+        <div key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white shadow-sm ring-1 ring-white/15 ${res === 'V' ? 'bg-emerald-500' : res === 'E' ? 'bg-sky-500' : 'bg-rose-500'}`}>
+          <span className="leading-none">{res}</span>
         </div>
       ))}
     </div>
@@ -3017,7 +3099,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, dark
                {upcomingMatches.map(match => {
                   const r = rivals.find(r => r.id === match.rivalId);
                   return (
-                    <div key={match.id} className="min-w-full lg:min-w-[85%] snap-center shrink-0">
+                    <div key={match.id} className="min-w-[290px] sm:min-w-[340px] lg:min-w-[370px] snap-start shrink-0">
                       <MatchScoreboardCard match={match} rival={r} gks={gks} theme={theme} darkMode={darkMode} onEdit={role !== 'staff' ? onEditMatch : null} onDelete={role !== 'staff' ? onDeleteMatch : null} />
                     </div>
                   )
@@ -3414,94 +3496,155 @@ function ModulePartidos({ matches, rivals, gks, role, onNew, onEdit, onDelete, t
   const [equipoFiltro, setEquipoFiltro] = useState('Todos');
 
   const todayStr = new Date().toISOString().split('T')[0];
-  
-  const upcomingMatches = [...matches]
-    .filter(m => m.date >= todayStr)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-  let pastMatches = [...matches]
-    .filter(m => m.date < todayStr)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Aplicar filtro por equipo solo al historial
-  if (equipoFiltro !== 'Todos') {
-    pastMatches = pastMatches.filter(m => m.myTeam === equipoFiltro);
-  }
-
-  // Orden estricto deseado para los botones
   const ordenDeseado = ["ALEVÍN A", "BENJAMÍN A", "BENJAMÍN B", "PREBENJAMÍN A"];
-
-  // Obtener equipos únicos del historial y ordenarlos
-  const equiposUnicos = Array.from(new Set(matches.filter(m => m.date < todayStr).map(m => m.myTeam).filter(Boolean)));
+  const equiposUnicos = Array.from(new Set(matches.map(m => m.myTeam).filter(Boolean)));
   equiposUnicos.sort((a, b) => {
     const indexA = ordenDeseado.indexOf(a.toUpperCase());
     const indexB = ordenDeseado.indexOf(b.toUpperCase());
-    if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Si no están en la lista, orden alfabético
-    if (indexA === -1) return 1; // Si A no está, va al final
-    if (indexB === -1) return -1; // Si B no está, va al final
-    return indexA - indexB; // Ordena según la posición en ordenDeseado
+    if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
   });
+  const equiposDisponibles = ['Todos', ...equiposUnicos];
 
-  const equiposConHistorial = ['Todos', ...equiposUnicos];
+  const filteredMatches = equipoFiltro === 'Todos'
+    ? matches
+    : matches.filter(m => m.myTeam === equipoFiltro);
 
-  if (isDataLoading) return <div className="grid grid-cols-1 xl:grid-cols-2 gap-8"><SkeletonMatch/><SkeletonMatch/></div>;
+  const upcomingMatches = [...filteredMatches]
+    .filter(m => m.date >= todayStr)
+    .sort((a, b) => new Date(a.date) - new Date(b.date) || (a.time || '').localeCompare(b.time || ''));
+
+  const pastMatches = [...filteredMatches]
+    .filter(m => m.date < todayStr)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (isDataLoading) return <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"><SkeletonMatch/><SkeletonMatch/><SkeletonMatch/></div>;
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona el calendario y las convocatorias de tus porteros.</p>
-        {role !== 'staff' && (
-          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20">
-            <Plus size={16} /> Añadir Partido
-          </button>
-        )}
+    <div className="space-y-8">
+      {/* CABECERA VISION OS */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
+            Calendario de Competición · Gestión de Partidos
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Convocatorias, sedes y resultados · Atlético de Madrid
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+          <span className="px-3.5 py-2 rounded-full bg-sky-500/15 border border-sky-400/25 text-[11px] font-bold text-sky-300">
+            {upcomingMatches.length} Próximos
+          </span>
+          <span className="px-3.5 py-2 rounded-full bg-white/8 border border-white/15 text-[11px] font-bold text-slate-300">
+            {pastMatches.length} Jugados
+          </span>
+
+          {role !== 'staff' && (
+            <button
+              onClick={onNew}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-red-600/25 ml-auto lg:ml-1"
+            >
+              <Plus size={14} /> Añadir Partido
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* SECCIÓN PRÓXIMOS PARTIDOS */}
-      <div>
-        <h3 className="text-xl font-black italic tracking-tighter uppercase text-blue-950 dark:text-white mb-6 flex items-center gap-2"><CalendarDays className="text-red-500"/> Próximos Partidos</h3>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      {/* BARRA DE FILTRO POR CATEGORÍA (PÍLDORAS CRISTAL) */}
+      {equiposDisponibles.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {equiposDisponibles.map(equipo => (
+            <button
+              key={equipo}
+              onClick={() => setEquipoFiltro(equipo)}
+              className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-full transition-all border ${
+                equipoFiltro === equipo
+                  ? 'bg-[#142042] dark:bg-sky-500 text-white border-blue-400/40 shadow-md'
+                  : 'bg-white/80 dark:bg-slate-800/70 backdrop-blur-md border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-blue-950 dark:hover:text-white'
+              }`}
+            >
+              {equipo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* SECCIÓN PRÓXIMOS PARTIDOS (3 COLUMNAS COMPACTAS) */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2.5 px-1">
+          <div className="w-8 h-8 rounded-xl bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400">
+            <CalendarDays size={16} />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-blue-950 dark:text-white">
+            Próximos Partidos
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {upcomingMatches.map(match => {
             const rival = rivals.find(r => r.id === match.rivalId);
-            return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
+            return (
+              <MatchScoreboardCard
+                key={match.id}
+                match={match}
+                rival={rival}
+                gks={gks}
+                onEdit={role !== 'staff' ? onEdit : null}
+                onDelete={role !== 'staff' ? onDelete : null}
+                theme={theme}
+                darkMode={darkMode}
+              />
+            );
           })}
-          
+
           {upcomingMatches.length === 0 && (
-            <div className="col-span-full py-12 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-200 dark:border-slate-700 shadow-sm">
-              <CalendarDays className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No hay próximos partidos</p>
+            <div className={`col-span-full py-12 text-center flex flex-col items-center justify-center rounded-[1.75rem] border ${theme.border} ${theme.card}`}>
+              <CalendarDays className="w-10 h-10 text-slate-400 mb-3 opacity-60" />
+              <p className="text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-xs">
+                No hay próximos partidos programados
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* SECCIÓN HISTORIAL */}
-      {matches.filter(m => m.date < todayStr).length > 0 && (
-        <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <h3 className="text-xl font-black italic tracking-tighter uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2"><RotateCcw className="text-slate-400"/> Historial de Partidos</h3>
-            
-            {/* Botones de filtro por equipo */}
-            <div className="flex flex-wrap gap-2">
-               {equiposConHistorial.map(equipo => (
-                 <button 
-                   key={equipo}
-                   onClick={() => setEquipoFiltro(equipo)}
-                   className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm ${equipoFiltro === equipo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-400'}`}
-                 >
-                   {equipo}
-                 </button>
-               ))}
+      {/* SECCIÓN HISTORIAL DE PARTIDOS (3 COLUMNAS COMPACTAS) */}
+      {matches.some(m => m.date < todayStr) && (
+        <div className="pt-6 border-t border-slate-200/70 dark:border-white/10 space-y-4">
+          <div className="flex items-center gap-2.5 px-1">
+            <div className="w-8 h-8 rounded-xl bg-slate-500/10 dark:bg-white/10 border border-slate-400/20 flex items-center justify-center text-slate-600 dark:text-slate-300">
+              <RotateCcw size={15} />
             </div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
+              Historial de Partidos
+            </h3>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 opacity-90 hover:opacity-100 transition-opacity">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {pastMatches.map(match => {
               const rival = rivals.find(r => r.id === match.rivalId);
-              return <MatchScoreboardCard key={match.id} match={match} rival={rival} gks={gks} onEdit={role !== 'staff' ? onEdit : null} onDelete={role !== 'staff' ? onDelete : null} theme={theme} darkMode={darkMode} />
+              return (
+                <MatchScoreboardCard
+                  key={match.id}
+                  match={match}
+                  rival={rival}
+                  gks={gks}
+                  onEdit={role !== 'staff' ? onEdit : null}
+                  onDelete={role !== 'staff' ? onDelete : null}
+                  theme={theme}
+                  darkMode={darkMode}
+                />
+              );
             })}
             {pastMatches.length === 0 && (
-               <div className="col-span-full py-8 text-center text-slate-400 font-bold text-sm">No hay partidos jugados con este equipo.</div>
+              <div className="col-span-full py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                No hay partidos jugados con este filtro.
+              </div>
             )}
           </div>
         </div>
