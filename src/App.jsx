@@ -2044,6 +2044,7 @@ export default function App() {
           rivals={visibleRivals} 
           theme={theme} 
           setModule={setCurrentModule} 
+          onSelectGk={(id) => { setSelectedGkId(id); setCurrentModule('reporte_detalle'); }}
           darkMode={darkMode} 
           onEditMatch={(m) => { setEditingMatch(m); setIsMatchFormOpen(true); }} 
           onDeleteMatch={(id) => handleDeleteDoc('matches', id)} 
@@ -2056,7 +2057,24 @@ export default function App() {
           showNotification={showNotification} 
         />
       );
-      case 'porteros': return <ModulePorteros gks={visibleGoalkeepers} role={role} onSelect={(id) => { setSelectedGkId(id); setCurrentModule('reporte_detalle'); }} onNew={() => { setEditingGk(null); setIsGkFormOpen(true); }} onEdit={(gk) => { setEditingGk(gk); setIsGkFormOpen(true); }} onDelete={(id) => handleDeleteDoc('goalkeepers', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
+      case 'porteros': return (
+        <ModulePorteros 
+          gks={visibleGoalkeepers} 
+          matches={currentSeasonMatches}
+          activeSeason={activeSeason}
+          viewLockerRoom={viewLockerRoom}
+          setViewLockerRoom={setViewLockerRoom}
+          onOpenLockerPlan={(gk) => setLockerSelectedGk(gk)}
+          role={role} 
+          onSelect={(id) => { setSelectedGkId(id); setCurrentModule('reporte_detalle'); }} 
+          onNew={() => { setEditingGk(null); setIsGkFormOpen(true); }} 
+          onEdit={(gk) => { setEditingGk(gk); setIsGkFormOpen(true); }} 
+          onDelete={(id) => handleDeleteDoc('goalkeepers', id)} 
+          theme={theme} 
+          darkMode={darkMode} 
+          isDataLoading={isDataLoading} 
+        />
+      );
       case 'partidos': return <ModulePartidos matches={currentSeasonMatches} rivals={visibleRivals} gks={visibleGoalkeepers} role={role} onNew={() => { setEditingMatch(null); setIsMatchFormOpen(true); }} onEdit={(match) => { setEditingMatch(match); setIsMatchFormOpen(true); }} onDelete={(id) => handleDeleteDoc('matches', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
       case 'rivales': return <ModuleRivales rivals={visibleRivals} role={role} onNew={() => {setEditingRival(null); setIsRivalFormOpen(true);}} onEdit={(rival) => {setEditingRival(rival); setIsRivalFormOpen(true);}} onDelete={(id) => handleDeleteDoc('rivals', id)} theme={theme} darkMode={darkMode} isDataLoading={isDataLoading} />;
       case 'comparador': return <ModuleComparador gks={visibleGoalkeepers} theme={theme} darkMode={darkMode} />;
@@ -2765,7 +2783,7 @@ function LockerPlanModal({ gk, onClose, theme, darkMode }) {
 // ==========================================
 // MÓDULOS DE LA APLICACIÓN
 // ==========================================
-function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
+function ModuleInicio({ gks, matches, rivals, theme, setModule, onSelectGk, darkMode, onEditMatch, onDeleteMatch, isDataLoading, currentUserData, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role }) {
   
   // PARSEADOR SEGURO PARA ORDENAR POR FECHA Y HORA EXACTAS
   const parseSafeDate = (d, t) => {
@@ -3035,7 +3053,7 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
         </div>
       </div>
 
-      {/* VISTA DEL VESTUARIO VIRTUAL O DE TARJETAS */}
+      {/* VISTA DEL VESTUARIO VIRTUAL O DE TARJETAS SCOUTING */}
       {viewLockerRoom ? (
         <VestuarioVirtual 
           gks={gks} 
@@ -3044,22 +3062,15 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
           theme={theme}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {gks.map(gk => (
-            <div key={gk.id} onClick={() => setModule('porteros')} className={`p-4 rounded-[2rem] border ${theme.border} bg-white dark:bg-slate-800 hover:border-red-500/50 hover:shadow-lg cursor-pointer transition-all group relative overflow-hidden shadow-sm`}>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-transparent text-7xl font-black italic transform -skew-x-6 z-0 pointer-events-none select-none transition-all group-hover:scale-110" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.05)' : '2px rgba(15, 23, 42, 0.05)' }}>
-                {gk.number}
-              </div>
-              <div className="flex items-center gap-4 relative z-10 text-left">
-                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-700 group-hover:border-red-500 transition-colors shrink-0 bg-slate-50 dark:bg-slate-900">
-                  <img src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} className="w-full h-full object-cover" style={{ objectPosition: 'center 15%' }} alt=""/>
-                </div>
-                <div>
-                  <h4 className="font-black text-sm uppercase text-blue-950 dark:text-white tracking-tight drop-shadow-sm">{gk.name}</h4>
-                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-red-600 dark:text-red-500 mt-1.5 ml-0.5">{gk.team}</p>
-                </div>
-              </div>
-            </div>
+            <GkScoutingCard
+              key={gk.id}
+              gk={gk}
+              matches={matches}
+              role={role}
+              onSelect={() => onSelectGk ? onSelectGk(gk.id) : setModule('porteros')}
+            />
           ))}
         </div>
       )}
@@ -3067,76 +3078,331 @@ function ModuleInicio({ gks, matches, rivals, theme, setModule, darkMode, onEdit
   );
 }
 
-function ModulePorteros({ gks, role, onSelect, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
-  if (isDataLoading) return <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6"><SkeletonCard/><SkeletonCard/><SkeletonCard/></div>;
+// ==========================================
+// TARJETA SCOUTING VISION OS CON MINI RADAR
+// ==========================================
+function GkScoutingCard({ gk, matches = [], role, onSelect, onEdit, onDelete }) {
+  // 1. Cálculo automático y exacto desde el calendario de partidos
+  const todayStr = new Date().toISOString().split('T')[0];
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const gkTeamNorm = normalizeStr(gk.team);
+
+  const pastTeamMatches = matches.filter(m => normalizeStr(m.myTeam) === gkTeamNorm && m.date < todayStr);
+  const hasDynamicMatches = pastTeamMatches.length > 0;
+  const pastGkMatches = pastTeamMatches.filter(m => m.goalkeeperIds?.includes(gk.id));
+
+  let dMins = 0, dGoals = 0, dCleanSheets = 0;
+
+  pastGkMatches.forEach(m => {
+    const minsJugados = parseInt(m.gkMinutes?.[gk.id]);
+    if (!isNaN(minsJugados) && minsJugados > 0) {
+      dMins += minsJugados;
+
+      let golesEncajados = 0;
+      if (m.gkGoalsConceded && m.gkGoalsConceded[gk.id] !== undefined && m.gkGoalsConceded[gk.id] !== '') {
+        golesEncajados = parseInt(m.gkGoalsConceded[gk.id]) || 0;
+      } else {
+        const jugaron = (m.goalkeeperIds || []).filter(id => parseInt(m.gkMinutes?.[id]) > 0);
+        if (jugaron.length === 1 && jugaron.includes(gk.id)) {
+          golesEncajados = parseInt(m.goalsRival) || 0;
+        }
+      }
+
+      dGoals += golesEncajados;
+      if (golesEncajados === 0) dCleanSheets += 1;
+    }
+  });
+
+  const stats = {
+    form: Number(gk.form || 5.0).toFixed(1).replace('.', ','),
+    mins: hasDynamicMatches ? dMins : (parseInt(gk.stats?.minutes) || 0),
+    goals: hasDynamicMatches ? dGoals : (parseInt(gk.stats?.goalsConceded) || 0),
+    cleanSheets: hasDynamicMatches ? dCleanSheets : (parseInt(gk.stats?.cleanSheets) || 0)
+  };
+
+  // 2. Edad automática según año de nacimiento
+  const parsedBirth = parseInt(gk.birthYear);
+  const computedAge = (!isNaN(parsedBirth) && parsedBirth > 1950)
+    ? (new Date().getFullYear() - parsedBirth)
+    : (gk.age || null);
+
+  // 3. Geometría SVG del Mini Radar Técnico
+  const skillsList = (Array.isArray(gk.skills) && gk.skills.length >= 3) ? gk.skills : DUMMY_GOALKEEPER.skills;
+  const totalAxes = skillsList.length;
+  const cx = 50, cy = 50, maxR = 38;
+
+  const buildPolygonPoints = (scaleFn) =>
+    skillsList.map((s, i) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / totalAxes;
+      const r = maxR * scaleFn(s, i);
+      return `${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`;
+    }).join(' ');
+
+  const dataVertices = skillsList.map((s, i) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / totalAxes;
+    const norm = Math.max(0.15, Math.min(1, (Number(s.A) || 50) / 100));
+    return {
+      x: (cx + maxR * norm * Math.cos(angle)).toFixed(1),
+      y: (cy + maxR * norm * Math.sin(angle)).toFixed(1)
+    };
+  });
+
+  const natLower = normalizeStr(gk.nationality);
+  const isSpain = !natLower || natLower.includes('espan');
+
+  return (
+    <div
+      onClick={onSelect}
+      className="cursor-pointer rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-br from-[#152246] via-[#0f1833] to-[#0a1024] border border-blue-400/20 hover:border-sky-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_16px_36px_rgba(7,11,24,0.4)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_22px_45px_rgba(10,20,52,0.65)] hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden text-white"
+    >
+      {/* Brillo ambiental interior */}
+      <div className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl group-hover:bg-sky-500/20 transition-colors duration-500" />
+
+      {/* PARTE SUPERIOR: FOTO + DATOS + MINI RADAR */}
+      <div className="flex items-center gap-4 sm:gap-5 relative z-10">
+        {/* Foto cuadrada redondeada con estudio azul */}
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-b from-[#33589e] via-[#223d72] to-[#132347] border border-sky-300/30 shadow-[0_8px_20px_rgba(0,0,0,0.4)] overflow-hidden shrink-0 relative">
+          <img
+            src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`}
+            alt={gk.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            style={{ objectPosition: 'center 15%' }}
+          />
+          {gk.number && (
+            <span className="absolute bottom-0 right-0 bg-[#0a1024]/85 backdrop-blur-md text-[10px] font-black text-sky-300 px-1.5 py-0.5 rounded-tl-lg border-t border-l border-white/15">
+              #{gk.number}
+            </span>
+          )}
+        </div>
+
+        {/* Identidad y Etiquetas */}
+        <div className="flex-1 min-w-0 text-left">
+          <h3 className="text-base sm:text-xl font-extrabold text-white tracking-tight leading-snug line-clamp-2 group-hover:text-sky-200 transition-colors">
+            {gk.name}
+          </h3>
+
+          <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-300/90 font-medium mt-1">
+            {isSpain ? (
+              <svg className="w-4 h-3 rounded-[2px] shrink-0 shadow-sm" viewBox="0 0 16 12">
+                <rect width="16" height="3" y="0" fill="#c60b1e" />
+                <rect width="16" height="6" y="3" fill="#ffc400" />
+                <rect width="16" height="3" y="9" fill="#c60b1e" />
+              </svg>
+            ) : (
+              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-slate-200">
+                {gk.nationality?.substring(0, 3)}
+              </span>
+            )}
+            <span>
+              Portero · {gk.team || 'Academia'}{computedAge ? ` · ${computedAge} años` : ''}
+            </span>
+          </div>
+
+          {/* Píldoras de Equipo, Competición y Edición */}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-slate-200">
+              <img src={ESCUDO_ATM_URL} alt="" className="w-3.5 h-3.5 object-contain" />
+              {gk.team || 'Atleti'}
+            </span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-slate-300 truncate max-w-[140px]">
+              {gk.league || 'RFFM'}
+            </span>
+
+            {onEdit && role !== 'staff' && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEdit(gk); }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 hover:bg-sky-500/30 border border-sky-400/25 text-[10px] font-bold text-sky-300 hover:text-white transition-colors"
+                title="Editar portero"
+              >
+                <Edit2 size={11} /> Editar
+              </button>
+            )}
+            {onDelete && role === 'admin' && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete(gk.id); }}
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/15 hover:bg-red-500/35 border border-red-400/25 text-red-400 hover:text-white transition-colors"
+                title="Borrar portero"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mini Radar SVG con vértices brillantes */}
+        <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center">
+          <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+            {[0.35, 0.68, 1].map((lvl, idx) => (
+              <polygon
+                key={idx}
+                points={buildPolygonPoints(() => lvl)}
+                fill="none"
+                stroke="rgba(148, 163, 184, 0.2)"
+                strokeWidth="1"
+              />
+            ))}
+            {skillsList.map((_, i) => {
+              const angle = -Math.PI / 2 + (2 * Math.PI * i) / totalAxes;
+              return (
+                <line
+                  key={i}
+                  x1={cx}
+                  y1={cy}
+                  x2={(cx + maxR * Math.cos(angle)).toFixed(1)}
+                  y2={(cy + maxR * Math.sin(angle)).toFixed(1)}
+                  stroke="rgba(148, 163, 184, 0.16)"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            <polygon
+              points={buildPolygonPoints((s) => Math.max(0.15, Math.min(1, (Number(s.A) || 50) / 100)))}
+              fill="rgba(56, 189, 248, 0.3)"
+              stroke="#60a5fa"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              className="drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+            />
+            {dataVertices.map((pt, idx) => (
+              <circle
+                key={idx}
+                cx={pt.x}
+                cy={pt.y}
+                r="2.6"
+                fill="#ffffff"
+                stroke="#3b82f6"
+                strokeWidth="1"
+              />
+            ))}
+          </svg>
+        </div>
+      </div>
+
+      {/* LÍNEA DIVISORIA */}
+      <div className="h-px bg-white/10 my-4 relative z-10" />
+
+      {/* PARTE INFERIOR: 4 MÉTRICAS AUTOMÁTICAS CON SEPARADORES VERTICALES */}
+      <div className="grid grid-cols-4 divide-x divide-white/10 text-left relative z-10">
+        <div className="pr-2 sm:pr-4">
+          <span className="block text-lg sm:text-2xl font-extrabold text-sky-400 tracking-tight leading-none">
+            {stats.form}
+          </span>
+          <span className="block text-[10px] sm:text-xs font-medium text-slate-400 mt-1.5 truncate">
+            Forma
+          </span>
+        </div>
+        <div className="px-2 sm:px-4">
+          <span className="block text-lg sm:text-2xl font-extrabold text-white tracking-tight leading-none">
+            {stats.mins}
+          </span>
+          <span className="block text-[10px] sm:text-xs font-medium text-slate-400 mt-1.5 truncate">
+            Minutos
+          </span>
+        </div>
+        <div className="px-2 sm:px-4">
+          <span className="block text-lg sm:text-2xl font-extrabold text-white tracking-tight leading-none">
+            {stats.goals}
+          </span>
+          <span className="block text-[10px] sm:text-xs font-medium text-slate-400 mt-1.5 truncate">
+            Goles Enc.
+          </span>
+        </div>
+        <div className="pl-2 sm:pl-4">
+          <span className="block text-lg sm:text-2xl font-extrabold text-white tracking-tight leading-none">
+            {stats.cleanSheets}
+          </span>
+          <span className="block text-[10px] sm:text-xs font-medium text-slate-400 mt-1.5 truncate">
+            Porterías a 0
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModulePorteros({ gks, matches = [], activeSeason, viewLockerRoom, setViewLockerRoom, onOpenLockerPlan, role, onSelect, onNew, onEdit, onDelete, theme, darkMode, isDataLoading }) {
+  if (isDataLoading) return <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><SkeletonCard/><SkeletonCard/></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <p className={`text-sm font-medium ${theme.textMuted}`}>Gestiona los perfiles y accede a sus estadísticas.</p>
-        {role === 'admin' && (
-          <button onClick={onNew} className="w-full md:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20">
-            <Plus size={16} /> Crear Portero
-          </button>
-        )}
+      {/* Cabecera estilo visionOS */}
+      <div className="rounded-[1.75rem] p-5 sm:p-6 bg-gradient-to-r from-[#142042] via-[#101936] to-[#1a1635] text-white border border-white/15 shadow-[0_15px_35px_rgba(10,16,41,0.25)] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
+            Tus Porteros · Planificación del Plantel
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+            Departamento de Porteros · Atlético de Madrid
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {activeSeason && (
+            <span className="px-3.5 py-2 rounded-full bg-white/8 border border-white/15 text-[11px] font-bold text-slate-200">
+              Temp. {activeSeason}
+            </span>
+          )}
+
+          {typeof setViewLockerRoom === 'function' && (
+            <div className="flex bg-black/25 p-1 rounded-full border border-white/10">
+              <button
+                type="button"
+                onClick={() => setViewLockerRoom(false)}
+                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${!viewLockerRoom ? 'bg-white/15 text-white shadow-sm border border-white/15' : 'text-slate-400 hover:text-white'}`}
+              >
+                📋 Tarjetas
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewLockerRoom(true)}
+                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${viewLockerRoom ? 'bg-white/15 text-white shadow-sm border border-white/15' : 'text-slate-400 hover:text-white'}`}
+              >
+                🚪 Vestuario 3D
+              </button>
+            </div>
+          )}
+
+          {role === 'admin' && (
+            <button
+              onClick={onNew}
+              className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-red-600 border border-white/20 hover:border-red-400 text-white px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-md"
+            >
+              <Plus size={14} /> Añadir Portero
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {gks.map(gk => (
-          <div key={gk.id} className={`rounded-[3rem] border ${theme.border} ${theme.card} overflow-hidden group relative flex flex-col shadow-sm hover:shadow-xl transition-shadow`}>
-            <div onClick={() => onSelect(gk.id)} className="cursor-pointer flex-1 flex flex-col">
-              <div className={`h-48 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'} relative overflow-hidden border-b`}>
-                <img 
-                  src={gk.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${gk.name}`} 
-                  className="absolute inset-0 w-full h-full object-cover z-10 group-hover:scale-105 transition-transform duration-700" 
-                  style={{ 
-                    objectPosition: 'center 15%',
-                    maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', 
-                    WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' 
-                  }} 
-                  alt=""
-                />
-              </div>
-              <div className="pt-4 pb-6 px-4 text-center relative z-20">
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-transparent text-6xl font-black italic transform -skew-x-6 z-0 pointer-events-none select-none transition-all group-hover:scale-110" style={{ WebkitTextStroke: darkMode ? '2px rgba(255, 255, 255, 0.05)' : '2px rgba(15, 23, 42, 0.05)' }}>
-                  {gk.number}
-                </span>
-                <div className="relative z-10">
-                  <h3 className={`text-xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-blue-950'}`}>{gk.name}</h3>
-                  <p className="text-[9px] font-black uppercase tracking-[0.4em] text-red-600 dark:text-red-500 mt-2 ml-1">{gk.team || 'Atlético de Madrid'}</p>
-                </div>
-              </div>
+      {/* Vista Tarjetas Scouting o Vestuario 3D */}
+      {viewLockerRoom && onOpenLockerPlan ? (
+        <VestuarioVirtual
+          gks={gks}
+          matches={matches}
+          onOpenPlan={onOpenLockerPlan}
+          theme={theme}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {gks.map(gk => (
+            <GkScoutingCard
+              key={gk.id}
+              gk={gk}
+              matches={matches}
+              role={role}
+              onSelect={() => onSelect(gk.id)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+          {gks.length === 0 && (
+            <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem]">
+              No hay porteros asignados.
             </div>
-            
-            <div className={`p-4 border-t ${theme.border} flex justify-center gap-3 mt-auto ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
-              {role !== 'staff' ? (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onEdit(gk); }} 
-                  className={`flex flex-1 items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2.5 rounded-xl transition-all ${darkMode ? 'text-blue-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white' : 'text-blue-600 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm'}`}
-                >
-                  <Edit2 size={14}/> Editar
-                </button>
-              ) : (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onSelect(gk.id); }} 
-                  className={`flex flex-1 items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2.5 rounded-xl transition-all ${darkMode ? 'text-blue-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white' : 'text-blue-600 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm'}`}
-                >
-                  <Eye size={14}/> Ver Perfil
-                </button>
-              )}
-              {role === 'admin' && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onDelete(gk.id); }} 
-                  className={`flex flex-1 items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2.5 rounded-xl transition-all ${darkMode ? 'text-red-400 bg-slate-800 border border-slate-700 hover:bg-red-500/20 hover:text-red-300' : 'text-red-600 bg-white border border-slate-200 hover:bg-red-50 shadow-sm'}`}
-                >
-                  <X size={14}/> Borrar
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-        {gks.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem]">No hay porteros asignados.</div>}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
